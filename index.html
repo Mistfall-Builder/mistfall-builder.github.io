@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mistfall Builder</title>
+<style>
+/* ------------------------------------------------------------------ base --
+   Charte relevée sur la page de référence : fond quasi noir légèrement
+   chaud, texte parchemin, un SEUL accent (orange), titres en condensé et
+   angles presque droits (2 à 4 px). Pas de dégradés décoratifs, pas de
+   cartes molles : la densité fait la lisibilité. */
+:root{
+  --fond:#080a0b; --panneau:#0b0f11; --panneau2:#0d1113; --releve:#171c1f;
+  --creux:#06080a;
+  --bord:#202528; --bord-fort:#303538;
+  --texte:#ece7dd; --texte2:#cfcbc3; --doux:#b3b0a8; --terne:#8a877f;
+  --accent:#f07b30; --accent-clair:#f19a61; --accent-sombre:#8a4519;
+  --ok:#7bbf6a; --ko:#e0644f; --avert:#d8a24a;
+  --off:#c9603f; --def:#5a86ad; --mob:#4c9e88; --sup:#c9a253;
+  --condense:'Bahnschrift Condensed','Bahnschrift','Arial Narrow','Aptos Narrow',
+             'Segoe UI',sans-serif;
+  --corps:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);color:var(--texte);
+     font:15px/1.5 var(--corps);-webkit-font-smoothing:antialiased;
+     position:relative;min-height:100vh}
+
+/* L'ILLUSTRATION DU JEU, EN FOND ET PAS EN OBSTACLE.
+   Elle est posée derrière tout (z-index -2), fixée pour ne pas défiler avec
+   le texte, ancrée en haut car le sujet y est, et surtout recouverte d'un
+   voile (z-index -1) qui la ramène au niveau de noir des panneaux. Sans ce
+   voile, un texte de 12 px sur une illustration contrastée devient illisible
+   dès qu'on descend dans la page. */
+body::before{content:'';position:fixed;inset:0;z-index:-2;
+  background:url('fond/bg-05.jpg') center top / cover no-repeat;
+  filter:saturate(.55) brightness(.42)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(180deg,rgba(8,10,11,.62) 0%,rgba(8,10,11,.88) 42%,
+                    rgba(8,10,11,.97) 100%),
+    radial-gradient(120% 80% at 50% 0%,rgba(240,123,48,.07),transparent 62%)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:var(--creux)}
+::-webkit-scrollbar-thumb{background:#262c30}
+::-webkit-scrollbar-thumb:hover{background:#394247}
+::selection{background:var(--accent);color:#0b0f11}
+
+/* ---------------------------------------------------------------- entête -- */
+header{position:sticky;top:0;z-index:30;height:64px;
+  background:rgba(8,10,11,.96);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--bord)}
+.barre{max-width:1460px;height:100%;margin:0 auto;padding:0 22px;
+       display:flex;align-items:center;gap:14px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.logo .sig{width:30px;height:30px;flex:0 0 auto;display:grid;place-items:center;
+  border:1px solid var(--accent-sombre);background:#12100d;border-radius:3px}
+.logo .mot{font:800 17px/1 var(--condense);letter-spacing:.6px;text-transform:uppercase}
+.logo .mot em{color:var(--accent);font-style:normal}
+.logo .sous{display:block;font:400 11px/1.4 var(--corps);color:var(--terne);
+  letter-spacing:.5px;text-transform:none;margin-top:2px}
+.droite{margin-left:auto;display:flex;align-items:center;gap:9px}
+
+/* ------------------------------------------------------------- structure -- */
+main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
+     display:grid;grid-template-columns:330px minmax(0,1fr);gap:18px;
+     align-items:start}
+@media(max-width:1040px){main{grid-template-columns:1fr}}
+.colonne{position:sticky;top:84px}
+@media(max-width:1040px){.colonne{position:static}}
+
+/* Légèrement translucides : l'illustration reste devinable derrière les
+   panneaux, ce qui donne la profondeur, sans jamais passer sous le texte. */
+.carte{background:rgba(11,15,17,.90);backdrop-filter:blur(6px);
+       border:1px solid var(--bord);border-radius:4px;margin-bottom:14px;
+       box-shadow:0 1px 16px rgba(0,0,0,.45)}
+.carte>h2{margin:0;padding:9px 13px;font:800 12px/1 var(--condense);
+  letter-spacing:1.9px;text-transform:uppercase;color:var(--doux);
+  border-bottom:1px solid var(--bord);background:var(--panneau2);
+  border-left:2px solid var(--accent);border-radius:3px 3px 0 0}
+.corps{padding:12px 13px}
+
+label{display:block;color:var(--terne);font:600 11px/1 var(--condense);
+      letter-spacing:1.3px;text-transform:uppercase;margin:12px 0 5px}
+.corps>label:first-child{margin-top:0}
+select,input[type=text]{width:100%;background:var(--creux);color:var(--texte);
+  font:400 14px/1.4 var(--corps);border:1px solid var(--bord-fort);
+  border-radius:3px;padding:7px 9px;transition:border-color .12s}
+select:hover,input[type=text]:hover{border-color:#43494d}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent-sombre)}
+select:disabled{opacity:.4}
+.rangee{display:flex;gap:8px;align-items:center}
+.rangee>*{flex:1}
+
+.coche{display:flex;align-items:center;gap:9px;color:var(--texte2);
+  font:400 13.5px/1.35 var(--corps);margin:11px 0 0;cursor:pointer;
+  text-transform:none;letter-spacing:0}
+.coche input{flex:0 0 auto;width:auto;accent-color:var(--accent);cursor:pointer}
+.coche.mini{margin:6px 0 0;font-size:13px;color:var(--doux)}
+#blocPlancher{margin-top:11px;padding:10px 11px;background:var(--creux);
+  border:1px solid var(--bord);border-radius:3px}
+#blocPlancher>.coche:first-child{margin-top:0;color:var(--accent-clair);
+  font-weight:600}
+#plancherSlots{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;margin-top:7px}
+#plancherGrade{margin-top:8px}
+
+button{background:var(--releve);border:1px solid var(--bord-fort);border-radius:3px;
+  padding:8px 13px;color:var(--texte2);cursor:pointer;
+  font:600 13px/1 var(--corps);transition:.12s;white-space:nowrap}
+button:hover{background:#20272b;border-color:#4a5257;color:var(--texte)}
+button:disabled{background:#0e1214;color:#4d514f;border-color:#1b2023;cursor:default}
+button.primaire{width:100%;background:var(--accent);border-color:var(--accent);
+  color:#160c05;font:800 14px/1 var(--condense);letter-spacing:1.6px;
+  text-transform:uppercase;padding:13px}
+button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-clair);
+  color:#160c05}
+
+/* ------------------------------------------------------------- affixes --- */
+#recherche{margin-bottom:8px}
+/* Les 44 affixes du jeu, tous listés : on ne tape rien, on règle un niveau
+   et, si on veut, les points de vin — exactement comme dans l'outil. */
+.entetes{display:flex;gap:9px;padding:0 8px 4px;color:var(--terne);
+  font:800 10px/1 var(--condense);letter-spacing:1.5px;text-transform:uppercase}
+.entetes span:first-child{flex:1}
+.entetes span:nth-child(2){width:56px;text-align:center}
+.entetes span:nth-child(3){width:64px;text-align:center}
+#listeAffixes{max-height:46vh;overflow-y:auto;border:1px solid var(--bord);
+  border-radius:3px;background:var(--creux)}
+#budgetVin{margin-top:7px;font-size:12px}
+.affixe{display:flex;align-items:center;gap:9px;padding:5px 8px;
+  border-bottom:1px solid #10151800;transition:background .1s}
+.affixe:hover{background:#12181b}
+.affixe.actif{background:#15100c;box-shadow:inset 2px 0 0 var(--accent)}
+.affixe .nom{flex:1;min-width:0;font-size:13.5px;color:var(--texte2)}
+.affixe.actif .nom{color:var(--texte)}
+.affixe .nom small{display:block;color:var(--terne);font-size:11px;line-height:1.3}
+.affixe select{flex:0 0 auto;padding:2px 3px;font-size:12.5px}
+.affixe select.niveau{width:56px}
+.affixe select.vin{width:64px;color:var(--doux)}
+.affixe select.vin:not([value=""]){color:var(--accent-clair)}
+.pastille{flex:0 0 auto;width:18px;height:18px;display:grid;place-items:center}
+.pastille svg{width:15px;height:15px;display:block}
+.c-offense{color:var(--off)}.c-defense{color:var(--def)}
+.c-mobility{color:var(--mob)}.c-support{color:var(--sup)}
+
+/* -------------------------------------------------------------- résultat -- */
+#etat{margin-top:11px;color:var(--terne);font-size:12.5px;line-height:1.55}
+
+/* ----------------------------------------------------------- mes builds -- */
+#listeBuilds{margin-top:9px;max-height:210px;overflow-y:auto}
+#listeBuilds:empty{display:none}
+.vide-liste{color:var(--terne);font-size:12px;font-style:italic;padding:4px 2px}
+.buildLigne{display:flex;gap:6px;align-items:stretch;margin-bottom:5px}
+.buildLigne .ouvrir{flex:1;text-align:left;padding:6px 9px;background:var(--creux);
+  border-color:var(--bord);line-height:1.3}
+.buildLigne .ouvrir b{display:block;font-size:12.5px;color:var(--texte);
+  font-weight:600}
+.buildLigne .ouvrir small{display:block;font-size:10.5px;color:var(--terne);
+  margin-top:1px}
+.buildLigne .ouvrir:hover{border-color:var(--accent-sombre)}
+.buildLigne .suppr{flex:0 0 auto;width:30px;padding:0;font-size:16px;
+  color:var(--terne);background:var(--creux);border-color:var(--bord)}
+.buildLigne .suppr:hover{color:var(--ko);border-color:var(--ko)}
+#noteBuilds:not(:empty){margin-top:8px;font-size:12px}
+
+#code{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;
+  color:var(--accent-clair);background:var(--creux);letter-spacing:.5px;
+  font-size:13px}
+#noteCode:not(:empty){margin-top:8px;color:var(--avert);font-size:12.5px}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{background:var(--panneau2);color:var(--doux);text-align:left;
+   padding:6px 9px;border-bottom:1px solid var(--bord-fort);
+   font:800 11px/1 var(--condense);letter-spacing:1.4px;text-transform:uppercase}
+td{padding:5px 9px;border-bottom:1px solid #141a1d;color:var(--texte2)}
+tr:last-child td{border-bottom:none}
+td.n{text-align:center;font-variant-numeric:tabular-nums}
+.ok{color:var(--ok);font-weight:700}.ko{color:var(--ko);font-weight:700}
+.pas{color:var(--terne)}
+.avert{color:var(--avert);font-size:12.5px}
+.defil{overflow-x:auto}
+
+/* ------------------------------------------------------------ paperdoll -- */
+#paperdoll{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+@media(max-width:1280px){#paperdoll{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){#paperdoll{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.piece{background:var(--creux);border:1px solid var(--bord);border-radius:3px;
+  padding:0 0 8px;min-height:172px;position:relative;overflow:hidden}
+.piece .slot{font:800 10px/1 var(--condense);letter-spacing:1.7px;
+  text-transform:uppercase;color:var(--terne);text-align:center;
+  padding:6px 4px;background:var(--panneau2);
+  border-bottom:1px solid var(--bord);
+  box-shadow:inset 0 2px 0 var(--tinte,transparent)}
+.vignette{width:58px;height:58px;margin:9px auto 7px;display:grid;
+  place-items:center;background:#0a0d0f;border:1px solid var(--tinte,#2a2f33);
+  border-radius:3px;position:relative}
+.vignette::after{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 30%,var(--halo,transparent),transparent 70%)}
+.vignette img{width:48px;height:48px;object-fit:contain;position:relative;z-index:1}
+.vignette .rien{color:#3d4245;font-size:19px}
+.piece .nom{font-size:12.5px;line-height:1.3;text-align:center;font-weight:600;
+  padding:0 7px;margin-bottom:4px}
+.piece .inne{font-size:11.5px;color:var(--ok);text-align:center;padding:0 7px;
+  margin-bottom:6px}
+.piece .inne.sans{color:#4d514f;font-style:italic}
+.socket{display:flex;align-items:center;gap:6px;padding:4px 8px 0;
+  margin:0 0 0;border-top:1px solid #121719;font-size:11px;color:var(--doux)}
+.socket img{width:18px;height:18px;object-fit:contain;flex:0 0 auto}
+.socket .creux{width:18px;height:18px;flex:0 0 auto;border:1px dashed #2e3438;
+  border-radius:50%}
+.socket b{font-weight:600;color:var(--texte2);display:block}
+.socket .mat{color:var(--terne);font-size:10px;letter-spacing:.4px}
+.piece .vide{color:#3d4245;font-style:italic;text-align:center;font-size:12px;
+  padding-top:34px}
+
+footer{border-top:1px solid var(--bord);margin-top:8px;padding:16px 22px;
+  color:var(--terne);font-size:12px;text-align:center}
+footer em{color:var(--doux);font-style:normal}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="barre">
+    <a class="logo" href="#">
+      <span class="sig">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2 21 6.5v6.8C21 18.6 17.1 21.8 12 23 6.9 21.8 3 18.6 3 13.3V6.5L12 2Z"
+                stroke="#f07b30" stroke-width="1.6" fill="rgba(240,123,48,.10)"/>
+          <path d="M12 7.5v9M8.6 10.6 12 7.5l3.4 3.1M8.6 14.4 12 17.5l3.4-3.1"
+                stroke="#f19a61" stroke-width="1.5" stroke-linecap="round"
+                stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="mot">Mistfall<em>Builder</em>
+        <span class="sous">Compose ton stuff, récupère le code d'import</span></span>
+    </a>
+    <div class="droite">
+      <button id="importer">Importer un code</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="colonne">
+    <div class="carte">
+      <h2>Personnage</h2>
+      <div class="corps">
+        <label for="classe">Classe</label>
+        <select id="classe"></select>
+        <label for="arme">Arme</label>
+        <select id="arme"></select>
+        <label for="rarete">Rareté</label>
+        <select id="rarete"></select>
+        <label class="coche"><input type="checkbox" id="vin" checked>
+          Compter le Victory Wine (+2 sur 4 affixes)</label>
+        <label class="coche"><input type="checkbox" id="mixte">
+          Panacher les raretés</label>
+        <div id="blocPlancher" hidden>
+          <label class="coche"><input type="checkbox" id="plancherActif">
+            Monter en priorité :</label>
+          <select id="plancherGrade"></select>
+          <div id="plancherSlots"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Affixes visés</h2>
+      <div class="corps">
+        <input type="text" id="recherche" placeholder="filtrer la liste…">
+        <div class="entetes"><span>Affixe</span><span>Niveau</span><span>Vin</span></div>
+        <div id="listeAffixes"></div>
+        <div id="budgetVin" class="pas"></div>
+        <div class="rangee" style="margin-top:9px">
+          <button id="vider">Tout vider</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="primaire" id="calculer">Calculer le build</button>
+    <div id="etat"></div>
+
+    <div class="carte" style="margin-top:14px">
+      <h2>Mes builds</h2>
+      <div class="corps">
+        <div class="rangee">
+          <input type="text" id="nomBuild" placeholder="nom du build…">
+          <button id="enregistrerBuild" style="flex:0 0 auto">Enregistrer</button>
+        </div>
+        <div id="listeBuilds"></div>
+        <div class="rangee" style="margin-top:9px">
+          <button id="lienBuild">Lien de partage</button>
+          <button id="exporterBuilds">Exporter</button>
+          <button id="importerBuilds">Importer</button>
+        </div>
+        <input type="file" id="fichierBuilds" accept="application/json" hidden>
+        <div id="noteBuilds"></div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="carte">
+      <h2>Code d'import</h2>
+      <div class="corps">
+        <div class="rangee">
+          <input type="text" id="code" readonly
+                 placeholder="Calcule un build pour obtenir son code.">
+          <button id="copier" style="flex:0 0 auto" disabled>Copier</button>
+        </div>
+        <div id="noteCode"></div>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Affixes obtenus</h2>
+      <div class="corps defil" id="tableauAffixes">
+        <span class="pas">Choisis des affixes, puis « Calculer le build ».</span>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Équipement</h2>
+      <div class="corps">
+        <div id="paperdoll"></div>
+        <div id="bilan" class="avert" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Le code produit ici se colle dans <em>Prepare → Manage/Import</em>.
+  Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.
+</footer>
+
+<script src="donnees.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

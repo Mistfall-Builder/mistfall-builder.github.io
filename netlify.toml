@@ -1,0 +1,22 @@
+# Site entièrement statique : rien à construire, on publie le dossier tel quel.
+[build]
+  publish = "."
+  command = ""
+
+# Les icônes et les données ne changent qu'à une régénération : on les laisse
+# en cache longtemps, mais jamais la page elle-même, sinon une correction
+# resterait invisible chez qui a déjà visité.
+[[headers]]
+  for = "/icones/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/fond/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
