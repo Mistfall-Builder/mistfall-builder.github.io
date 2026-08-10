@@ -59,6 +59,53 @@ déplacer :
   L'import fusionne au lieu d'écraser.
 - **Le code d'import du jeu** — pour rejouer le stuff en jeu directement.
 
+## Comptes (facultatif)
+
+Sans configuration, le bloc « Compte » n'apparaît pas et le site reste
+100 % local. Pour activer la synchronisation entre appareils :
+
+**1. Créer le projet.** Sur [supabase.com](https://supabase.com), nouveau
+projet (gratuit). Note la région la plus proche.
+
+**2. Créer la table.** Dans *SQL Editor*, exécute :
+
+```sql
+create table public.builds (
+  id      uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade
+          default auth.uid(),
+  nom     text not null,
+  etat    jsonb not null,
+  code    text default '',
+  maj     timestamptz not null default now(),
+  unique (user_id, nom)
+);
+
+alter table public.builds enable row level security;
+
+-- Chacun ne voit et ne modifie QUE ses propres builds. Sans cette
+-- politique, la table serait lisible par n'importe qui avec la clé anon.
+create policy "chacun ses builds" on public.builds
+  for all
+  using      (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+**3. Brancher le site.** Dans *Project Settings → API*, copie le
+**Project URL** et la clé **anon public** dans `config.js`.
+
+La clé `anon` est faite pour être publique : elle ne donne accès à rien
+toute seule, c'est la politique RLS ci-dessus qui décide. N'y mets **jamais**
+la clé `service_role`, elle contourne toutes les protections.
+
+**4. L'adresse du site.** Dans *Authentication → URL Configuration*, ajoute
+l'adresse GitHub Pages en *Site URL* et en *Redirect URL*, sinon les liens de
+confirmation par e-mail renverront vers `localhost`.
+
+Par défaut Supabase exige une confirmation par e-mail à l'inscription. Pour
+s'en passer : *Authentication → Providers → Email* → décocher *Confirm
+email*.
+
 ## Régénérer les données
 
 Depuis la racine du projet :

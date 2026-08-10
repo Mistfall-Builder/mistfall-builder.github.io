@@ -84,11 +84,14 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 label{display:block;color:var(--terne);font:600 11px/1 var(--condense);
       letter-spacing:1.3px;text-transform:uppercase;margin:12px 0 5px}
 .corps>label:first-child{margin-top:0}
-select,input[type=text]{width:100%;background:var(--creux);color:var(--texte);
+select,input[type=text],input[type=email],input[type=password]{
+  width:100%;background:var(--creux);color:var(--texte);
   font:400 14px/1.4 var(--corps);border:1px solid var(--bord-fort);
   border-radius:3px;padding:7px 9px;transition:border-color .12s}
-select:hover,input[type=text]:hover{border-color:#43494d}
-select:focus,input[type=text]:focus{outline:none;border-color:var(--accent);
+select:hover,input[type=text]:hover,input[type=email]:hover,
+input[type=password]:hover{border-color:#43494d}
+select:focus,input[type=text]:focus,input[type=email]:focus,
+input[type=password]:focus{outline:none;border-color:var(--accent);
   box-shadow:0 0 0 1px var(--accent-sombre)}
 select:disabled{opacity:.4}
 .rangee{display:flex;gap:8px;align-items:center}
@@ -164,6 +167,13 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
   color:var(--terne);background:var(--creux);border-color:var(--bord)}
 .buildLigne .suppr:hover{color:var(--ko);border-color:var(--ko)}
 #noteBuilds:not(:empty){margin-top:8px;font-size:12px}
+.separateur{margin:14px 0 9px;color:var(--terne);
+  font:800 10px/1 var(--condense);letter-spacing:1.7px;text-transform:uppercase;
+  display:flex;align-items:center;gap:9px}
+.separateur::after{content:'';flex:1;height:1px;background:var(--bord)}
+#blocCompte .qui{font-size:12.5px;color:var(--doux)}
+#blocCompte .qui b{color:var(--accent-clair);font-weight:600}
+#noteCompte:not(:empty){margin-top:8px;font-size:12px}
 
 #code{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;
   color:var(--accent-clair);background:var(--creux);letter-spacing:.5px;
@@ -298,6 +308,28 @@ footer em{color:var(--doux);font-style:normal}
         </div>
         <input type="file" id="fichierBuilds" accept="application/json" hidden>
         <div id="noteBuilds"></div>
+
+        <div id="blocCompte" hidden>
+          <div class="separateur">Compte</div>
+          <div id="compteDeconnecte">
+            <input type="email" id="compteEmail_in" placeholder="adresse e-mail"
+                   autocomplete="email">
+            <input type="password" id="compteMdp" placeholder="mot de passe"
+                   autocomplete="current-password" style="margin-top:6px">
+            <div class="rangee" style="margin-top:7px">
+              <button id="compteConnexion">Se connecter</button>
+              <button id="compteInscription">Créer un compte</button>
+            </div>
+          </div>
+          <div id="compteConnecte" hidden>
+            <div class="qui">Connecté : <b id="compteEmail"></b></div>
+            <div class="rangee" style="margin-top:7px">
+              <button id="compteSync">Synchroniser</button>
+              <button id="compteDeconnexion">Se déconnecter</button>
+            </div>
+          </div>
+          <div id="noteCompte"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -337,6 +369,8 @@ footer em{color:var(--doux);font-style:normal}
   Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.
 </footer>
 
+<script src="config.js"></script>
+<script src="comptes.js"></script>
 <script src="donnees.js"></script>
 <script src="app.js"></script>
 </body>

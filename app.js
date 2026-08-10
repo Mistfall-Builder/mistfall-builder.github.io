@@ -785,6 +785,51 @@ function ecrireBiblio(liste) {
   }
 }
 
+/* ------------------------------------------------------------- comptes ----
+   La bibliothèque locale reste la référence : elle marche hors ligne et sans
+   compte. Le compte n'ajoute qu'UNE chose, la synchronisation entre
+   appareils. Se déconnecter ne doit donc rien effacer. */
+function comptesDispo() {
+  return window.Comptes && window.Comptes.actif();
+}
+
+function majBandeauCompte() {
+  const bloc = $('blocCompte');
+  if (!bloc) return;
+  if (!comptesDispo()) { bloc.hidden = true; return; }
+  bloc.hidden = false;
+  const email = window.Comptes.courriel();
+  $('compteDeconnecte').hidden = !!email;
+  $('compteConnecte').hidden = !email;
+  if (email) $('compteEmail').textContent = email;
+}
+
+async function synchroniser(silencieux) {
+  if (!comptesDispo() || !window.Comptes.connecte()) return;
+  const dire = (html) => { if (!silencieux) $('noteBuilds').innerHTML = html; };
+  try {
+    dire('<span class="pas">Synchronisation…</span>');
+    const distants = await window.Comptes.listerBuilds();
+    const locaux = biblio();
+    // FUSION, jamais remplacement : on ne perd ni ce qui est sur le serveur
+    // ni ce qui vient d'être créé hors ligne.
+    const par = new Map(locaux.map((b) => [b.nom, b]));
+    let recus = 0;
+    for (const d of distants || []) {
+      if (!par.has(d.nom)) recus += 1;
+      par.set(d.nom, { nom: d.nom, etat: d.etat, code: d.code || '' });
+    }
+    const fusion = [...par.values()];
+    ecrireBiblio(fusion);
+    dessinerBuilds();
+    await window.Comptes.envoyerBuilds(fusion);
+    dire(`<span class="pas">Synchronisé : ${fusion.length} build(s), `
+         + `${recus} récupéré(s) du compte.</span>`);
+  } catch (e) {
+    dire(`<span class="ko">Synchronisation impossible : ${e.message}</span>`);
+  }
+}
+
 function dessinerBuilds() {
   const liste = biblio();
   const boite = $('listeBuilds');
@@ -808,8 +853,13 @@ function dessinerBuilds() {
     };
     ligne.querySelector('.suppr').onclick = () => {
       const l = biblio();
-      l.splice(i, 1);
-      if (ecrireBiblio(l)) dessinerBuilds();
+      const [parti] = l.splice(i, 1);
+      if (!ecrireBiblio(l)) return;
+      dessinerBuilds();
+      if (comptesDispo() && window.Comptes.connecte() && parti) {
+        // Sinon la prochaine synchro le ferait réapparaître.
+        window.Comptes.supprimerBuild(parti.nom).catch(() => {});
+      }
     };
     boite.appendChild(ligne);
   });
@@ -836,6 +886,12 @@ function enregistrerBuild() {
   dessinerBuilds();
   $('noteBuilds').innerHTML =
     `<span class="pas">« ${nom} » ${deja >= 0 ? 'remplacé' : 'enregistré'}.</span>`;
+  if (comptesDispo() && window.Comptes.connecte()) {
+    window.Comptes.envoyerBuilds([entree]).catch((e) => {
+      $('noteBuilds').innerHTML =
+        `<span class="ko">Enregistré ici, mais pas sur le compte : ${e.message}</span>`;
+    });
+  }
 }
 
 /* Le lien partageable. Tout l'état tient dans l'adresse : rien à héberger,
@@ -989,6 +1045,49 @@ function demarrer(donnees) {
 
   // ------------------------------------------------------- mes builds
   dessinerBuilds();
+  majBandeauCompte();
+  if (comptesDispo() && window.Comptes.connecte()) synchroniser(true);
+
+  const agirCompte = async (quoi) => {
+    const email = ($('compteEmail_in').value || '').trim();
+    const mdp = $('compteMdp').value || '';
+    const note = $('noteCompte');
+    if (!email || !mdp) {
+      note.innerHTML = '<span class="ko">Adresse et mot de passe requis.</span>';
+      return;
+    }
+    note.innerHTML = '<span class="pas">…</span>';
+    try {
+      if (quoi === 'inscription') {
+        const r = await window.Comptes.inscrire(email, mdp);
+        if (!r.connecte) { note.innerHTML = `<span class="pas">${r.message}</span>`; }
+      } else {
+        await window.Comptes.connecter(email, mdp);
+      }
+      $('compteMdp').value = '';
+      majBandeauCompte();
+      if (window.Comptes.connecte()) {
+        note.innerHTML = '';
+        await synchroniser(false);
+      }
+    } catch (e) {
+      note.innerHTML = `<span class="ko">${e.message}</span>`;
+    }
+  };
+  if ($('compteConnexion')) {
+    $('compteConnexion').onclick = () => agirCompte('connexion');
+    $('compteInscription').onclick = () => agirCompte('inscription');
+    $('compteMdp').onkeydown = (ev) => { if (ev.key === 'Enter') agirCompte('connexion'); };
+    $('compteDeconnexion').onclick = async () => {
+      await window.Comptes.deconnecter();
+      majBandeauCompte();
+      // Les builds locaux RESTENT : se déconnecter n'est pas effacer.
+      $('noteBuilds').innerHTML =
+        '<span class="pas">Déconnecté. Tes builds restent sur cet appareil.</span>';
+    };
+    $('compteSync').onclick = () => synchroniser(false);
+  }
+
   $('enregistrerBuild').onclick = enregistrerBuild;
   $('nomBuild').onkeydown = (ev) => { if (ev.key === 'Enter') enregistrerBuild(); };
   $('lienBuild').onclick = () => {
