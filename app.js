@@ -462,11 +462,19 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
    D.vin.max × D.vin.bonus au total. Une consigne qui déborde est rognée —
    un build calculé sur un vin impossible serait faux. */
 function repartitionVin(cibleListe, manuel) {
-  if (!manuel || !manuel.size) {
+  // Le vin posé sur un affixe qu'on ne vise plus ne compte pas. Sans ce
+  // filtre, retirer une cible laissait son allocation derrière elle : on
+  // dépassait les 4 affixes sans comprendre pourquoi, et le rognage
+  // sacrifiait une cible réelle au profit d'une cible fantôme.
+  const vises = new Set(cibleListe.map(([n]) => n));
+  const utile = manuel
+    ? [...manuel.entries()].filter(([n]) => vises.has(n))
+    : [];
+  if (!utile.length) {
     return new Map([...choisirVin(cibleListe)].map((n) => [n, D.vin.bonus]));
   }
   const budgetTotal = D.vin.max * D.vin.bonus;
-  const voulus = [...manuel.entries()]
+  const voulus = utile
     .map(([n, p]) => [n, Math.max(0, Math.min(p, D.vin.bonus))])
     .filter(([, p]) => p > 0)
     .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
@@ -564,6 +572,23 @@ function infobulle(it) {
   return bouts.filter(Boolean).join('\n');
 }
 
+/* Le vin ne se règle que sur un affixe qu'on VISE. Griser la case le dit à
+   l'écran plutôt que de laisser croire à un réglage qui ne compte pas. */
+function majEtatVin(ligne) {
+  const nom = ligne.dataset.affixe;
+  const vin = ligne.querySelector('.vin');
+  if (!vin) return;
+  const vise = cibles.has(nom);
+  vin.disabled = !vise;
+  // On remet la case sur « auto » : la laisser afficher « +2 » alors que
+  // l'affixe n'est plus visé donnerait un réglage qui ne compte pas.
+  if (!vise) vin.value = '';
+  vin.title = vise
+    ? `Points de Victory Wine sur cet affixe (au plus ${D.vin.max} affixes, `
+      + `${D.vin.bonus} points chacun).`
+    : "Choisis d'abord un niveau visé pour cet affixe.";
+}
+
 /* Dit en clair où en est le budget de vin, faute de quoi une consigne rognée
    en silence passerait pour un bug. */
 function majBudgetVin() {
@@ -590,6 +615,7 @@ function dessinerAffixes() {
     if (filtre && !nom.toLowerCase().includes(filtre)) continue;
     const info = D.affixes[nom];
     const ligne = document.createElement('div');
+    ligne.dataset.affixe = nom;
     ligne.className = 'affixe' + (cibles.has(nom) ? ' actif' : '');
     const sansGemme = !info.mat.length;
     ligne.innerHTML = pastille(info.cat) + `<span class="nom">${nom}
@@ -604,8 +630,16 @@ function dessinerAffixes() {
       Array.from({ length: info.cap }, (_, i) => `<option>${i + 1}</option>`).join('');
     sel.value = cibles.has(nom) ? String(cibles.get(nom)) : '';
     sel.onchange = () => {
-      if (sel.value) cibles.set(nom, Number(sel.value)); else cibles.delete(nom);
+      if (sel.value) {
+        cibles.set(nom, Number(sel.value));
+      } else {
+        // On retire aussi le vin : le garder sur un affixe abandonné faisait
+        // sauter le plafond de 4 sans que rien ne l'explique à l'écran.
+        cibles.delete(nom);
+        vinManuel.delete(nom);
+      }
       ligne.classList.toggle('actif', cibles.has(nom));
+      majEtatVin(ligne);
       majBudgetVin();
     };
     ligne.appendChild(sel);
@@ -627,6 +661,7 @@ function dessinerAffixes() {
       majBudgetVin();
     };
     ligne.appendChild(vin);
+    majEtatVin(ligne);
     conteneur.appendChild(ligne);
   }
 }
@@ -817,7 +852,8 @@ async function synchroniser(silencieux) {
     let recus = 0;
     for (const d of distants || []) {
       if (!par.has(d.nom)) recus += 1;
-      par.set(d.nom, { nom: d.nom, etat: d.etat, code: d.code || '' });
+      par.set(d.nom, { nom: d.nom, etat: d.etat, code: d.code || '',
+                       pub: !!d.public });
     }
     const fusion = [...par.values()];
     ecrireBiblio(fusion);
@@ -828,6 +864,50 @@ async function synchroniser(silencieux) {
   } catch (e) {
     dire(`<span class="ko">Synchronisation impossible : ${e.message}</span>`);
   }
+}
+
+/* ------------------------------------------------------ builds partagés --
+   Une liste d'auteurs, et pour chacun ses builds marqués publics. On ne
+   montre QUE le pseudo : l'adresse e-mail ne sort jamais de la base. */
+let _partages = null;
+
+async function chargerPartages(silencieux) {
+  if (!comptesDispo()) return;
+  const note = $('notePartage');
+  try {
+    if (!silencieux) note.innerHTML = '<span class="pas">Chargement…</span>';
+    _partages = await window.Comptes.partages();
+    const sel = $('partageAuteur');
+    const avant = sel.value;
+    sel.innerHTML = '<option value="">— choisis un joueur —</option>'
+      + _partages.map((p) =>
+          `<option value="${p.pseudo}">${p.pseudo} (${p.builds.length})</option>`).join('');
+    if (avant && _partages.some((p) => p.pseudo === avant)) sel.value = avant;
+    dessinerBuildsPartages();
+    note.innerHTML = _partages.length
+      ? `<span class="pas">${_partages.length} joueur(s) partagent des builds.</span>`
+      : '<span class="pas">Personne n\'a encore publié de build.</span>';
+  } catch (e) {
+    note.innerHTML = `<span class="ko">Impossible de charger : ${e.message}</span>`;
+  }
+}
+
+function dessinerBuildsPartages() {
+  const sel = $('partageBuild');
+  const auteur = $('partageAuteur').value;
+  const p = (_partages || []).find((x) => x.pseudo === auteur);
+  sel.innerHTML = p
+    ? p.builds.map((b, i) => `<option value="${i}">${b.nom}</option>`).join('')
+    : '<option value="">—</option>';
+  sel.disabled = !p;
+  $('partageCharger').disabled = !p;
+  $('partageCopier').disabled = !p;
+}
+
+function buildPartageChoisi() {
+  const p = (_partages || []).find((x) => x.pseudo === $('partageAuteur').value);
+  if (!p) return null;
+  return p.builds[Number($('partageBuild').value) || 0] || null;
 }
 
 function dessinerBuilds() {
@@ -843,9 +923,32 @@ function dessinerBuilds() {
     ligne.className = 'buildLigne';
     const cl = (D.classes[String(b.etat.c)] || '?');
     const ra = b.etat.g ? (D.raretes[String(b.etat.g)] || '') : 'auto';
+    // La case « public » n'a de sens qu'avec un compte : sans lui, il n'y a
+    // nulle part où publier. On la montre grisée plutôt que de la cacher,
+    // pour que la possibilité soit visible.
+    const avecCompte = comptesDispo() && window.Comptes.connecte();
     ligne.innerHTML = `<button class="ouvrir" title="Charger ce build">
         <b>${b.nom}</b><small>${cl} · ${ra} · ${(b.etat.t || []).length} affixe(s)</small>
-      </button><button class="suppr" title="Supprimer">×</button>`;
+      </button>
+      <label class="pub" title="${avecCompte
+        ? 'Rendre ce build visible par les autres'
+        : 'Connecte-toi pour publier un build'}">
+        <input type="checkbox" ${b.pub ? 'checked' : ''}
+               ${avecCompte ? '' : 'disabled'}><span>pub</span></label>
+      <button class="suppr" title="Supprimer">×</button>`;
+    const casePub = ligne.querySelector('.pub input');
+    casePub.onchange = () => {
+      const l = biblio();
+      l[i] = { ...l[i], pub: casePub.checked };
+      if (!ecrireBiblio(l)) { casePub.checked = !casePub.checked; return; }
+      window.Comptes.envoyerBuilds([l[i]]).then(() => {
+        $('noteBuilds').innerHTML = casePub.checked
+          ? `<span class="pas">« ${b.nom} » est maintenant public.</span>`
+          : `<span class="pas">« ${b.nom} » n'est plus public.</span>`;
+      }).catch((e) => {
+        $('noteBuilds').innerHTML = `<span class="ko">${e.message}</span>`;
+      });
+    };
     ligne.querySelector('.ouvrir').onclick = () => {
       appliquerEtat(b.etat);
       $('noteBuilds').innerHTML = `<span class="pas">« ${b.nom} » chargé.</span>`;
@@ -878,8 +981,11 @@ function enregistrerBuild() {
     return;
   }
   const liste = biblio();
-  const entree = { nom, etat: etatActuel(), code: $('code').value || '' };
   const deja = liste.findIndex((b) => b.nom === nom);
+  const entree = { nom, etat: etatActuel(), code: $('code').value || '',
+                   // Réenregistrer un build ne doit pas le dépublier en
+                   // douce : on garde son état de partage.
+                   pub: deja >= 0 ? !!liste[deja].pub : false };
   if (deja >= 0) liste[deja] = entree; else liste.push(entree);
   if (!ecrireBiblio(liste)) return;
   champ.value = '';
@@ -1065,6 +1171,57 @@ function demarrer(donnees) {
   // quelque chose se passer : là, on parle.
   if (comptesDispo() && window.Comptes.connecte()) {
     synchroniser(!(retourAuth && retourAuth.connecte));
+    window.Comptes.monProfil().then((p) => {
+      if (p) $('pseudo').value = p;
+    }).catch(() => {});
+  }
+
+  // ---------------------------------------------------- builds partagés
+  if (comptesDispo()) {
+    $('blocPartage').hidden = false;
+    chargerPartages(true);
+    $('partageAuteur').onchange = dessinerBuildsPartages;
+    $('partageRafraichir').onclick = () => chargerPartages(false);
+    $('partageCharger').onclick = () => {
+      const b = buildPartageChoisi();
+      if (!b) return;
+      appliquerEtat(b.etat);
+      $('notePartage').innerHTML =
+        `<span class="pas">« ${b.nom} » chargé — il n'est pas ajouté à tes builds.</span>`;
+      calculer();
+    };
+    $('partageCopier').onclick = () => {
+      const b = buildPartageChoisi();
+      if (!b) return;
+      const liste = biblio();
+      const nom = liste.some((x) => x.nom === b.nom)
+        ? `${b.nom} (copie)` : b.nom;
+      liste.push({ nom, etat: b.etat, code: b.code || '', pub: false });
+      if (!ecrireBiblio(liste)) return;
+      dessinerBuilds();
+      $('notePartage').innerHTML =
+        `<span class="pas">« ${nom} » ajouté à tes builds (privé).</span>`;
+      if (window.Comptes.connecte()) {
+        window.Comptes.envoyerBuilds([liste[liste.length - 1]]).catch(() => {});
+      }
+    };
+    $('enregistrerPseudo').onclick = async () => {
+      const p = ($('pseudo').value || '').trim();
+      const note = $('notePseudo');
+      if (p.length < 2 || p.length > 24) {
+        note.innerHTML = '<span class="ko">Entre 2 et 24 caractères.</span>';
+        return;
+      }
+      try {
+        await window.Comptes.definirPseudo(p);
+        note.innerHTML = '<span class="ok">Pseudo enregistré.</span>';
+        chargerPartages(true);
+      } catch (e) {
+        note.innerHTML = /duplicate|unique/i.test(e.message)
+          ? '<span class="ko">Ce pseudo est déjà pris.</span>'
+          : `<span class="ko">${e.message}</span>`;
+      }
+    };
   }
 
   const agirCompte = async (quoi) => {

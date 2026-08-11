@@ -158,7 +158,49 @@
   // ------------------------------------------------------------ builds ----
   async function listerBuilds() {
     return avecReprise(() => appeler(
-      '/rest/v1/builds?select=nom,etat,code,maj&order=maj.desc', {}, true));
+      '/rest/v1/builds?select=nom,etat,code,public,maj&order=maj.desc', {}, true));
+  }
+
+  // ------------------------------------------------------- partage --------
+  /* Le pseudo est la SEULE chose qu'on expose : l'adresse e-mail ne sort
+     jamais de auth.users. Sans pseudo, on n'apparaît nulle part. */
+  async function monProfil() {
+    const s = connecte();
+    if (!s) return null;
+    const r = await avecReprise(() => appeler(
+      `/rest/v1/profiles?select=pseudo&user_id=eq.${s.user.id}`, {}, true));
+    return (r && r[0]) ? r[0].pseudo : null;
+  }
+
+  async function definirPseudo(pseudo) {
+    const s = connecte();
+    return avecReprise(() => appeler('/rest/v1/profiles?on_conflict=user_id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: s.user.id, pseudo }),
+    }, true));
+  }
+
+  /* Les builds partagés par tout le monde, groupés par auteur. Deux
+     requêtes plutôt qu'une jointure : la RLS n'ouvre que les lignes
+     publiques, et on recolle les pseudos ici. */
+  async function partages() {
+    const [profils, builds] = await Promise.all([
+      appeler('/rest/v1/profiles?select=user_id,pseudo'),
+      appeler('/rest/v1/builds?select=nom,etat,code,user_id&public=is.true'
+              + '&order=maj.desc'),
+    ]);
+    const nomDe = new Map((profils || []).map((p) => [p.user_id, p.pseudo]));
+    const par = new Map();
+    for (const b of builds || []) {
+      const pseudo = nomDe.get(b.user_id);
+      if (!pseudo) continue;   // un build public sans pseudo n'est signable
+      if (!par.has(pseudo)) par.set(pseudo, []);
+      par.get(pseudo).push({ nom: b.nom, etat: b.etat, code: b.code || '' });
+    }
+    return [...par.entries()]
+      .map(([pseudo, liste]) => ({ pseudo, builds: liste }))
+      .sort((a, b) => a.pseudo.localeCompare(b.pseudo));
   }
 
   async function envoyerBuilds(liste) {
@@ -166,6 +208,7 @@
     const s = connecte();
     const lignes = liste.map((b) => ({
       user_id: s.user.id, nom: b.nom, etat: b.etat, code: b.code || '',
+      public: !!b.pub,
     }));
     return avecReprise(() => appeler(
       '/rest/v1/builds?on_conflict=user_id,nom', {
@@ -235,5 +278,6 @@
   window.Comptes = {
     actif, connecte, courriel, inscrire, connecter, deconnecter,
     listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
+    monProfil, definirPseudo, partages,
   };
 }());

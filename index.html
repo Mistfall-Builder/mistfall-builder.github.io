@@ -167,6 +167,17 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
   color:var(--terne);background:var(--creux);border-color:var(--bord)}
 .buildLigne .suppr:hover{color:var(--ko);border-color:var(--ko)}
 #noteBuilds:not(:empty){margin-top:8px;font-size:12px}
+.buildLigne .pub{flex:0 0 auto;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;width:34px;
+  background:var(--creux);border:1px solid var(--bord);border-radius:3px;
+  cursor:pointer}
+.buildLigne .pub span{font:700 8.5px/1 var(--condense);letter-spacing:.9px;
+  text-transform:uppercase;color:var(--terne)}
+.buildLigne .pub input{accent-color:var(--accent);cursor:pointer;margin:0}
+.buildLigne .pub:has(input:checked){border-color:var(--accent-sombre)}
+.buildLigne .pub:has(input:checked) span{color:var(--accent-clair)}
+.buildLigne .pub:has(input:disabled){opacity:.4;cursor:default}
+#notePartage:not(:empty),#notePseudo:not(:empty){margin-top:8px;font-size:12px}
 .separateur{margin:14px 0 9px;color:var(--terne);
   font:800 10px/1 var(--condense);letter-spacing:1.7px;text-transform:uppercase;
   display:flex;align-items:center;gap:9px}
@@ -229,6 +240,8 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 footer{border-top:1px solid var(--bord);margin-top:8px;padding:16px 22px;
   color:var(--terne);font-size:12px;text-align:center}
 footer em{color:var(--doux);font-style:normal}
+footer .don a{color:var(--accent);text-decoration:none}
+footer .don a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -328,6 +341,13 @@ footer em{color:var(--doux);font-style:normal}
               <button id="compteSync">Synchroniser</button>
               <button id="compteDeconnexion">Se déconnecter</button>
             </div>
+            <label for="pseudo">Pseudo public</label>
+            <div class="rangee">
+              <input type="text" id="pseudo" placeholder="visible par les autres"
+                     maxlength="24">
+              <button id="enregistrerPseudo" style="flex:0 0 auto">OK</button>
+            </div>
+            <div id="notePseudo"></div>
           </div>
           <div id="noteCompte"></div>
         </div>
@@ -355,6 +375,22 @@ footer em{color:var(--doux);font-style:normal}
       </div>
     </div>
 
+    <div class="carte" id="blocPartage" hidden>
+      <h2>Builds partagés</h2>
+      <div class="corps">
+        <div class="rangee">
+          <select id="partageAuteur"></select>
+          <select id="partageBuild" disabled></select>
+        </div>
+        <div class="rangee" style="margin-top:8px">
+          <button id="partageCharger" disabled>Charger</button>
+          <button id="partageCopier" disabled>Copier chez moi</button>
+          <button id="partageRafraichir">Rafraîchir</button>
+        </div>
+        <div id="notePartage"></div>
+      </div>
+    </div>
+
     <div class="carte">
       <h2>Équipement</h2>
       <div class="corps">
@@ -368,6 +404,9 @@ footer em{color:var(--doux);font-style:normal}
 <footer>
   Le code produit ici se colle dans <em>Prepare → Manage/Import</em>.
   Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.
+  <span class="don">·
+    <a href="https://paypal.me/zackgh96" target="_blank" rel="noopener noreferrer">
+      Offrir un café</a></span>
 </footer>
 
 <!-- Le ?v= n'est pas décoratif : sans lui, GitHub Pages sert l'ancien
@@ -375,9 +414,9 @@ footer em{color:var(--doux);font-style:normal}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="config.js?v=3"></script>
-<script src="comptes.js?v=3"></script>
-<script src="donnees.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="config.js?v=5"></script>
+<script src="comptes.js?v=5"></script>
+<script src="donnees.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
