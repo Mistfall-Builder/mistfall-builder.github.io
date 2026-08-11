@@ -369,9 +369,14 @@ footer em{color:var(--doux);font-style:normal}
   Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.
 </footer>
 
-<script src="config.js"></script>
-<script src="comptes.js"></script>
-<script src="donnees.js"></script>
-<script src="app.js"></script>
+<!-- Le ?v= n'est pas décoratif : sans lui, GitHub Pages sert l'ancien
+     script depuis le cache du navigateur pendant plusieurs minutes après
+     une mise en ligne, et on se retrouve avec une page neuve pilotée par
+     du vieux code — le pire des deux mondes. À incrémenter à chaque
+     modification de ces fichiers. -->
+<script src="config.js?v=2"></script>
+<script src="comptes.js?v=2"></script>
+<script src="donnees.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
