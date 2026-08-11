@@ -14,18 +14,23 @@ Le dossier est prêt tel quel, il n'y a rien à compiler.
 
 ### GitHub Pages
 
-1. Crée un dépôt **vide** sur GitHub (sans README, sans .gitignore).
-2. Dans ce dossier :
+Le site est publié depuis
+[`mistfall-builder/mistfall-builder.github.io`](https://github.com/mistfall-builder/mistfall-builder.github.io)
+et sert à l'adresse **https://mistfall-builder.github.io/**.
 
-   ```
-   git remote add origin https://github.com/TON-COMPTE/TON-DEPOT.git
-   git push -u origin main
-   ```
+Pour republier après une modification, depuis ce dossier :
 
-3. Dépôt → *Settings* → *Pages* → *Source: Deploy from a branch*, branche
-   `main`, dossier `/ (root)`.
+```
+git add -A
+git commit -m "ce qui a changé"
+git push
+```
 
-L'adresse sera `https://TON-COMPTE.github.io/TON-DEPOT/`.
+Pour repartir de zéro ailleurs : crée un dépôt **vide** nommé
+`<organisation>.github.io` (le nom compte — c'est lui qui donne une adresse
+à la racine plutôt qu'un sous-chemin), puis `git remote add origin …` et
+`git push -u origin main`. Enfin, dépôt → *Settings* → *Pages* →
+*Deploy from a branch*, branche `main`, dossier `/ (root)`.
 
 ### Netlify ou Cloudflare Pages
 
