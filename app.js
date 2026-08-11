@@ -1048,13 +1048,77 @@ function calculer() {
       for (const it of Object.values(res.slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
       const detail = Object.entries(raretes).sort()
         .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
-      $('etat').innerHTML = `${res.suffisant ? '<span class="ok">Toutes les cibles sont atteintes.</span>'
-        : '<span class="ko">Certaines cibles ne sont pas atteintes à cette rareté.</span>'}
-        <br>${detail} — calculé en ${Math.round(performance.now() - t0)} ms.`;
+      const chrono = `${detail} — calculé en ${Math.round(performance.now() - t0)} ms.`;
+      if (res.suffisant) {
+        $('etat').innerHTML =
+          `<span class="ok">Toutes les cibles sont atteintes.</span><br>${chrono}`;
+        return;
+      }
+      // ÉCHEC : ne pas s'arrêter à « pas atteignable ». Une rareté figée
+      // n'escalade JAMAIS, par construction — c'est le piège quand on passe
+      // d'un build tout-violet à un build qui a besoin de deux pièces
+      // dorées. On cherche donc ce qui marcherait, et on le propose.
+      $('etat').innerHTML =
+        `<span class="ko">Certaines cibles ne sont pas atteintes.</span><br>${chrono}`
+        + '<br><span class="pas">Recherche d\'un réglage qui passe…</span>';
+      const issue = chercherUneIssue(classe, arme, grade, mixte, planchers);
+      $('etat').innerHTML =
+        `<span class="ko">Certaines cibles ne sont pas atteintes.</span><br>${chrono}`
+        + (issue ? `<br>${issue}` : '<br><span class="pas">Aucun réglage ne les '
+           + 'atteint toutes, même en Légendaire panaché : les cibles sont hors '
+           + 'de portée du jeu, pas du réglage.</span>');
     } catch (err) {
       $('etat').innerHTML = `<span class="ko">Erreur : ${err.message}</span>`;
     }
   }, 10);
+}
+
+/* Quel réglage atteindrait les cibles ? On essaie, dans l'ordre du moins
+   cher au plus cher, et on rend un bouton qui l'applique. Un message qui dit
+   seulement « non » est un cul-de-sac ; celui-ci dit « oui, comme ça ». */
+function chercherUneIssue(classe, arme, grade, mixte, planchers) {
+  const liste = [...cibles.entries()];
+  const vin = $('vin').checked;
+  const essais = [];
+  if (!mixte) {
+    essais.push({ cle: 'panache', texte: 'en panachant les raretés',
+                  grade, mixte: true });
+  }
+  if (grade !== null) {
+    essais.push({ cle: 'auto', texte: 'en rareté « Auto »',
+                  grade: null, mixte });
+    if (!mixte) {
+      essais.push({ cle: 'auto-panache', texte: 'en « Auto » + panaché',
+                    grade: null, mixte: true });
+    }
+  }
+  for (const e of essais) {
+    let r;
+    try {
+      r = construire(classe, arme, liste, e.grade, vin, e.mixte,
+                     e.mixte ? planchers : {}, vinManuel);
+    } catch (err) { continue; }
+    if (!r.suffisant) continue;
+    const raretes = {};
+    for (const it of Object.values(r.slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
+    const detail = Object.entries(raretes).sort()
+      .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
+    setTimeout(() => {
+      const b = $('appliquerIssue');
+      if (!b) return;
+      b.onclick = () => {
+        if (e.grade === null) $('rarete').value = '';
+        else $('rarete').value = String(e.grade);
+        $('mixte').checked = e.mixte;
+        $('blocPlancher').hidden = !e.mixte;
+        calculer();
+      };
+    }, 0);
+    return `<span class="ok">Ça passe ${e.texte}</span> (${detail}). `
+      + '<button id="appliquerIssue" style="padding:3px 9px;font-size:12px">'
+      + 'Appliquer</button>';
+  }
+  return null;
 }
 
 function importer() {
@@ -1121,9 +1185,13 @@ function demarrer(donnees) {
 
   remplirSelect($('classe'), Object.entries(D.classes).map(([id, n]) => [id, n]), '11');
   majArmes();
+  // PAR DÉFAUT « Auto », et non Epic. Une rareté figée n'escalade jamais :
+  // avec Epic imposé d'entrée, tout build ayant besoin d'une pièce dorée
+  // échouait en annonçant « pas atteignable », ce qui ressemble à une panne
+  // alors que c'est une consigne de l'utilisateur qu'il n'a jamais donnée.
   remplirSelect($('rarete'),
     [['', 'Auto — la plus basse qui suffit']].concat(
-      [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '5');
+      [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
   // Une case par emplacement : plusieurs pièces peuvent monter ensemble.
   const boite = $('plancherSlots');
   for (const s of D.ordreSlots) {
