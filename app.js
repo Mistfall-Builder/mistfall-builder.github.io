@@ -1045,8 +1045,27 @@ function demarrer(donnees) {
 
   // ------------------------------------------------------- mes builds
   dessinerBuilds();
+
+  // Le retour du lien de confirmation reçu par e-mail, AVANT tout le reste :
+  // c'est lui qui décide si l'on arrive connecté ou non.
+  let retourAuth = null;
+  if (comptesDispo()) {
+    try { retourAuth = window.Comptes.lireFragmentAuth(); } catch (e) { retourAuth = null; }
+  }
   majBandeauCompte();
-  if (comptesDispo() && window.Comptes.connecte()) synchroniser(true);
+  if (retourAuth && retourAuth.erreur) {
+    $('noteCompte').innerHTML = `<span class="ko">${retourAuth.erreur}</span>`;
+  } else if (retourAuth && retourAuth.connecte) {
+    $('noteCompte').innerHTML = retourAuth.type === 'signup'
+      ? '<span class="ok">Adresse confirmée, te voilà connecté.</span>'
+      : '<span class="ok">Connecté.</span>';
+  }
+  // Au démarrage ordinaire la synchro est muette (personne n'a rien demandé),
+  // mais juste après un lien de confirmation l'utilisateur ATTEND de voir
+  // quelque chose se passer : là, on parle.
+  if (comptesDispo() && window.Comptes.connecte()) {
+    synchroniser(!(retourAuth && retourAuth.connecte));
+  }
 
   const agirCompte = async (quoi) => {
     const email = ($('compteEmail_in').value || '').trim();

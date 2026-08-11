@@ -181,8 +181,59 @@
       { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true));
   }
 
+  /* LE RETOUR DU LIEN DE CONFIRMATION.
+   *
+   * Après avoir validé une adresse, Supabase renvoie vers le site avec les
+   * jetons dans le FRAGMENT (#access_token=…&refresh_token=…), ou avec
+   * #error=… si le lien a expiré. Sans ce traitement, l'utilisateur qui
+   * clique dans son e-mail atterrit sur le site... toujours déconnecté, et
+   * sans la moindre explication. */
+  function lireFragmentAuth() {
+    const brut = (location.hash || '').replace(/^#/, '');
+    if (!brut || brut.startsWith('b=')) return null;
+    const p = new URLSearchParams(brut);
+    const nettoyer = () => history.replaceState(
+      null, '', location.pathname + location.search);
+
+    if (p.get('error') || p.get('error_description')) {
+      nettoyer();
+      const brutMsg = (p.get('error_description') || p.get('error') || '')
+        .replace(/\+/g, ' ');
+      return { erreur: /expired|invalid/i.test(brutMsg)
+        ? "Le lien de confirmation a expiré ou a déjà servi. "
+          + "Refais une demande de connexion."
+        : lisible(brutMsg) };
+    }
+
+    const acces = p.get('access_token');
+    if (!acces) return null;
+    poserSession({
+      access_token: acces,
+      refresh_token: p.get('refresh_token') || '',
+      expires_in: Number(p.get('expires_in') || 3600),
+      token_type: p.get('token_type') || 'bearer',
+      // L'identifiant tient dans le jeton lui-même : le lire ici évite un
+      // aller-retour réseau juste pour savoir qui vient d'arriver.
+      user: lireJeton(acces),
+    });
+    nettoyer();
+    return { connecte: true, type: p.get('type') || '' };
+  }
+
+  /* Le corps d'un JWT, décodé sans rien vérifier — la vérification, c'est le
+     serveur qui la fait à chaque appel. On n'y lit que l'id et l'e-mail. */
+  function lireJeton(jeton) {
+    try {
+      const corps = jeton.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const o = JSON.parse(decodeURIComponent(escape(atob(corps))));
+      return { id: o.sub, email: o.email };
+    } catch (e) {
+      return null;
+    }
+  }
+
   window.Comptes = {
     actif, connecte, courriel, inscrire, connecter, deconnecter,
-    listerBuilds, envoyerBuilds, supprimerBuild,
+    listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
   };
 }());
