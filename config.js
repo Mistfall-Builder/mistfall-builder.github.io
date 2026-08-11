@@ -15,5 +15,5 @@
  */
 window.MISTFALL_CONFIG = {
   supabaseUrl: 'https://grnndksniashncksyzvv.supabase.co',
-  supabaseAnonKey: '',
+  supabaseAnonKey: 'sb_publishable_o-6QtPqCK624RcH96KsFxA_qHHdbgRx',
 };
