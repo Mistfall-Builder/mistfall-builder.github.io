@@ -1,0 +1,6 @@
+# Rattache ce dossier au projet Supabase. C'est ce que lit l'intégration
+# GitHub activée dans Settings → Integrations : à chaque push sur `main`,
+# elle applique les migrations de supabase/migrations/ à la base de
+# production. La table des builds se crée donc toute seule, sans avoir à
+# coller du SQL à la main dans l'éditeur.
+project_id = "grnndksniashncksyzvv"

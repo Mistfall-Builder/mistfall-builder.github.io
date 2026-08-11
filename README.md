@@ -67,7 +67,13 @@ Sans configuration, le bloc « Compte » n'apparaît pas et le site reste
 **1. Créer le projet.** Sur [supabase.com](https://supabase.com), nouveau
 projet (gratuit). Note la région la plus proche.
 
-**2. Créer la table.** Dans *SQL Editor*, exécute :
+**2. Créer la table.** Si l'intégration GitHub de Supabase est activée
+(*Settings → Integrations*, dépôt connecté, *Deploy to production* actif),
+il n'y a **rien à faire** : `supabase/migrations/` est appliqué tout seul au
+prochain push sur `main`.
+
+Sinon, dans *SQL Editor*, exécute le même contenu — c'est le fichier
+[`supabase/migrations/20260811000000_builds.sql`](supabase/migrations/20260811000000_builds.sql) :
 
 ```sql
 create table public.builds (
@@ -92,11 +98,16 @@ create policy "chacun ses builds" on public.builds
 ```
 
 **3. Brancher le site.** Dans *Project Settings → API*, copie le
-**Project URL** et la clé **anon public** dans `config.js`.
+**Project URL** et la clé **Publishable** (`sb_publishable_…`) dans
+`config.js`.
 
-La clé `anon` est faite pour être publique : elle ne donne accès à rien
-toute seule, c'est la politique RLS ci-dessus qui décide. N'y mets **jamais**
-la clé `service_role`, elle contourne toutes les protections.
+Cette clé est faite pour être publique : elle ne donne accès à rien toute
+seule, c'est la politique RLS ci-dessus qui décide. N'y mets **jamais** la
+clé **Secret** (`sb_secret_…`) — elle contourne toutes les protections, et
+`config.js` est lisible par n'importe qui une fois le site en ligne. Si une
+clé secrète a été exposée ne serait-ce qu'une fois (capture d'écran, copie
+dans un message), il faut la révoquer : *API Keys → Secret keys → ⋮ →
+Revoke*.
 
 **4. L'adresse du site.** Dans *Authentication → URL Configuration*, ajoute
 l'adresse GitHub Pages en *Site URL* et en *Redirect URL*, sinon les liens de

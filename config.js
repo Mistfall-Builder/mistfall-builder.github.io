@@ -4,17 +4,16 @@
  * avant : les builds restent dans le navigateur, et le bloc « Compte »
  * n'apparaît même pas. Rien ne dépend d'internet.
  *
- * Pour activer les comptes, crée un projet sur https://supabase.com
- * (gratuit), puis recopie ici :
- *   Project Settings → API → Project URL
- *   Project Settings → API → Project API keys → « anon public »
+ * Les deux valeurs viennent de Project Settings → API :
+ *   supabaseUrl  = Project URL
+ *   supabaseAnonKey = clé « Publishable » (sb_publishable_…)
  *
- * La clé « anon » est FAITE pour être publique : elle ne donne accès à rien
- * toute seule, c'est la politique RLS de la base (voir README) qui décide
- * qui lit quoi. N'y mets JAMAIS la clé « service_role », elle contourne
- * toutes les protections.
+ * Cette clé est FAITE pour être publique — c'est la politique RLS de la
+ * table (voir README) qui décide qui lit quoi, pas elle. N'y mets JAMAIS
+ * la clé « Secret » (sb_secret_…) : elle contourne toutes les protections,
+ * et tout le monde peut lire ce fichier une fois le site en ligne.
  */
 window.MISTFALL_CONFIG = {
-  supabaseUrl: '',
+  supabaseUrl: 'https://grnndksniashncksyzvv.supabase.co',
   supabaseAnonKey: '',
 };
