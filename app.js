@@ -435,21 +435,40 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
     (r.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
 
   let res = null;
+  // On retient le dernier palier INSUFFISANT : c'est le meilleur point de
+  // départ pour le panaché (voir plus bas).
+  let justeEnDessous = null;
   const grades = grade ? [grade] : [1, 2, 3, 4, 5, 6];
-  for (const g of grades) { res = essai(g, false, null); if (suffit(res)) break; }
+  for (const g of grades) {
+    res = essai(g, false, null);
+    if (suffit(res)) break;
+    justeEnDessous = res;
+  }
 
   if (mixte) {
-    // Le panaché repart du meilleur build à rareté unique, et on ne le garde
-    // que s'il fait mieux. À couverture égale on prend la rareté LA PLUS
-    // BASSE : sans ce terme, le panaché habille tout en Légendaire, puisque
-    // les emplacements en trop ne changent plus le score une fois les cibles
-    // atteintes. C'est le critère de l'outil de bureau, mot pour mot.
+    // DEUX POINTS DE DÉPART, PAS UN.
+    //
+    // Partir du seul build suffisant (souvent tout doré) ne laisse au
+    // panaché qu'une chose à faire : redescendre. Or descendre d'un cran
+    // fait perdre une cible, donc la recherche locale refuse et ne bouge
+    // plus. Le second départ est le dernier palier insuffisant : de là, on
+    // ne monte que les pièces qui manquent vraiment.
+    // Mesuré sur un build réel : départ unique -> 8 Légendaires ; avec les
+    // deux -> 2 Épiques et 6 Légendaires.
+    //
+    // À couverture égale on garde la rareté LA PLUS BASSE : sans ce terme,
+    // le panaché rhabille tout en Légendaire puisque les emplacements en
+    // trop ne changent plus le score une fois les cibles atteintes.
     const raretes = (r) => Object.values(r.slotItems)
       .reduce((s, it) => s + (it ? it.g : 0), 0);
-    const pan = essai(grade || 1, true, { ...res.slotItems });
-    const np = [couvertureEffective(pan.couvert, want, null), -raretes(pan)];
-    const nr = [couvertureEffective(res.couvert, want, null), -raretes(res)];
-    if (np[0] > nr[0] || (np[0] === nr[0] && np[1] > nr[1])) res = pan;
+    const departs = [{ ...res.slotItems }];
+    if (justeEnDessous) departs.push({ ...justeEnDessous.slotItems });
+    for (const dep of departs) {
+      const pan = essai(grade || 1, true, dep);
+      const np = [couvertureEffective(pan.couvert, want, null), -raretes(pan)];
+      const nr = [couvertureEffective(res.couvert, want, null), -raretes(res)];
+      if (np[0] > nr[0] || (np[0] === nr[0] && np[1] > nr[1])) res = pan;
+    }
   }
   res.vin = vinNoms;
   res.vinPoints = vinPoints;
@@ -763,6 +782,9 @@ const CLE_BIBLIO = 'mistfall.builds.v1';
 
 function etatActuel() {
   return {
+    // Le code du stuff affiché : c'est lui qui permet de rendre le build
+    // tel quel plus tard, au lieu de le recomposer.
+    k: $('code').value || '',
     c: Number($('classe').value),
     a: $('arme').value || null,
     g: $('rarete').value ? Number($('rarete').value) : null,
@@ -910,6 +932,29 @@ function buildPartageChoisi() {
   return p.builds[Number($('partageBuild').value) || 0] || null;
 }
 
+/* Rendre un build enregistré À L'IDENTIQUE.
+ *
+ * Un build garde son code d'import : c'est la seule chose qui décrit les
+ * pièces réellement choisies. Sans ça, rouvrir un build ne faisait que
+ * relancer l'optimiseur sur la liste d'affixes, et un panaché 6 Épique +
+ * 2 Légendaire ressortait tout doré — « du jaune partout ». On ne recalcule
+ * que si aucun code n'a été gardé. */
+function restituer(b) {
+  if (b && b.code) {
+    try {
+      afficherCode(b.code);
+      return;
+    } catch (e) {
+      // Code devenu illisible (données du jeu changées) : on retombe sur le
+      // calcul plutôt que de ne rien afficher, mais on le DIT.
+      $('noteBuilds').innerHTML =
+        `<span class="avert">Code du build illisible (${e.message}), `
+        + 'le stuff est recomposé à partir des affixes.</span>';
+    }
+  }
+  calculer();
+}
+
 function dessinerBuilds() {
   const liste = biblio();
   const boite = $('listeBuilds');
@@ -952,7 +997,7 @@ function dessinerBuilds() {
     ligne.querySelector('.ouvrir').onclick = () => {
       appliquerEtat(b.etat);
       $('noteBuilds').innerHTML = `<span class="pas">« ${b.nom} » chargé.</span>`;
-      calculer();
+      restituer(b);
     };
     ligne.querySelector('.suppr').onclick = () => {
       const l = biblio();
@@ -982,7 +1027,8 @@ function enregistrerBuild() {
   }
   const liste = biblio();
   const deja = liste.findIndex((b) => b.nom === nom);
-  const entree = { nom, etat: etatActuel(), code: $('code').value || '',
+  const etat = etatActuel();
+  const entree = { nom, etat, code: etat.k || '',
                    // Réenregistrer un build ne doit pas le dépublier en
                    // douce : on garde son état de partage.
                    pub: deja >= 0 ? !!liste[deja].pub : false };
@@ -1012,13 +1058,17 @@ function depuisLien(frag) {
   return JSON.parse(decodeURIComponent(escape(atob(b64))));
 }
 
+let _etatPartage = null;
+
 function lirePermalien() {
   const frag = (location.hash || '').replace(/^#b=/, '');
   if (!frag || frag === location.hash) return false;
   try {
-    appliquerEtat(depuisLien(frag));
+    const e = depuisLien(frag);
+    appliquerEtat(e);
+    _etatPartage = e;
     return true;
-  } catch (e) {
+  } catch (err) {
     return false;
   }
 }
@@ -1125,6 +1175,21 @@ function importer() {
   const code = prompt("Colle un code « Import Stuff » du jeu :");
   if (!code) return;
   try {
+    afficherCode(code.trim());
+  } catch (err) {
+    $('etat').innerHTML = `<span class="ko">Code illisible : ${err.message}</span>`;
+  }
+}
+
+/* AFFICHER UN BUILD TEL QUEL, depuis son code.
+ *
+ * C'est la différence entre « voici ce que tu avais » et « voici ce que je
+ * recomposerais avec les mêmes objectifs ». Un build enregistré doit rendre
+ * le PREMIER : sinon un panaché 6 Épique + 2 Légendaire réenregistré puis
+ * rouvert ressortait tout en Légendaire, parce que seule la liste d'affixes
+ * avait été gardée et que l'optimiseur repartait de zéro. */
+function afficherCode(code) {
+  {
     const lu = decoderCode(code.trim());
     const parId = new Map();
     for (const pool of Object.values(D.objets)) for (const it of pool) parId.set(it.id, it);
@@ -1158,13 +1223,20 @@ function importer() {
       }
     }
     dessinerAffixes();
+    majBudgetVin();
     dernier = { slotItems, sockets, couvert, vin: new Set(), suffisant: true, sources: [] };
     afficher(dernier, lu.classe);
-    $('etat').innerHTML = hors
-      ? `<span class="avert">Build importé — ${hors} pièce(s) inconnue(s) du catalogue n'ont pas été chargées.</span>`
-      : '<span class="ok">Build importé.</span>';
-  } catch (err) {
-    $('etat').innerHTML = `<span class="ko">Code illisible : ${err.message}</span>`;
+    const raretes = {};
+    for (const it of Object.values(slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
+    const detail = Object.entries(raretes).sort()
+      .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
+    const tete = hors
+      ? `<span class="avert">${hors} pièce(s) inconnue(s) du catalogue `
+        + 'n\'ont pas été chargées.</span>'
+      : '<span class="ok">Build chargé tel quel.</span>';
+    $('etat').innerHTML = `${tete}<br>${detail} — <span class="pas">`
+      + '« Calculer » recomposerait le stuff à partir des affixes visés.</span>';
+    return { hors, raretes };
   }
 }
 
@@ -1256,7 +1328,7 @@ function demarrer(donnees) {
       appliquerEtat(b.etat);
       $('notePartage').innerHTML =
         `<span class="pas">« ${b.nom} » chargé — il n'est pas ajouté à tes builds.</span>`;
-      calculer();
+      restituer(b);
     };
     $('partageCopier').onclick = () => {
       const b = buildPartageChoisi();
@@ -1421,9 +1493,9 @@ function demarrer(donnees) {
     dire(ok);
   };
 
-  // Un lien partagé ouvre directement sur son build, déjà calculé.
+  // Un lien partagé ouvre directement sur son build, rendu tel quel.
   if (lirePermalien()) {
-    calculer();
+    restituer({ code: (_etatPartage && _etatPartage.k) || '' });
     return;
   }
   $('etat').textContent = 'Prêt.';
