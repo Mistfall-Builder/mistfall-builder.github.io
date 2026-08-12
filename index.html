@@ -593,8 +593,21 @@ select:focus,input[type=text]:focus,input[type=email]:focus,
 input[type=password]:focus{outline:none;border-color:var(--accent);
   box-shadow:0 0 0 1px var(--accent-sombre)}
 select:disabled{opacity:.4}
-.rangee{display:flex;gap:8px;align-items:center}
-.rangee>*{flex:1}
+/* UNE RANGEE PASSE A LA LIGNE PLUTOT QUE DE DEBORDER. Un element flex a
+   par defaut `min-width:auto`, donc il refuse de retrecir sous la largeur
+   de son mot le plus long : quatre boutons dans une colonne etroite se
+   poussaient hors de la carte au lieu de s'y ranger. `min-width:0` leve ce
+   plancher, `flex-wrap` donne la ligne suivante quand meme ca ne suffit
+   plus. */
+.rangee{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rangee>*{flex:1;min-width:0}
+/* Les puces de tri gardent leur largeur naturelle : `.rangee>*` l'emporte
+   sur `.chipsPref`, et sans cette ligne elles s'etiraient en volant sa
+   place au champ de recherche. */
+.rangee>.chipsPref{flex:0 0 auto}
+/* Les rangees de boutons d'action gardent une largeur lisible : sous
+   ~120 px un libelle se coupe en deux lignes, autant passer a la ligne. */
+.rangeeBoutons>*{flex:1 1 120px}
 
 .coche{display:flex;align-items:center;gap:9px;color:var(--texte2);
   font:400 13.5px/1.35 var(--corps);margin:11px 0 0;cursor:pointer;
@@ -912,7 +925,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         </div>
         <div id="listeBuilds"></div>
         <div id="compteBuilds" class="pas" style="font-size:11px"></div>
-        <div class="rangee" style="margin-top:9px">
+        <div class="rangee rangeeBoutons" style="margin-top:9px">
           <button id="comparer" data-i18n="cmp.bouton">Comparer</button>
           <button id="lienBuild" data-i18n="builds.lien">Lien de partage</button>
           <button id="exporterBuilds" data-i18n="builds.exporter">Exporter</button>
@@ -928,14 +941,14 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
                    autocomplete="email">
             <input type="password" id="compteMdp" data-i18n-ph="compte.mdp" placeholder="mot de passe"
                    autocomplete="current-password" style="margin-top:6px">
-            <div class="rangee" style="margin-top:7px">
+            <div class="rangee rangeeBoutons" style="margin-top:7px">
               <button id="compteConnexion" data-i18n="compte.connexion">Se connecter</button>
               <button id="compteInscription" data-i18n="compte.inscription">Créer un compte</button>
             </div>
           </div>
           <div id="compteConnecte" hidden>
             <div class="qui"><span data-i18n="compte.connecte">Connecté :</span> <b id="compteEmail"></b></div>
-            <div class="rangee" style="margin-top:7px">
+            <div class="rangee rangeeBoutons" style="margin-top:7px">
               <button id="compteSync" data-i18n="compte.sync">Synchroniser</button>
               <button id="compteDeconnexion" data-i18n="compte.deconnexion">Se déconnecter</button>
             </div>
@@ -1213,15 +1226,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=56"></script>
-<script src="config.js?v=56"></script>
-<script src="comptes.js?v=56"></script>
-<script src="donnees.js?v=56"></script>
-<script src="skills.js?v=56"></script>
-<script src="talents.js?v=56"></script>
-<script src="builds_reference.js?v=56"></script>
-<script src="guides_classes.js?v=56"></script>
-<script src="fiche.js?v=56"></script>
-<script src="app.js?v=56"></script>
+<script src="i18n.js?v=58"></script>
+<script src="config.js?v=58"></script>
+<script src="comptes.js?v=58"></script>
+<script src="donnees.js?v=58"></script>
+<script src="skills.js?v=58"></script>
+<script src="talents.js?v=58"></script>
+<script src="builds_reference.js?v=58"></script>
+<script src="guides_classes.js?v=58"></script>
+<script src="fiche.js?v=58"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>
