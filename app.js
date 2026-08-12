@@ -1115,48 +1115,132 @@ async function synchroniser(silencieux) {
   }
 }
 
-/* ------------------------------------------------------ builds partagés --
-   Une liste d'auteurs, et pour chacun ses builds marqués publics. On ne
-   montre QUE le pseudo : l'adresse e-mail ne sort jamais de la base. */
-let _partages = null;
+/* ------------------------------------------------------------- les amis --
+   PAS D'ANNUAIRE. La première version listait tous les joueurs dans un menu
+   déroulant : curieux à dix, inutilisable à mille, et personne n'a envie
+   d'y figurer pour avoir montré un build à un ami. On ajoute quelqu'un par
+   son CODE, donné de la main à la main, et la liste reste sur la machine. */
+const CLE_AMIS = 'mistfall.amis.v1';
 
-async function chargerPartages(silencieux) {
-  if (!comptesDispo()) return;
-  const note = $('notePartage');
+function amis() {
   try {
-    if (!silencieux) note.innerHTML = '<span class="pas">Chargement…</span>';
-    _partages = await window.Comptes.partages();
-    const sel = $('partageAuteur');
-    const avant = sel.value;
-    sel.innerHTML = '<option value="">— choisis un joueur —</option>'
-      + _partages.map((p) =>
-          `<option value="${p.pseudo}">${p.pseudo} (${p.builds.length})</option>`).join('');
-    if (avant && _partages.some((p) => p.pseudo === avant)) sel.value = avant;
-    dessinerBuildsPartages();
-    note.innerHTML = _partages.length
-      ? `<span class="pas">${_partages.length} joueur(s) partagent des builds.</span>`
-      : '<span class="pas">Personne n\'a encore publié de build.</span>';
+    return JSON.parse(localStorage.getItem(CLE_AMIS) || '[]');
   } catch (e) {
-    note.innerHTML = `<span class="ko">Impossible de charger : ${e.message}</span>`;
+    return [];
   }
 }
 
-function dessinerBuildsPartages() {
-  const sel = $('partageBuild');
-  const auteur = $('partageAuteur').value;
-  const p = (_partages || []).find((x) => x.pseudo === auteur);
-  sel.innerHTML = p
-    ? p.builds.map((b, i) => `<option value="${i}">${b.nom}</option>`).join('')
-    : '<option value="">—</option>';
-  sel.disabled = !p;
-  $('partageCharger').disabled = !p;
-  $('partageCopier').disabled = !p;
+function ecrireAmis(liste) {
+  try {
+    localStorage.setItem(CLE_AMIS, JSON.stringify(liste));
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
-function buildPartageChoisi() {
-  const p = (_partages || []).find((x) => x.pseudo === $('partageAuteur').value);
-  if (!p) return null;
-  return p.builds[Number($('partageBuild').value) || 0] || null;
+async function ajouterAmi() {
+  const champ = $('amiCode');
+  const note = $('noteAmis');
+  const brut = champ.value || '';
+  note.innerHTML = '<span class="pas">…</span>';
+  try {
+    const trouve = await window.Comptes.parCode(brut);
+    if (!trouve) {
+      note.innerHTML = `<span class="ko">${t('ami.introuvable')}</span>`;
+      return;
+    }
+    const liste = amis();
+    if (liste.some((a) => a.code === trouve.code)) {
+      note.innerHTML = `<span class="pas">${t('ami.deja', { nom: trouve.pseudo })}</span>`;
+      return;
+    }
+    liste.push({ code: trouve.code, pseudo: trouve.pseudo });
+    ecrireAmis(liste);
+    champ.value = '';
+    note.innerHTML = `<span class="ok">${t('ami.ajoute', { nom: trouve.pseudo })}</span>`;
+    dessinerAmis();
+  } catch (e) {
+    note.innerHTML = `<span class="ko">${e.message}</span>`;
+  }
+}
+
+async function dessinerAmis() {
+  const boite = $('listeAmis');
+  const liste = amis();
+  if (!liste.length) {
+    boite.innerHTML = `<div class="vide-liste">${t('ami.aucun')}</div>`;
+    return;
+  }
+  boite.innerHTML = '';
+  for (const a of liste) {
+    const bloc = document.createElement('div');
+    bloc.className = 'amiBloc';
+    bloc.innerHTML = `<div class="amiTete"><b>${a.pseudo}</b>
+      <span class="amiCode">${window.Comptes.formater(a.code)}</span>
+      <button class="amiSuppr" title="${t('ami.retirer')}">×</button></div>
+      <div class="amiListe"></div>`;
+    bloc.querySelector('.amiSuppr').onclick = () => {
+      ecrireAmis(amis().filter((x) => x.code !== a.code));
+      dessinerAmis();
+    };
+    boite.appendChild(bloc);
+    try {
+      const d = await window.Comptes.parCode(a.code);
+      const dedans = bloc.querySelector('.amiListe');
+      if (!d || !d.builds.length) {
+        dedans.innerHTML = `<span class="pas">${t('ami.rien', { nom: a.pseudo })}</span>`;
+        continue;
+      }
+      for (const b of d.builds) dedans.appendChild(carteBuildDistant(b, a.pseudo));
+    } catch (e) { /* un ami injoignable ne casse pas la liste */ }
+  }
+}
+
+/* Une carte de build venu d'ailleurs : charger pour l'essayer, copier pour
+   le garder. Les deux sont explicites — rien n'entre chez toi sans clic. */
+function carteBuildDistant(b, auteur) {
+  const el = document.createElement('div');
+  el.className = 'buildDistant';
+  const cl = D.classes[String(b.etat && b.etat.c)] || '?';
+  el.innerHTML = `<div class="bd"><b>${b.nom}</b>
+      <small>${cl}${auteur ? ' · ' + t('gal.par') + ' ' + auteur : ''}</small></div>
+    <button class="bdCharger">${t('gal.charger')}</button>
+    <button class="bdCopier">${t('gal.copier')}</button>`;
+  el.querySelector('.bdCharger').onclick = () => {
+    appliquerEtat(b.etat);
+    restituer(b);
+  };
+  el.querySelector('.bdCopier').onclick = () => {
+    const liste = biblio();
+    const nom = liste.some((x) => x.nom === b.nom) ? `${b.nom} (copie)` : b.nom;
+    liste.push({ nom, etat: b.etat, code: b.code || '', pub: false, ami: false });
+    if (!ecrireBiblio(liste)) return;
+    dessinerBuilds();
+    $('noteBuilds').innerHTML =
+      `<span class="pas">${t('partage.copieOk', { nom })}</span>`;
+  };
+  return el;
+}
+
+/* ------------------------------------------------------ galerie publique -- */
+async function chargerGalerie() {
+  const boite = $('listeGalerie');
+  const note = $('noteGalerie');
+  if (!comptesDispo()) return;
+  note.innerHTML = `<span class="pas">${t('partage.chargement')}</span>`;
+  try {
+    const liste = await window.Comptes.galerie(60);
+    boite.innerHTML = '';
+    if (!liste.length) {
+      note.innerHTML = `<span class="pas">${t('gal.vide')}</span>`;
+      return;
+    }
+    for (const b of liste) boite.appendChild(carteBuildDistant(b, b.auteur));
+    note.innerHTML = '';
+  } catch (e) {
+    note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
+  }
 }
 
 /* Rendre un build enregistré À L'IDENTIQUE.
@@ -1217,25 +1301,36 @@ function dessinerBuilds() {
         <b>${b.nom}${fige ? '' : ' <i>⚠</i>'}</b>
         <small>${cl} · ${ra} · ${t('builds.affixes', { n: (b.etat.t || []).length })}</small>
       </button>
+      <label class="ami" title="${avecCompte
+        ? t('ami.marque') : t('ami.marqueNon')}">
+        <input type="checkbox" ${b.ami ? 'checked' : ''}
+               ${avecCompte ? '' : 'disabled'}><span>ami</span></label>
       <label class="pub" title="${avecCompte
         ? t('builds.public')
         : t('builds.publicNon')}">
         <input type="checkbox" ${b.pub ? 'checked' : ''}
                ${avecCompte ? '' : 'disabled'}><span>pub</span></label>
       <button class="suppr" title="${t('builds.supprimer')}">×</button>`;
-    const casePub = ligne.querySelector('.pub input');
-    casePub.onchange = () => {
-      const l = biblio();
-      l[i] = { ...l[i], pub: casePub.checked };
-      if (!ecrireBiblio(l)) { casePub.checked = !casePub.checked; return; }
-      window.Comptes.envoyerBuilds([l[i]]).then(() => {
-        $('noteBuilds').innerHTML = casePub.checked
-          ? `<span class="pas">« ${b.nom} » est maintenant public.</span>`
-          : `<span class="pas">« ${b.nom} » n'est plus public.</span>`;
-      }).catch((e) => {
-        $('noteBuilds').innerHTML = `<span class="ko">${e.message}</span>`;
-      });
+    const brancher = (sel, cle, cleOui, cleNon) => {
+      const c = ligne.querySelector(sel);
+      if (!c) return;
+      c.onchange = () => {
+        const l = biblio();
+        l[i] = { ...l[i], [cle]: c.checked };
+        if (!ecrireBiblio(l)) { c.checked = !c.checked; return; }
+        window.Comptes.envoyerBuilds([l[i]]).then(() => {
+          $('noteBuilds').innerHTML = `<span class="pas">`
+            + t(c.checked ? cleOui : cleNon, { nom: b.nom }) + '</span>';
+        }).catch((e) => {
+          $('noteBuilds').innerHTML = `<span class="ko">${e.message}</span>`;
+        });
+      };
     };
+    // Deux visibilités distinctes, indépendantes : « ami » se donne avec un
+    // code, « pub » entre dans la galerie. Un build peut être l'un, l'autre,
+    // les deux, ou rien — c'est le défaut.
+    brancher('.pub input', 'pub', 'builds.estPublic', 'builds.plusPublic');
+    brancher('.ami input', 'ami', 'ami.marque', 'ami.marque');
     ligne.querySelector('.ouvrir').onclick = () => {
       appliquerEtat(b.etat);
       $('noteBuilds').innerHTML = `<span class="pas">${t('builds.chargeOk', { nom: b.nom })}</span>`;
@@ -1402,9 +1497,12 @@ function dessinerAlternatives(res, classe) {
   } catch (e) { liste = []; }
   carte.hidden = !liste.length;
   if (!liste.length) return;
-  const total = liste.reduce((s, e) => s * e.bonnes.length, 1);
-  $('noteAlternatives').innerHTML =
-    `<span class="pas">${t('alt.total', { n: total })}</span>`;
+  // PAS DE PRODUIT DES POSSIBILITÉS. Multiplier les compteurs donnerait un
+  // nombre flatteur mais faux : chaque pièce n'est vérifiée que SEULE, et
+  // les gemmes étant partagées par tout le build, deux échanges qui tiennent
+  // séparément peuvent très bien ne pas tenir ensemble. On annonce donc ce
+  // qu'on a réellement mesuré, et l'échange est revérifié au clic.
+  $('noteAlternatives').innerHTML = `<span class="pas">${t('alt.aide')}</span>`;
   boite.innerHTML = '';
   for (const e of liste) {
     const bloc = document.createElement('div');
@@ -1425,13 +1523,21 @@ function dessinerAlternatives(res, classe) {
         el.onclick = () => {
           const neufs = { ...res.slotItems, [e.slot]: b.item };
           const a = assembler(neufs, Object.fromEntries(cibles), true);
+          const vp = res.vinPoints || new Map();
+          // On REVÉRIFIE après coup : c'est le seul moment où l'on connaît
+          // l'effet combiné de tous les échanges déjà faits.
+          const manques = [...cibles.entries()].filter(([n, l]) =>
+            Math.min(plafond(n), (a.couvert[n] || 0) + (vp.get(n) || 0)) < l);
           const maj = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
                         sources: a.sources, vin: res.vin,
-                        vinPoints: res.vinPoints, suffisant: true };
+                        vinPoints: vp, suffisant: !manques.length };
           dernier = maj;
           afficher(maj, classe);
-          $('etat').innerHTML = `<span class="ok">${t('alt.pose')}</span>`
-            + `<span class="pas"> — ${b.item.n}.</span>`;
+          $('etat').innerHTML = manques.length
+            ? `<span class="ko">${t('alt.perdu')}</span><span class="pas"> — `
+              + manques.map(([n, l]) => `${n} ${l}`).join(', ') + '.</span>'
+            : `<span class="ok">${t('alt.pose')}</span>`
+              + `<span class="pas"> — ${b.item.n}.</span>`;
         };
       }
       rangee.appendChild(el);
@@ -1614,6 +1720,31 @@ function afficherCode(code) {
 /* Le sélecteur de langue. Il est posé avant tout le reste : si le chargement
    des données échouait, on veut quand même pouvoir changer de langue pour
    lire le message d'erreur. */
+/* Deux pages, pas un site à onglets : le builder, et la galerie publique.
+   La galerie ne se charge qu'à la première visite — inutile d'interroger la
+   base pour quelqu'un qui ne la regardera jamais. */
+let _galerieChargee = false;
+
+function montrerPage(id) {
+  for (const el of document.querySelectorAll('main, .page')) {
+    el.hidden = (id === 'main') ? (el.tagName !== 'MAIN') : (el.id !== id);
+  }
+  for (const b of document.querySelectorAll('#nav button')) {
+    b.classList.toggle('actif', b.dataset.page === id);
+  }
+  if (id === 'pageGalerie' && !_galerieChargee) {
+    _galerieChargee = true;
+    chargerGalerie();
+  }
+  window.scrollTo({ top: 0 });
+}
+
+function poserNavigation() {
+  for (const b of document.querySelectorAll('#nav button')) {
+    b.onclick = () => montrerPage(b.dataset.page);
+  }
+}
+
 function poserLangues() {
   const boite = $('langues');
   if (!boite || !window.I18N) return;
@@ -1647,6 +1778,7 @@ window.surChangementDeLangue = function () {
 function demarrer(donnees) {
   D = donnees;
   if (window.I18N) { I18N.appliquer(); poserLangues(); }
+  poserNavigation();
   for (const g of D.gemmes) {
     gemParId.set(g.id, g);
     for (const a of g.a) {
@@ -1712,54 +1844,46 @@ function demarrer(donnees) {
   // quelque chose se passer : là, on parle.
   if (comptesDispo() && window.Comptes.connecte()) {
     synchroniser(!(retourAuth && retourAuth.connecte));
-    window.Comptes.monProfil().then((p) => {
-      if (p) $('pseudo').value = p;
+    window.Comptes.monProfilComplet().then((p) => {
+      if (!p) return;
+      if (p.pseudo) $('pseudo').value = p.pseudo;
+      if (p.code) $('monCode').textContent = window.Comptes.formater(p.code);
     }).catch(() => {});
   }
 
-  // ---------------------------------------------------- builds partagés
+  // ---------------------------------------------------- amis et galerie
   if (comptesDispo()) {
     $('blocPartage').hidden = false;
-    chargerPartages(true);
-    $('partageAuteur').onchange = dessinerBuildsPartages;
-    $('partageRafraichir').onclick = () => chargerPartages(false);
-    $('partageCharger').onclick = () => {
-      const b = buildPartageChoisi();
-      if (!b) return;
-      appliquerEtat(b.etat);
-      $('notePartage').innerHTML =
-        `<span class="pas">« ${b.nom} » chargé — il n'est pas ajouté à tes builds.</span>`;
-      restituer(b);
-    };
-    $('partageCopier').onclick = () => {
-      const b = buildPartageChoisi();
-      if (!b) return;
-      const liste = biblio();
-      const nom = liste.some((x) => x.nom === b.nom)
-        ? `${b.nom} (copie)` : b.nom;
-      liste.push({ nom, etat: b.etat, code: b.code || '', pub: false });
-      if (!ecrireBiblio(liste)) return;
-      dessinerBuilds();
-      $('notePartage').innerHTML =
-        `<span class="pas">« ${nom} » ajouté à tes builds (privé).</span>`;
-      if (window.Comptes.connecte()) {
-        window.Comptes.envoyerBuilds([liste[liste.length - 1]]).catch(() => {});
+    dessinerAmis();
+    $('amiAjouter').onclick = ajouterAmi;
+    $('amiCode').onkeydown = (ev) => { if (ev.key === 'Enter') ajouterAmi(); };
+    $('monCodeCopier').onclick = () => {
+      const c = $('monCode').textContent;
+      if (!c || c === '—') return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(c).then(() => {
+          $('notePseudo').innerHTML = `<span class="pas">${t('ami.copie')}</span>`;
+        }, () => {});
       }
     };
+    $('galRafraichir').onclick = chargerGalerie;
+
+    // Le pseudo engendre le code ami à sa première écriture, puis ne le
+    // change plus : sinon les amis à qui on l'a donné le perdraient.
     $('enregistrerPseudo').onclick = async () => {
       const p = ($('pseudo').value || '').trim();
       const note = $('notePseudo');
       if (p.length < 2 || p.length > 24) {
-        note.innerHTML = '<span class="ko">Entre 2 et 24 caractères.</span>';
+        note.innerHTML = `<span class="ko">${t('compte.pseudoTaille')}</span>`;
         return;
       }
       try {
-        await window.Comptes.definirPseudo(p);
-        note.innerHTML = '<span class="ok">Pseudo enregistré.</span>';
-        chargerPartages(true);
+        const code = await window.Comptes.definirPseudo(p);
+        if (code) $('monCode').textContent = window.Comptes.formater(code);
+        note.innerHTML = `<span class="ok">${t('compte.pseudoOk')}</span>`;
       } catch (e) {
         note.innerHTML = /duplicate|unique/i.test(e.message)
-          ? '<span class="ko">Ce pseudo est déjà pris.</span>'
+          ? `<span class="ko">${t('compte.pseudoPris')}</span>`
           : `<span class="ko">${e.message}</span>`;
       }
     };

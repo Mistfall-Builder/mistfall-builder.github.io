@@ -172,35 +172,82 @@
     return (r && r[0]) ? r[0].pseudo : null;
   }
 
+  /* Le code ami est engendré une seule fois, à la création du profil, et ne
+     change plus : sinon les amis à qui on l'a donné le perdraient. */
   async function definirPseudo(pseudo) {
     const s = connecte();
-    return avecReprise(() => appeler('/rest/v1/profiles?on_conflict=user_id', {
+    const actuel = await monProfilComplet();
+    const ligne = { user_id: s.user.id, pseudo };
+    if (!actuel || !actuel.code) ligne.code = engendrerCode();
+    await avecReprise(() => appeler('/rest/v1/profiles?on_conflict=user_id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ user_id: s.user.id, pseudo }),
+      body: JSON.stringify(ligne),
     }, true));
+    return ligne.code || (actuel && actuel.code) || null;
   }
 
-  /* Les builds partagés par tout le monde, groupés par auteur. Deux
-     requêtes plutôt qu'une jointure : la RLS n'ouvre que les lignes
-     publiques, et on recolle les pseudos ici. */
-  async function partages() {
-    const [profils, builds] = await Promise.all([
-      appeler('/rest/v1/profiles?select=user_id,pseudo'),
-      appeler('/rest/v1/builds?select=nom,etat,code,user_id&public=is.true'
-              + '&order=maj.desc'),
-    ]);
-    const nomDe = new Map((profils || []).map((p) => [p.user_id, p.pseudo]));
-    const par = new Map();
-    for (const b of builds || []) {
-      const pseudo = nomDe.get(b.user_id);
-      if (!pseudo) continue;   // un build public sans pseudo n'est signable
-      if (!par.has(pseudo)) par.set(pseudo, []);
-      par.get(pseudo).push({ nom: b.nom, etat: b.etat, code: b.code || '' });
+  /* Le code ami : court, lisible à voix haute, sans caractères ambigus.
+     Il sert à TROUVER quelqu'un, pas à garder un secret. */
+  const ALPHABET_CODE = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+  function engendrerCode() {
+    let s = '';
+    const tirage = new Uint32Array(8);
+    (window.crypto || window.msCrypto).getRandomValues(tirage);
+    for (let i = 0; i < 8; i += 1) {
+      s += ALPHABET_CODE[tirage[i] % ALPHABET_CODE.length];
     }
-    return [...par.entries()]
-      .map(([pseudo, liste]) => ({ pseudo, builds: liste }))
-      .sort((a, b) => a.pseudo.localeCompare(b.pseudo));
+    return s;
+  }
+
+  function formater(code) {
+    return code ? `${code.slice(0, 4)}-${code.slice(4)}` : '';
+  }
+
+  function nettoyer(code) {
+    return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  async function monProfilComplet() {
+    const s = connecte();
+    if (!s) return null;
+    const r = await avecReprise(() => appeler(
+      `/rest/v1/profiles?select=pseudo,code&user_id=eq.${s.user.id}`, {}, true));
+    return (r && r[0]) || null;
+  }
+
+  /* Les builds d'UN joueur, retrouvé par son code. Rien n'est listé sans
+     code : il n'y a plus d'annuaire de tous les joueurs. */
+  async function parCode(code) {
+    const propre = nettoyer(code);
+    if (propre.length !== 8) throw new Error(lisible('code invalide'));
+    const profs = await appeler(
+      `/rest/v1/profiles?select=user_id,pseudo,code&code=eq.${propre}`);
+    if (!profs || !profs.length) return null;
+    const p = profs[0];
+    const builds = await appeler(
+      `/rest/v1/builds?select=nom,etat,code&user_id=eq.${p.user_id}`
+      + '&or=(partage.is.true,public.is.true)&order=maj.desc');
+    return { pseudo: p.pseudo, code: p.code,
+             builds: (builds || []).map((b) => ({
+               nom: b.nom, etat: b.etat, code: b.code || '' })) };
+  }
+
+  /* La galerie : uniquement ce qui est explicitement publié. */
+  async function galerie(limite) {
+    const builds = await appeler(
+      '/rest/v1/builds?select=nom,etat,code,user_id,maj&public=is.true'
+      + `&order=maj.desc&limit=${Number(limite) || 60}`);
+    if (!builds || !builds.length) return [];
+    const ids = [...new Set(builds.map((b) => b.user_id))];
+    const profs = await appeler(
+      `/rest/v1/profiles?select=user_id,pseudo&user_id=in.(${ids.join(',')})`);
+    const nomDe = new Map((profs || []).map((p) => [p.user_id, p.pseudo]));
+    return builds.map((b) => ({
+      nom: b.nom, etat: b.etat, code: b.code || '',
+      auteur: nomDe.get(b.user_id) || '?', maj: b.maj,
+    }));
   }
 
   async function envoyerBuilds(liste) {
@@ -208,7 +255,7 @@
     const s = connecte();
     const lignes = liste.map((b) => ({
       user_id: s.user.id, nom: b.nom, etat: b.etat, code: b.code || '',
-      public: !!b.pub,
+      public: !!b.pub, partage: !!b.ami,
     }));
     return avecReprise(() => appeler(
       '/rest/v1/builds?on_conflict=user_id,nom', {
@@ -278,6 +325,7 @@
   window.Comptes = {
     actif, connecte, courriel, inscrire, connecter, deconnecter,
     listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
-    monProfil, definirPseudo, partages,
+    monProfil, monProfilComplet, definirPseudo,
+    parCode, galerie, formater, nettoyer,
   };
 }());

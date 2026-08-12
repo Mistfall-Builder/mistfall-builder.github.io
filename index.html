@@ -71,6 +71,46 @@ header{position:sticky;top:0;z-index:30;height:64px;
 .langues button:hover{opacity:.85;background:#161d21}
 .langues button.actif{opacity:1;border-color:var(--accent-sombre);
   background:#1d1208}
+.nav{display:flex;gap:4px;margin-left:18px}
+.nav button{background:none;border:1px solid transparent;color:var(--terne);
+  padding:7px 13px;font:700 12.5px/1 var(--corps);letter-spacing:.3px}
+.nav button:hover{color:var(--texte2);background:#12181b}
+.nav button.actif{color:var(--accent);border-color:var(--accent-sombre);
+  background:#1d1208}
+.page{max-width:1460px;margin:0 auto;padding:20px 22px 44px}
+/* `display:grid` sur main l'emporterait sur l'attribut hidden : sans cette
+   règle, changer de page laisserait les deux affichées. */
+main[hidden],.page[hidden]{display:none}
+
+/* ------------------------------------------------------ amis et galerie -- */
+.codeAmi{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;
+  background:var(--creux);border:1px solid var(--bord-fort);border-radius:3px;
+  padding:7px 9px;color:var(--accent-clair);letter-spacing:1.5px;font-size:14px}
+.amiBloc{margin-bottom:12px}
+.amiTete{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.amiTete b{font-size:13px}
+.amiCode{font-family:Consolas,monospace;font-size:10.5px;color:var(--terne);
+  border:1px solid var(--bord);border-radius:20px;padding:1px 8px}
+.amiSuppr{margin-left:auto;width:26px;padding:0;font-size:15px;
+  background:var(--creux);border-color:var(--bord);color:var(--terne)}
+.amiSuppr:hover{color:var(--ko);border-color:var(--ko)}
+.buildDistant{display:flex;align-items:center;gap:7px;padding:7px 9px;
+  background:var(--creux);border:1px solid var(--bord);border-radius:3px;
+  margin-bottom:5px}
+.buildDistant .bd{flex:1;min-width:0}
+.buildDistant .bd b{display:block;font-size:12.5px}
+.buildDistant .bd small{color:var(--terne);font-size:10.5px}
+.buildDistant button{flex:0 0 auto;padding:5px 10px;font-size:11.5px}
+.buildLigne .ami{flex:0 0 auto;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;width:34px;
+  background:var(--creux);border:1px solid var(--bord);border-radius:3px;
+  cursor:pointer}
+.buildLigne .ami span{font:700 8.5px/1 var(--condense);letter-spacing:.9px;
+  text-transform:uppercase;color:var(--terne)}
+.buildLigne .ami input{accent-color:var(--accent);cursor:pointer;margin:0}
+.buildLigne .ami:has(input:checked){border-color:var(--accent-sombre)}
+.buildLigne .ami:has(input:checked) span{color:var(--accent-clair)}
+.buildLigne .ami:has(input:disabled){opacity:.4;cursor:default}
 
 /* ------------------------------------------------------------- structure -- */
 main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
@@ -324,6 +364,10 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <span class="mot">Mistfall<em>Builder</em>
         <span class="sous" data-i18n="entete.sous">Compose ton stuff, récupère le code d'import</span></span>
     </a>
+    <nav class="nav" id="nav">
+      <button data-page="main" class="actif" data-i18n="nav.builder">Builder</button>
+      <button data-page="pageGalerie" data-i18n="nav.publics">Builds publics</button>
+    </nav>
     <div class="droite">
       <div class="langues" id="langues" title="Change language"></div>
       <button id="importer" data-i18n="entete.importer">Importer un code</button>
@@ -412,6 +456,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
                      maxlength="24">
               <button id="enregistrerPseudo" style="flex:0 0 auto" data-i18n="compte.ok">OK</button>
             </div>
+            <label data-i18n="ami.mon">Mon code ami</label>
+            <div class="rangee">
+              <div id="monCode" class="codeAmi">—</div>
+              <button id="monCodeCopier" style="flex:0 0 auto"
+                      data-i18n="code.copier">Copier</button>
+            </div>
+            <div class="pas" style="font-size:11px;margin-top:4px"
+                 data-i18n="ami.monAide">Donne-le à tes amis pour qu'ils voient
+              tes builds marqués « ami ».</div>
             <div id="notePseudo"></div>
           </div>
           <div id="noteCompte"></div>
@@ -459,18 +512,16 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     </div>
 
     <div class="carte" id="blocPartage" hidden>
-      <h2 data-i18n="partage.titre">Builds partagés</h2>
+      <h2 data-i18n="ami.titre">Builds de mes amis</h2>
       <div class="corps">
         <div class="rangee">
-          <select id="partageAuteur"></select>
-          <select id="partageBuild" disabled></select>
+          <input type="text" id="amiCode" maxlength="12"
+                 data-i18n-ph="ami.place" placeholder="code ami (ex. ABCD-2345)">
+          <button id="amiAjouter" style="flex:0 0 auto"
+                  data-i18n="ami.ajouter">Ajouter</button>
         </div>
-        <div class="rangee" style="margin-top:8px">
-          <button id="partageCharger" disabled data-i18n="partage.charger">Charger</button>
-          <button id="partageCopier" disabled data-i18n="partage.copier">Copier chez moi</button>
-          <button id="partageRafraichir" data-i18n="partage.rafraichir">Rafraîchir</button>
-        </div>
-        <div id="notePartage"></div>
+        <div id="noteAmis"></div>
+        <div id="listeAmis" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -483,6 +534,17 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     </div>
   </div>
 </main>
+
+<section id="pageGalerie" class="page" hidden>
+  <div class="carte">
+    <h2 data-i18n="gal.titre">Builds publics</h2>
+    <div class="corps">
+      <button id="galRafraichir" data-i18n="gal.rafraichir">Rafraîchir</button>
+      <div id="noteGalerie" style="margin-top:9px;font-size:12px"></div>
+      <div id="listeGalerie" style="margin-top:10px"></div>
+    </div>
+  </div>
+</section>
 
 <footer>
   <span data-i18n="pied.texte">Le code produit ici se colle dans</span> <em>Prepare → Manage/Import</em>. <span data-i18n="pied.texte2">Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.</span>
@@ -502,10 +564,10 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=13"></script>
-<script src="config.js?v=13"></script>
-<script src="comptes.js?v=13"></script>
-<script src="donnees.js?v=13"></script>
-<script src="app.js?v=13"></script>
+<script src="i18n.js?v=15"></script>
+<script src="config.js?v=15"></script>
+<script src="comptes.js?v=15"></script>
+<script src="donnees.js?v=15"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>
