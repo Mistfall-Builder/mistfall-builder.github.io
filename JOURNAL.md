@@ -1,0 +1,281 @@
+# Mistfall Helper — journal de bord
+
+But de ce fichier : permettre à n'importe qui (humain ou IA) de **reprendre
+le projet sans rien savoir d'autre**. Il décrit ce qui existe, pourquoi, ce
+qui est vérifié, et ce qui reste ouvert.
+
+**À tenir à jour à chaque modification.** Une entrée = quoi, pourquoi, et
+comment ça a été vérifié. Une correction non vérifiée n'est pas une
+correction, c'est une hypothèse.
+
+---
+
+## 1. Ce que c'est
+
+Deux choses qui partagent le même moteur :
+
+| Quoi | Où | Pour qui |
+|---|---|---|
+| **Mistfall Helper** — application Windows | `C:\Projets Claude\AuctionAutoSell\` | l'auteur |
+| **Mistfall Builder** — site public | `site/`, publié sur GitHub Pages | tout le monde |
+
+Le jeu est *Mistfall Hunter*. On compose un ensemble d'équipement
+(« stuff ») qui atteint des niveaux d'affixes visés, et on obtient le
+**code d'import** que le jeu accepte dans *Prepare → Manage/Import*.
+
+- Site en ligne : <https://mistfall-builder.github.io/>
+- Dépôt du site : `mistfall-builder/mistfall-builder.github.io`
+- Base de comptes : Supabase, projet `grnndksniashncksyzvv`
+
+---
+
+## 2. Règles absolues du projet
+
+Elles viennent de l'auteur et priment sur toute autre considération.
+
+1. **Ne jamais inventer.** Aucune donnée de jeu supposée. Si une valeur n'est
+   pas mesurée, elle est inconnue et on le dit.
+2. **Les noms du jeu restent en anglais** (objets, affixes, gemmes, raretés,
+   classes), dans toutes les langues de l'interface. La conversation avec
+   l'auteur est en français.
+3. **Ne jamais recompiler l'exe sans demande explicite.** « build l'exe »
+   ou équivalent.
+4. **Ne pas compter la rareté `Damaged`.**
+5. **Ne jamais parler d'une certaine capture d'un jeu tiers.**
+6. Vérifier avant d'affirmer. Toute mesure comparative doit utiliser la
+   **même méthode des deux côtés** (piège rencontré deux fois, voir §7).
+
+---
+
+## 3. Le moteur (partagé)
+
+`game_data.py` côté Python, `site/app.js` côté navigateur. **Les deux
+implémentations doivent rester d'accord** — un test le vérifie (§8).
+
+### Enchaînement d'un build
+
+1. `build_loadout(classe, cibles, arme, rareté, vin, panaché, planchers, vin_manuel)`
+2. essaie chaque rareté de la plus basse à la plus haute jusqu'à ce qu'une
+   suffise (sauf rareté imposée : aucune escalade, par construction)
+3. si panaché : relance une recherche locale depuis **deux** points de
+   départ — le build suffisant, et le dernier palier insuffisant
+4. **passe d'allègement** : redescend chaque pièce tant que toutes les cibles
+   tiennent
+5. pose des gemmes : gloutonne pendant la recherche, **exacte** au final
+
+### Fonctions notables
+
+| Fonction | Rôle |
+|---|---|
+| `alleger(...)` | rend les crans de rareté inutiles |
+| `suggestions(...)` | échanges d'UNE pièce qui gagnent sans rien perdre |
+| `repartition_vin(...)` | Victory Wine, automatique ou imposé |
+| `variantes(...)` | répartitions de raretés possibles (Python seulement) |
+| `alternatives(...)` | pièces interchangeables par emplacement (JS) |
+
+---
+
+## 4. Le codec des codes d'import — **décodé et vérifié en jeu**
+
+C'est la pièce maîtresse. `code_import.py`.
+
+```
+base62 → BigInt → octets (octet 0 = poids fort)
+bits écrits POIDS FAIBLE EN TÊTE dans chaque octet
+[24 bits en-tête 0x134E01][10 bits version=1][4 bits classe]
+puis 9 emplacements [0,1,2,3,4,5,6,10,11], chacun :
+   [10 bits index d'objet] puis holeCount × [10 bits index de gemme]
+bourrage de zéros
+```
+
+- Structure d'un identifiant : 7 chiffres
+  `[2 emplacement][1 rareté][2 famille][2 variante]`
+- Les emplacements **10 et 11** sont les deux armes. La *Polearm and Shield*
+  vit en 11, ce qui explique son absence du catalogue public.
+- **Vérifié dans les deux sens** : 31/31 codes du registre font l'aller-retour
+  à l'identique ; deux codes fabriqués ont été importés en jeu et ont donné
+  exactement les pièces annoncées.
+
+---
+
+## 5. Règles du jeu mesurées
+
+Détail complet dans `docs/regles_du_jeu.md`. L'essentiel :
+
+- Variantes **01–07** : exactement 1 inné. **08–09** : aucun inné, mais un
+  emplacement de gemme en plus (156/156 vérifiés pour chaque).
+- **L'inné dépend de (emplacement, famille, variante) et de rien d'autre** :
+  273 groupes sur 273 cohérents, 0 conflit sur 1092 objets. La rareté n'y
+  change rien ; la famille si.
+- 4 matériaux de gemme × 12 affixes. Colliers et bagues n'ont jamais d'inné.
+- Le **palier** d'un affixe plafonné à 7 est au niveau **5**, pas 4.
+- **Victory Wine** : au plus 2 points sur au plus 4 affixes, 8 au total.
+  Rien n'oblige à mettre 2 partout.
+
+### Les 155 objets absents du catalogue public
+
+Reconstitués par élimination (`innes_deduits.py`). La méthode est lancée à
+l'aveugle sur les captures d'hôtel des ventes puis **confrontée au
+catalogue** : elle doit retrouver ce qu'il affirme déjà, sinon elle refuse
+de publier. Score : **262 sur 262**, zéro erreur.
+
+| Cas | Objets | Comment |
+|---|---|---|
+| variantes 08/09 | 34 | aucun inné, par règle |
+| famille connue ailleurs | 63 | par la loi (emplacement, famille, variante) |
+| famille 10 Polearm and Shield | 37 | par élimination, appariement **unique** |
+| familles 11–13 (Holy jamais vues) | 21 | **inconnu**, et laissé inconnu |
+
+Polearm and Shield, complète : 01 Unyielding · 02 Tenacious · 03 Bulwark ·
+04 Distant Ward · 05 Brotherhood · 06 Spirit Shield · 07 Fervor ·
+08 et 09 aucun.
+
+---
+
+## 6. Le site
+
+`site/` — statique, aucun serveur, tout se calcule dans le navigateur.
+
+| Fichier | Rôle |
+|---|---|
+| `index.html` | la page, le style, les balises `data-i18n` |
+| `app.js` | moteur de build + interface |
+| `i18n.js` | français / anglais / russe |
+| `donnees.js` | données du jeu, chargées par balise `<script>` |
+| `comptes.js` | comptes Supabase (facultatif) |
+| `config.js` | URL + clé publique Supabase |
+| `icones/`, `fond/` | images du jeu |
+
+**`donnees.js` et pas `fetch(donnees.json)`** : ouvert depuis le disque
+(`file://`), un `fetch` est refusé et la page restait vide.
+
+**Les scripts portent `?v=N`** dans `index.html`. GitHub Pages sert l'ancien
+JavaScript en cache plusieurs minutes après une mise en ligne : sans ce
+numéro, page neuve + vieux code. **À incrémenter à chaque modification.**
+
+### Fonctionnalités
+
+- choix classe / arme / rareté (**« Auto » par défaut**), panaché, planchers
+  par emplacement (plusieurs à la fois)
+- 44 affixes listés : niveau visé, points de vin, **préférence** (neutre /
+  bonus souhaité / refusé)
+- code d'import généré et importable
+- **Suggestions** : échanges d'une pièce, jamais appliqués sans clic, ne
+  changent **jamais** la rareté
+- **Pièces interchangeables** : par emplacement, toutes celles qui tiennent
+- Mes builds : enregistrer, charger **à l'identique**, lien de partage,
+  export/import, comptes Supabase, builds publics
+- Trois langues, drapeaux en haut à droite
+
+### Publier
+
+```
+cd site
+git add -A && git commit -m "..." && git push
+```
+ou double-clic sur `pousser-le-site.bat`. Compter ~45 s avant la mise en
+ligne effective.
+
+---
+
+## 7. Pièges rencontrés — à ne pas refaire
+
+1. **Mesure biaisée.** Comparer une pose de gemmes *exacte* à des poses
+   *gloutonnes* fait paraître perdant tout échange. Rencontré deux fois :
+   sur les « occasions manquées », puis sur les suggestions qui ne rendaient
+   jamais rien. **Toujours mesurer les deux côtés pareil.**
+2. **Le panaché partait du build suffisant** (donc tout doré) et ne pouvait
+   plus que redescendre — ce qu'une recherche locale ne sait pas faire.
+3. **Une rareté figée n'escalade jamais.** Avec Epic par défaut, tout build
+   ayant besoin d'une pièce dorée annonçait « pas atteignable ».
+4. **Enregistrer un build n'enregistrait pas le build**, seulement la liste
+   d'affixes : le rouvrir le recomposait et donnait autre chose.
+5. **Le vin survivait à la suppression de sa cible** et mangeait une des
+   quatre places.
+6. **PowerShell `Set-Content` casse l'encodage** des fichiers accentués
+   (double encodage UTF-8). **Utiliser Python** pour tout patch de fichier.
+7. **La compilation échoue si l'application est ouverte** (`PermissionError`).
+
+---
+
+## 8. Vérifier avant de livrer
+
+```
+python innes_deduits.py                 # doit afficher 262/262, fiable=True
+python tools/generer_site.py            # régénère donnees.js + icônes
+node <scratchpad>/test_site.mjs         # JS et Python doivent concorder
+```
+
+Contrôles manuels utiles : importer un code puis le ré-exporter (doit être
+identique) ; enregistrer un build, en charger un autre, revenir (doit être
+identique).
+
+---
+
+## 9. Compiler
+
+```
+python build_exe.py                     # -> dist\Mistfall Helper.exe
+python installer\build_installer.py     # -> dist\...Setup.exe
+```
+
+Fermer l'application d'abord. Tout module importé **dans une fonction**
+doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
+`theme_sombre`…) : l'analyse statique de PyInstaller ne les voit pas.
+
+---
+
+## 10. Ce qui reste ouvert
+
+- **21 objets** (familles 11–13, armes *Holy*) : innés inconnus. Il faudrait
+  un code d'import ou une capture par variante.
+- **Interface de l'application** : les fonctions `variantes`, `alternatives`
+  et `suggestions` existent dans `game_data.py` mais **ne sont exposées que
+  sur le site**.
+- **Thème sombre de l'application** : posé globalement, mais des styles
+  bleus définis pièce par pièce subsistent et ne suivent pas l'accent orange.
+- **Réglages Supabase** à faire dans le tableau de bord : décocher *Confirm
+  email* (sinon quota d'envoi saturé → « trop d'essais » en boucle), et
+  renseigner l'adresse du site dans *Authentication → URL Configuration*.
+- **Le site publie ses données.** `donnees.js` est téléchargeable par qui
+  regarde le code source. Seul un calcul côté serveur y changerait quelque
+  chose.
+
+---
+
+## 11. Historique
+
+Entrées les plus récentes en premier.
+
+### Pièces interchangeables + préférences
+Lister les combinaisons était inutilisable (23 328 sur un cas réel) : on
+liste donc les pièces interchangeables **par emplacement**, chacune posée et
+vérifiée. Ajout d'un bouton de préférence à trois états par affixe pour
+guider les suggestions sans alourdir le cas courant.
+
+### Trois langues, don plus visible
+Interface en français / anglais / russe, détectée au navigateur, forçable
+par drapeaux. Le lien de don devient un vrai bouton. Les suggestions ne
+changent plus la rareté et disent d'où vient chaque gain.
+
+### Suggestions
+Échanges d'une pièce qui gagnent sans rien perdre. Un troc n'est retenu que
+s'il décroche un palier. Rien n'est appliqué sans clic.
+
+### Minimum viable
+Passe d'allègement : 8 Legendary → 2 Legendary + 5 Epic + 1 Excellent sur un
+cas réel, mieux que le build fait à la main. 20 cas sur 20 allégés, 146 crans
+économisés, 0 cible perdue.
+
+### Builds rendus à l'identique
+Un build garde son code d'import et est restitué tel quel. Les builds
+enregistrés avant cette correction sont signalés dans la liste.
+
+### Mise en ligne
+Dépôt transféré vers l'organisation `Mistfall-Builder` pour retirer le nom
+de l'auteur de l'adresse. Comptes Supabase branchés ; table `builds` créée
+par migration versionnée, avec politique RLS.
+
+### Codes d'import
+Format décodé et vérifié en jeu dans les deux sens. Les 155 objets absents du
+catalogue reconstitués par élimination (262/262 au contrôle).
