@@ -1,101 +1,208 @@
-/* Trente-six builds, six par classe.
+/* LES BUILDS QUE LA COMMUNAUTÉ JOUE VRAIMENT.
  *
- * Chacun a été calculé puis contrôlé : ses cibles sont atteintes et son code
- * d'import a été engendré par le codec du site.
+ * Ce fichier ne contient plus d'archétypes inventés. Chaque entrée vient
+ * d'un guide publié, elle porte son lien, et le choix des affixes est celui
+ * de la source — pas le nôtre.
  *
- * SIX INTENTIONS, DÉCRITES UNE FOIS. Le plan est le même d'une classe à
- * l'autre, seuls les affixes changent selon l'affinité — une classe magique
- * ne prend pas d'affixe de dégâts physiques. Décrire l'intention une seule
- * fois évite six paragraphes qui répètent la même chose.
+ * CE QUI VIENT DE LA SOURCE : la classe, l'arme, la LISTE des affixes, et
+ * leur niveau quand le guide le donne. Quand un guide se contente de
+ * nommer un affixe sans niveau — c'est fréquent —, on le pousse à son
+ * palier, c'est-à-dire au niveau où il débloque son second effet. C'est
+ * dit dans le texte du build à chaque fois.
  *
- * NE PAS ÉDITER À LA MAIN : les codes viennent du moteur.
+ * CE QUI VIENT DE NOUS : le stuff. Les guides disent quels affixes viser,
+ * jamais quelles pièces porter. Le moteur du site cherche la rareté la
+ * plus basse qui atteint la consigne, Victory Wine compris, et le code
+ * d'import en découle. Les douze ont été vérifiés : zéro cible manquée,
+ * douze codes distincts, chacun se redécodant sur la bonne classe.
+ *
+ * CE QU'ON NE REPREND PAS : les descriptions d'affixes des guides. Deux
+ * d'entre eux décrivent Fervid comme un bonus « au-dessus de 70 % de vie »
+ * et Fervor comme cumulatif ; les données du jeu disent autre chose. On
+ * garde leur CHOIX d'affixes, on décrit les effets d'après donnees.json.
+ *
+ * Relevé le 12 août 2026. Un guide qui change ne se met pas à jour tout
+ * seul ici.
  */
-window.D_INTENTIONS = {
-  offensif: {
-    nom: { fr: 'Offensif', en: 'Offensive', ru: 'Атакующий' },
-    d: {
-      fr: "Trois affixes de dégâts à leur palier. Deux d'entre eux ajoutent de la pénétration de défense au passage : contre un monstre, tous à 50 % de réduction, chaque point de pénétration retire un point entier de mitigation.",
-      en: 'Three damage affixes at their breakpoint. Two of them add defence penetration along the way: against a monster, all sitting at 50 % reduction, every point of penetration removes a whole point of mitigation.',
-      ru: 'Три атакующих аффикса на пороге. Два попутно дают пробивание защиты: у монстров 50 % снижения, и каждая единица пробивания снимает целый процент.',
-    },
-  },
-  defensif: {
-    nom: { fr: 'Défensif', en: 'Defensive', ru: 'Защитный' },
-    d: {
-      fr: "Aegis, Tenacious et Stoic à 5, c'est-à-dire tous les trois au niveau où ils débloquent leur second effet : résistance physique, vie, et le filet de sécurité sous 50 % de vie.",
-      en: 'Aegis, Tenacious and Stoic at 5 — all three at the level where they unlock their second effect: physical resistance, health, and the safety net below 50 % health.',
-      ru: 'Aegis, Tenacious и Stoic на 5 — все три на уровне, где открывается второй эффект: физическое сопротивление, здоровье и страховка ниже 50 % HP.',
-    },
-  },
-  equilibre: {
-    nom: { fr: 'Équilibré', en: 'Balanced', ru: 'Сбалансированный' },
-    d: {
-      fr: "Un affixe de chaque famille, tous les trois à leur palier : de quoi frapper, de quoi encaisser, de quoi bouger. Le build qui ne brille nulle part et ne coince nulle part.",
-      en: 'One affix from each family, all three at their breakpoint: something to hit with, something to soak with, something to move with. Shines nowhere, gets stuck nowhere.',
-      ru: 'По одному аффиксу из каждой группы, все три на пороге: чем бить, чем держать, чем двигаться. Нигде не блещет, нигде не встаёт.',
-    },
-  },
-  mobilite: {
-    nom: { fr: 'Mobilité', en: 'Mobility', ru: 'Подвижность' },
-    d: {
-      fr: "Swift et Elusive à 5, plus un affixe de dégâts. On ne gagne pas en dégâts par coup, on gagne en coups placés et en fuites réussies — contre des joueurs, ça vaut souvent mieux qu'un affixe offensif de plus.",
-      en: 'Swift and Elusive at 5, plus one damage affix. You do not gain damage per hit, you gain hits landed and escapes made — against players that often beats one more offensive affix.',
-      ru: 'Swift и Elusive на 5 плюс один атакующий аффикс. Не урон за удар, а число попаданий и удачных отходов — против игроков это часто ценнее.',
-    },
-  },
-  soutien: {
-    nom: { fr: 'Soutien', en: 'Support', ru: 'Поддержка' },
-    d: {
-      fr: "Eloquence 5 pour ne pas se faire interrompre en incantation, Blessing 5 pour le soin, Aegis 5 pour rester debout pendant qu'on soigne les autres.",
-      en: 'Eloquence 5 so chanting cannot be interrupted, Blessing 5 for healing, Aegis 5 to stay standing while you keep the others up.',
-      ru: 'Eloquence 5 против прерывания каста, Blessing 5 — лечение, Aegis 5 — чтобы устоять, пока лечишь остальных.',
-    },
-  },
-  paliers: {
-    nom: { fr: 'Quatre paliers', en: 'Four breakpoints', ru: 'Четыре порога' },
-    d: {
-      fr: "Le plus large : quatre affixes, trois à leur palier. Il fait moins bien que les spécialisés sur leur terrain, mais il ne laisse aucun trou — et le quatrième ne coûte rien puisqu'il reste sous son seuil.",
-      en: 'The widest: four affixes, three at their breakpoint. It loses to the specialists on their own ground, but leaves no hole — and the fourth costs nothing since it stays under its threshold.',
-      ru: 'Самый широкий: четыре аффикса, три на пороге. Уступает специалистам на их поле, но не оставляет дыр — а четвёртый ничего не стоит, оставаясь ниже порога.',
-    },
-  },
+window.D_SOURCES = {
+  gamerant: { nom: 'GameRant' },
+  keengamer: { nom: 'KeenGamer' },
+  skycoach: { nom: 'Skycoach' },
+  mhguide: { nom: 'Mistfall Hunter Guide' },
 };
 
 window.D_BUILDS = [
-{"k":"10-offensif","c":10,"a":"Sword and Shield","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"Gtf32jMSCIaIQqljKVOdb9KE03OaiW0MjAWLbs","r":"8 × Excellent"},
-{"k":"10-defensif","c":10,"a":"Hammer","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf38QtLbz7Mem2Zx24xSHUxvlKEnPwfNeZfZQ","r":"8 × Excellent"},
-{"k":"10-equilibre","c":10,"a":"Sword and Shield","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf32jMSVdhn4fdv4HzmdXkcrssuEfweNyRZlA","r":"8 × Excellent"},
-{"k":"10-mobilite","c":10,"a":"Hammer","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf32jMSVdhn4hj7iq69NTpJpGGygiGc7uXj96","r":"8 × Excellent"},
-{"k":"10-soutien","c":10,"a":"Sword and Shield","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf35a8zDAbbLraHewEJItyxsLAgJfDHHlWeBc","r":"8 × Excellent"},
-{"k":"10-paliers","c":10,"a":"Hammer","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"17lpUl3AaT7jXbXdOtDJAmbRUHTEf7ws6I2YaJUm","r":"8 × Excellent"},
-{"k":"11-offensif","c":11,"a":"Staff","i":"offensif","t":[["Valor",5],["Fervor",5],["Strife",5]],"code":"Gtf32uOzIa7huzAn3irECngyXbMHHRsGJ0zJvk","r":"8 × Excellent"},
-{"k":"11-defensif","c":11,"a":"Staff","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf32uPcfUPVaPP8hLAoshjmfqcHUjtPFIBXJw","r":"8 × Excellent"},
-{"k":"11-equilibre","c":11,"a":"Staff","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf32uOzIZD9JYjXXmgvJrYQyawknIGZRCdWdc","r":"8 × Excellent"},
-{"k":"11-mobilite","c":11,"a":"Staff","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf32uPddRjqdumheOooVqK0MvqftJE7X0J5ai","r":"8 × Excellent"},
-{"k":"11-soutien","c":11,"a":"Staff","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf32uQJR0vr2XQXtAEYnu0kytFBDyNbfojIQK","r":"8 × Excellent"},
-{"k":"11-paliers","c":11,"a":"Staff","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"Gtf32uOzIZD9JYjXXmgvJrYU5sSeM4fqa0C15c","r":"8 × Excellent"},
-{"k":"12-offensif","c":12,"a":"Bow","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"Gtf335SPUM5kYjIojF4wDVwILDYM3AFUf6QlO4","r":"8 × Excellent"},
-{"k":"12-defensif","c":12,"a":"Bow","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf335SOgRy1qxxAx7I5lzPp6g4yRaLp8UgMWO","r":"8 × Excellent"},
-{"k":"12-equilibre","c":12,"a":"Bow","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf335SPoZwr5mkgxJinfxcuUb1Wy3jxrsmVGa","r":"8 × Excellent"},
-{"k":"12-mobilite","c":12,"a":"Bow","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf335SPoS2hxWCPnFDNOgYrMfFKrumJjppDbU","r":"8 × Excellent"},
-{"k":"12-soutien","c":12,"a":"Bow","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf38mzvTCWKdy5O5BlemkD38kVCCs9L3QxQQa","r":"8 × Excellent"},
-{"k":"12-paliers","c":12,"a":"Bow","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"17lpUakXJFtkLOjhonfzMYocQEovk1IGxUbSKeBs","r":"8 × Excellent"},
-{"k":"13-offensif","c":13,"a":"Dagger","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"17lpUbU7lxnJXCJOB0RuNC6CIzfao7KCvykixUSO","r":"8 × Excellent"},
-{"k":"13-defensif","c":13,"a":"Dual Blades","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf38y2FSdtPB9dTdiCgC2r8s099pWRvWviyfo","r":"8 × Excellent"},
-{"k":"13-equilibre","c":13,"a":"Dagger","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf367GdSlr9j3hIHEqvcxff3tjqks1PJIQ3DU","r":"8 × Excellent"},
-{"k":"13-mobilite","c":13,"a":"Dual Blades","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf33GVawHRFbJftipnA99v5TJnE14fNLT1MHY","r":"8 × Excellent"},
-{"k":"13-soutien","c":13,"a":"Dagger","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf367Gb1w0EKgtfqdN7VhII8VhueZsIARI2VM","r":"8 × Excellent"},
-{"k":"13-paliers","c":13,"a":"Dual Blades","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"17lpUnG0gw1tL9nUbULqIiUa0rwZ20O2NELVnd2W","r":"8 × Excellent"},
-{"k":"14-offensif","c":14,"a":"Catalyst","i":"offensif","t":[["Valor",5],["Fervor",5],["Strife",5]],"code":"Gtf33RYaOtoHLr1EZwpkxFMLZGN3HotA4Mhvpw","r":"8 × Excellent"},
-{"k":"14-defensif","c":14,"a":"Mace","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf33RXvFnXsmIiNekfWFXIimfkS4KizZvK7Ci","r":"8 × Excellent"},
-{"k":"14-equilibre","c":14,"a":"Catalyst","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf33RXvFeGtjwdIhvOUnSbDLLeLqUsknUh9zk","r":"8 × Excellent"},
-{"k":"14-mobilite","c":14,"a":"Mace","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf33RYZagNQyQAb9hJ6kBI49h6nNVI6DXgsy0","r":"8 × Excellent"},
-{"k":"14-soutien","c":14,"a":"Catalyst","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf33RYZuko82DnmJnDPf8dHcEe5GK0lShyyvo","r":"8 × Excellent"},
-{"k":"14-paliers","c":14,"a":"Mace","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"Gtf33RYaiyY7XoVjzSJ7zlZDgA21AShs1cUTc8","r":"8 × Excellent"},
-{"k":"15-offensif","c":15,"a":"Greatsword","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"Gtf39K8FBzWlhhMCRLzKKCb4UR9ygRidGysXmC","r":"8 × Excellent"},
-{"k":"15-defensif","c":15,"a":"Polearm and Shield","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf36TNBhWZ9uDmHDgFhwXM6wlb5AIyQMMF9DE","r":"8 × Excellent"},
-{"k":"15-equilibre","c":15,"a":"Greatsword","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf36TMYKvtUceiZrRs6WTsETsZdlySHnoO120","r":"8 × Excellent"},
-{"k":"15-mobilite","c":15,"a":"Polearm and Shield","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf33catu3D4OqiRwficKdJNJcYr0knekjQBs0","r":"8 × Excellent"},
-{"k":"15-soutien","c":15,"a":"Greatsword","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"17lpUojHpfQpNEfW27hbLRW7BHwOLB6r0lXT22q0","r":"8 × Excellent"},
-{"k":"15-paliers","c":15,"a":"Polearm and Shield","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"Gtf36TMYKl5wGjIajT7Yci5rFGGO6QXTEGgNvc","r":"8 × Excellent"}
+  /* ------------------------------------------------------------ MERCENARY */
+  {
+    c: 10, a: 'Hammer', k: 'merc-hammer', r: '8 × Excellent',
+    code: 'Gtf38QtLbhBASC1w2mYuvVzM5qNeWJokKSNa9w',
+    t: [['Stoic', 5], ['Seeker', 5], ['Unyielding', 5], ['Tenacious', 5]],
+    src: 'gamerant',
+    url: 'https://gamerant.com/mistfall-hunter-best-mercenary-build-gear-gem-affixes-talent-skill/',
+    nom: { fr: 'Marteau — bruiser', en: 'Hammer — bruiser', ru: 'Молот — брузер' },
+    d: {
+      fr: "Le build tank du Mercenary. Stoic 5 rend 15 % de vie sous 30 %, Unyielding 5 cumule ses résistances, Tenacious 5 monte la vie et les soins reçus, Seeker 5 rattrape la lenteur de l'arme. Le guide nomme aussi Aegis et Elusive sans donner de niveau ; ils passent en prime sur le stuff trouvé.",
+      en: "The Mercenary tank build. Stoic 5 restores 15 % health below 30 %, Unyielding 5 stacks its resistances, Tenacious 5 raises health and healing received, Seeker 5 offsets the weapon's slowness. The guide also names Aegis and Elusive without levels; they come along as extras on the gear found.",
+      ru: 'Танковая сборка Mercenary. Stoic 5 возвращает 15 % здоровья ниже 30 %, Unyielding 5 копит сопротивления, Tenacious 5 поднимает здоровье и лечение, Seeker 5 компенсирует медлительность оружия. Гайд называет также Aegis и Elusive без уровней; они идут бонусом на найденном снаряжении.',
+    },
+  },
+  {
+    c: 10, a: 'Sword and Shield', k: 'merc-bloc', r: '8 × Excellent',
+    code: 'Gtf38QtLw49jJRP2008RVXS0BfKLu5yaUjO6ls',
+    t: [['Bulwark', 4], ['Stoic', 5], ['Wrath', 5], ['Valor', 5]],
+    src: 'mhguide',
+    url: 'https://www.mistfallhunterguide.org/builds/mercenary-build',
+    nom: { fr: 'Bouclier — blocage PvP', en: 'Shield — PvP block', ru: 'Щит — блок в PvP' },
+    d: {
+      fr: "L'ordre de priorité est celui du guide : Bulwark d'abord, puis Stoic et Wrath, Valor ensuite. Bulwark est poussé à 4, son palier — au-delà, seul le taux de réduction au blocage monte encore. Wrath 5 est le plus gros affixe de dégâts du jeu, +14,7 % physique et magique à son maximum.",
+      en: "The priority order is the guide's: Bulwark first, then Stoic and Wrath, Valor after. Bulwark is pushed to 4, its breakpoint — past that only the block reduction rate keeps rising. Wrath 5 is the biggest damage affix in the game, +14.7 % physical and magic at its cap.",
+      ru: 'Порядок приоритета взят из гайда: сначала Bulwark, затем Stoic и Wrath, потом Valor. Bulwark доведён до 4 — его порог; дальше растёт только процент снижения урона при блоке. Wrath 5 — самый большой аффикс урона в игре, +14,7 % физического и магического на максимуме.',
+    },
+  },
+  {
+    c: 10, a: 'Sword and Shield', k: 'merc-ss', r: '8 × Rare',
+    code: 'lfMC2Y5gb47HxYtAkJ0C8QW4tMm',
+    t: [['Elusive', 3], ['Vitality', 4], ['Valor', 5]],
+    src: 'skycoach',
+    url: 'https://skycoach.gg/blog/mistfall-hunter/articles/gyldhunters-best-builds',
+    nom: { fr: 'Épée et bouclier — trio Elusive/Vitality/Valor',
+           en: 'Sword and shield — the Elusive/Vitality/Valor trio',
+           ru: 'Меч и щит — трио Elusive/Vitality/Valor' },
+    d: {
+      fr: "Ce trio revient dans presque tous les guides, toutes classes confondues : Elusive pour l'esquive, Vitality pour l'énergie, Valor pour l'attaque. Vitality est à 4, son palier, où il rend immunisé au découvert d'énergie. Trois affixes seulement, et le stuff tient entièrement en Rare — c'est le build le moins exigeant de la liste avec celui du Blackarrow.",
+      en: "This trio recurs in nearly every guide, across all classes: Elusive for dodging, Vitality for energy, Valor for attack. Vitality sits at 4, its breakpoint, where it grants immunity to energy overdraft. Three affixes only, and the gear holds entirely in Rare — the least demanding build on this list alongside the Blackarrow one.",
+      ru: 'Это трио встречается почти во всех гайдах, у всех классов: Elusive — уклонение, Vitality — энергия, Valor — атака. Vitality на 4, на своём пороге, где даёт иммунитет к перерасходу энергии. Всего три аффикса, и снаряжение полностью держится на Rare — наименее требовательная сборка списка наряду с Blackarrow.',
+    },
+  },
+
+  /* ------------------------------------------------------------- SORCERER */
+  {
+    c: 11, a: 'Staff', k: 'sorc-stardust', r: '8 × Epic',
+    code: 'Gtf32uR1CQkMXZEOei4wXBwMmvOBvTJJUQUtOa',
+    t: [['Ranged', 7], ['Eloquence', 7], ['Elusive', 3], ['Aegis', 3],
+        ['Fervid', 2], ['Fervor', 1]],
+    src: 'gamerant',
+    url: 'https://gamerant.com/mistfall-hunter-sorcerer-build-guide/',
+    nom: { fr: 'Stardust PvP', en: 'Stardust PvP', ru: 'Stardust PvP' },
+    d: {
+      fr: "Le seul build relevé dont la source donne tous les niveaux, et le seul à monter deux affixes jusqu'à 7 : Ranged 7 et Eloquence 7. Le reste est volontairement bas — Elusive 3, Aegis 3, Fervid 2, Fervor 1. C'est l'inverse d'un build étalé : deux affixes très hauts, quatre en appoint. Il faut de l'Epic pour y arriver.",
+      en: "The only build found whose source gives every level, and the only one taking two affixes to 7: Ranged 7 and Eloquence 7. The rest is deliberately low — Elusive 3, Aegis 3, Fervid 2, Fervor 1. The opposite of a spread build: two very high affixes, four topping up. It takes Epic gear to get there.",
+      ru: 'Единственная найденная сборка, где источник даёт все уровни, и единственная, поднимающая два аффикса до 7: Ranged 7 и Eloquence 7. Остальное намеренно низкое — Elusive 3, Aegis 3, Fervid 2, Fervor 1. Противоположность размазанной сборке: два очень высоких аффикса и четыре добора. Нужен Epic.',
+    },
+  },
+  {
+    c: 11, a: 'Staff', k: 'sorc-elem', r: '8 × Excellent',
+    code: 'Gtf32uPde4oPQgHtY0T2itNDCJ7QqFhK6DhDRA',
+    t: [['Eloquence', 5], ['Elusive', 3], ['Vitality', 4], ['Ranged', 5], ['Fervor', 5]],
+    src: 'skycoach',
+    url: 'https://skycoach.gg/blog/mistfall-hunter/articles/gyldhunters-best-builds',
+    nom: { fr: 'Élémentaire — Eloquence d\'abord', en: 'Elemental — Eloquence first',
+           ru: 'Стихийный — сначала Eloquence' },
+    d: {
+      fr: "« Eloquence 5 en premier, puis Elusive, Vitality, Ranged, Fervor » — l'ordre est celui du guide, mot pour mot. Eloquence 5 est le palier qui rend l'incantation ininterrompable par les impacts mineurs, et toutes les sources consultées le mettent en tête pour cette classe. Les affixes cités sans niveau sont posés à leur palier.",
+      en: "\"Eloquence 5 first, then Elusive, Vitality, Ranged, Fervor\" — the order is the guide's, word for word. Eloquence 5 is the breakpoint that makes chanting immune to minor impacts, and every source consulted puts it first for this class. Affixes named without a level are set at their breakpoint.",
+      ru: '«Сначала Eloquence 5, затем Elusive, Vitality, Ranged, Fervor» — порядок взят из гайда дословно. Eloquence 5 — порог, на котором каст перестаёт прерываться мелкими импактами, и все просмотренные источники ставят его первым для этого класса. Аффиксы без уровня выставлены на порог.',
+    },
+  },
+
+  /* ----------------------------------------------------------- BLACKARROW */
+  {
+    c: 12, a: 'Bow', k: 'ba-pvp', r: '8 × Excellent',
+    code: 'Gtf335RxxSYa1zqzZeMEdz8OyqldqWDQpE6L1U',
+    t: [['Ranged', 5], ['Focused', 5], ['Elusive', 3], ['Fervid', 5]],
+    src: 'gamerant',
+    url: 'https://gamerant.com/mistfall-hunter-best-blackarrow-build-gear-gem-affixes-talent-skill-pvp-pve/',
+    nom: { fr: 'Arc — PvP à distance', en: 'Bow — ranged PvP', ru: 'Лук — дальний PvP' },
+    d: {
+      fr: "Le guide classe les affixes par importance sans donner de niveau : Ranged et Focused en tête, Elusive et Fervid ensuite, Fervor et Valor en appoint. Les quatre premiers sont posés à leur palier. Ranged 5 ajoute +12 % de portée efficace, Focused 5 ajoute +10 % de vitesse de déplacement à la vitesse de charge.",
+      en: "The guide ranks affixes by importance without giving levels: Ranged and Focused on top, Elusive and Fervid next, Fervor and Valor as filler. The first four are set at their breakpoint. Ranged 5 adds +12 % effective range, Focused 5 adds +10 % movement speed on top of charging speed.",
+      ru: 'Гайд ранжирует аффиксы по важности без уровней: Ranged и Focused во главе, затем Elusive и Fervid, Fervor и Valor как добор. Первые четыре выставлены на порог. Ranged 5 добавляет +12 % эффективной дистанции, Focused 5 — +10 % скорости передвижения сверх скорости зарядки.',
+    },
+  },
+  {
+    c: 12, a: 'Bow', k: 'ba-curse', r: '8 × Common',
+    code: '2nLRaa5USjOvOgczZzLA1Q8H2',
+    t: [['Curse', 4], ['Focused', 2], ['Elusive', 3], ['Seeker', 2], ['Ranged', 2]],
+    src: 'gamerant',
+    url: 'https://gamerant.com/mistfall-hunter-best-blackarrow-build-gear-gem-affixes-talent-skill-pvp-pve/',
+    nom: { fr: 'Arc — PvE debuffs', en: 'Bow — PvE debuffs', ru: 'Лук — PvE дебаффы' },
+    d: {
+      fr: "Curse en priorité absolue : il allonge la durée de tous les debuffs qu'on applique. Le reste est bas exprès — Focused 2, Seeker 2, Ranged 2, Elusive 3. C'est le build le moins exigeant de tout le site : le stuff tient en **Common**, la rareté de départ. À prendre tel quel pour débuter, sans rien acheter.",
+      en: "Curse is the absolute priority: it extends the duration of every debuff you apply. The rest is deliberately low — Focused 2, Seeker 2, Ranged 2, Elusive 3. This is the least demanding build on the whole site: the gear holds in **Common**, the starting rarity. Take it as-is to begin, without buying anything.",
+      ru: 'Curse — абсолютный приоритет: он продлевает длительность всех накладываемых дебаффов. Остальное намеренно низкое — Focused 2, Seeker 2, Ranged 2, Elusive 3. Самая нетребовательная сборка на сайте: снаряжение держится на **Common**, стартовой редкости. Берётся как есть для начала, без покупок.',
+    },
+  },
+
+  /* ---------------------------------------------------------- SHADOWSTRIX */
+  {
+    c: 13, a: 'Dual Blades', k: 'shadow-db', r: '8 × Excellent',
+    code: 'Gtf33GVawHROjSv4J4M4CD4F45rtHkG7t2rMcS',
+    t: [['Fervor', 5], ['Valor', 5], ['Vitality', 4], ['Elusive', 3], ['Seeker', 4]],
+    src: 'keengamer',
+    url: 'https://www.keengamer.com/articles/guides/mistfall-hunter-best-shadowstrix-build-skills-talents-and-affixes/',
+    nom: { fr: 'Lames jumelles — pression', en: 'Dual blades — pressure',
+           ru: 'Парные клинки — давление' },
+    d: {
+      fr: "Six emplacements chez la source : Fervor, Valor, Vitality, Elusive, Seeker, puis Fervid ou Smiting au choix. Les cinq premiers sont retenus, chacun à son palier. Un autre guide donne pour cette classe la cible de fin de partie « Valor 5 + Fervor 5 » : ce sont exactement les deux premiers, ce qui recoupe.",
+      en: "Six slots at the source: Fervor, Valor, Vitality, Elusive, Seeker, then Fervid or Smiting by choice. The first five are kept, each at its breakpoint. Another guide gives this class the endgame target \"Valor 5 + Fervor 5\": those are exactly the first two, which corroborates.",
+      ru: 'Шесть слотов в источнике: Fervor, Valor, Vitality, Elusive, Seeker, затем Fervid или Smiting на выбор. Первые пять взяты, каждый на своём пороге. Другой гайд даёт для этого класса эндгейм-цель «Valor 5 + Fervor 5» — это ровно первые два, что подтверждает.',
+    },
+  },
+
+  /* ----------------------------------------------------------------- SEER */
+  {
+    c: 14, a: 'Mace', k: 'seer-blasph', r: '8 × Excellent',
+    code: '17lpVBXOYaFMoB5eKc0yxHX0xQqHZafZ7ZGcrz4S',
+    t: [['Stoic', 5], ['Tenacious', 5], ['Fervor', 5], ['Strife', 5]],
+    src: 'gamerant',
+    url: 'https://gamerant.com/mistfall-hunter-best-seer-build-gear-gem-affixes-talent-skill/',
+    nom: { fr: 'Masse — Blasphemer', en: 'Mace — Blasphemer', ru: 'Булава — Blasphemer' },
+    d: {
+      fr: "Le Seer au corps-à-corps, quatre affixes tous à 5, niveaux donnés par la source. Une précision qui compte : le soin de ce build ne vient d'aucun affixe, il vient de la compétence Drain Rune. Tenacious 5 augmente les soins REÇUS (+7,5 %) en plus des +9 % de vie — c'est le seul affixe du jeu qui touche au soin.",
+      en: "The melee Seer, four affixes all at 5, levels given by the source. One clarification that matters: this build's healing comes from no affix at all, it comes from the Drain Rune skill. Tenacious 5 raises healing RECEIVED (+7.5 %) on top of +9 % health — it is the only affix in the game that touches healing.",
+      ru: 'Seer в ближнем бою, четыре аффикса на 5, уровни даны источником. Важное уточнение: лечение этой сборки не идёт ни от одного аффикса — оно идёт от умения Drain Rune. Tenacious 5 повышает ПОЛУЧАЕМОЕ лечение (+7,5 %) сверх +9 % здоровья: это единственный аффикс в игре, связанный с лечением.',
+    },
+  },
+  {
+    c: 14, a: 'Catalyst', k: 'seer-rev', r: '8 × Excellent',
+    code: 'Gtf33RYZbSQakhGAW5hB460ogiW74b0pNF39Xc',
+    t: [['Valor', 5], ['Eloquence', 5], ['Stoic', 5], ['Elusive', 3]],
+    src: 'skycoach',
+    url: 'https://skycoach.gg/blog/mistfall-hunter/articles/gyldhunters-best-builds',
+    nom: { fr: 'Catalyseur — Reverent', en: 'Catalyst — Reverent', ru: 'Катализатор — Reverent' },
+    d: {
+      fr: "« Valor 5, Eloquence 5, Stoic 5, Elusive le plus haut possible » — les niveaux sont ceux du guide. Elusive plafonne à 5 mais n'a pas de palier ; il est ici à 3, le niveau que les guides citent le plus souvent pour trois barres d'esquive. Eloquence 5 vaut ici ce qu'il vaut au Sorcerer : les runes s'incantent.",
+      en: "\"Valor 5, Eloquence 5, Stoic 5, Elusive as high as possible\" — the levels are the guide's. Elusive caps at 5 but has no breakpoint; it sits at 3 here, the level guides most often quote for three dodge bars. Eloquence 5 is worth here what it is worth on the Sorcerer: runes are chanted.",
+      ru: '«Valor 5, Eloquence 5, Stoic 5, Elusive как можно выше» — уровни из гайда. Elusive упирается в 5, но порога не имеет; здесь он на 3 — уровень, который гайды чаще всего называют для трёх полос уклонения. Eloquence 5 здесь стоит того же, что у Sorcerer: руны читаются.',
+    },
+  },
+
+  /* ------------------------------------------------------ WITHERED KNIGHT */
+  {
+    c: 15, a: 'Greatsword', k: 'wk-burst', r: '8 × Excellent',
+    code: 'Gtf33cbMQ0mwFoHZo7Da4WlwLdGT2OgCosw82K',
+    t: [['Tenacious', 5], ['Burst', 5], ['Fervid', 5], ['Stoic', 5]],
+    src: 'mhguide',
+    url: 'https://www.mistfallhunterguide.org/builds/withered-knight-build',
+    nom: { fr: 'Espadon — duelliste', en: 'Greatsword — duelist', ru: 'Двуручник — дуэлянт' },
+    d: {
+      fr: "Tenacious 5 « à prendre tôt » selon la source, puis Burst, qualifié de gain propre à la classe : +25 % de dégâts d'exécution sur les cibles à basse vie. Le guide préfère explicitement Fervor à Valor ici, « parce que le Chevalier frappe vite ». Burst n'a pas de palier ; il est posé à son maximum, 5.",
+      en: "Tenacious 5 \"to take early\" per the source, then Burst, called the class-specific payoff: +25 % execution damage on low-health targets. The guide explicitly prefers Fervor over Valor here, \"because the Knight attacks fast\". Burst has no breakpoint; it is set at its cap, 5.",
+      ru: 'Tenacious 5 «брать рано» по источнику, затем Burst, названный классовой выплатой: +25 % урона добивания по целям с низким здоровьем. Гайд явно предпочитает здесь Fervor вместо Valor, «потому что Рыцарь бьёт быстро». У Burst нет порога; он выставлен на максимум, 5.',
+    },
+  },
+  {
+    c: 15, a: 'Polearm and Shield', k: 'wk-trio', r: '8 × Excellent',
+    code: '17lpUcxOFtpdWkZsvcjFImDLlwLq99Zf6dt85e0e',
+    t: [['Unyielding', 5], ['Resilience', 4], ['Valor', 5], ['Seamless', 5]],
+    src: 'mhguide',
+    url: 'https://www.mistfallhunterguide.org/builds/withered-knight-build',
+    nom: { fr: 'Hallebarde et bouclier — trio', en: 'Polearm and shield — trio',
+           ru: 'Древковое и щит — трио' },
+    d: {
+      fr: "Les cibles de fin de partie données pour la variante trio, telles quelles : 5 Unyielding, 4 Resilience, 5 Valor, 5 Seamless. Resilience 4 est son palier — il y ajoute −25 % de durée des debuffs subis. Seamless 5 accélère les recharges de compétences ; c'est le seul build de la liste à le prendre.",
+      en: "The endgame targets given for the trio variant, as they stand: 5 Unyielding, 4 Resilience, 5 Valor, 5 Seamless. Resilience 4 is its breakpoint — it adds −25 % duration on debuffs you suffer. Seamless 5 speeds up skill cooldowns; it is the only build on this list that takes it.",
+      ru: 'Эндгейм-цели для трио-варианта, как есть: 5 Unyielding, 4 Resilience, 5 Valor, 5 Seamless. Resilience 4 — его порог, добавляет −25 % длительности накладываемых на тебя дебаффов. Seamless 5 ускоряет перезарядку умений; это единственная сборка списка, которая его берёт.',
+    },
+  },
 ];

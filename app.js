@@ -1818,12 +1818,12 @@ function dessinerBuilds() {
       <label class="ami" title="${avecCompte
         ? t('ami.marque') : t('ami.marqueNon')}">
         <input type="checkbox" ${b.ami ? 'checked' : ''}
-               ${avecCompte ? '' : 'disabled'}><span>ami</span></label>
+               ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastilleAmi')}</span></label>
       <label class="pub" title="${avecCompte
         ? t('builds.public')
         : t('builds.publicNon')}">
         <input type="checkbox" ${b.pub ? 'checked' : ''}
-               ${avecCompte ? '' : 'disabled'}><span>pub</span></label>
+               ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastillePub')}</span></label>
       <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
               title="${t('cmp.mettre')}">⇄</button>
       <button class="suppr" title="${t('builds.supprimer')}">×</button>`;
@@ -2916,7 +2916,7 @@ function dessinerBuildsClasses() {
   const boite = $('listeReference');
   if (!boite || !window.D_BUILDS) return;
   const langue = (window.I18N && I18N.courante()) || 'fr';
-  const INT = window.D_INTENTIONS || {};
+  const SRC = window.D_SOURCES || {};
   const parClasse = new Map();
   for (const b of window.D_BUILDS) {
     if (!parClasse.has(b.c)) parClasse.set(b.c, []);
@@ -2936,9 +2936,12 @@ function dessinerBuildsClasses() {
       <div class="refGrille"></div>`;
     const grille = bloc.querySelector('.refGrille');
     for (const b of liste) {
-      const info = INT[b.i] || {};
-      const nom = (info.nom && (info.nom[langue] || info.nom.fr)) || b.i;
-      const desc = (info.d && (info.d[langue] || info.d.fr)) || '';
+      const nom = (b.nom && (b.nom[langue] || b.nom.fr)) || b.k;
+      const desc = (b.d && (b.d[langue] || b.d.fr)) || '';
+      // LA SOURCE EST AFFICHÉE, PAS SOUS-ENTENDUE. Ces builds viennent de
+      // guides publiés : le lecteur doit pouvoir aller vérifier lui-même,
+      // et voir quand deux guides ne disent pas la même chose.
+      const src = SRC[b.src];
       const carte = document.createElement('div');
       carte.className = 'refCarte';
       carte.innerHTML = `<h4>${echapper(nom)}</h4>
@@ -2948,6 +2951,9 @@ function dessinerBuildsClasses() {
           ${b.t.map(([n, l]) => `<span class="puce">${n} ${l}</span>`).join('')}
         </div>
         <div class="quoi">${echapper(desc)}</div>
+        ${src ? `<div class="refSource">${t('ref.dapres')}
+          <a href="${echapper(b.url)}" target="_blank"
+             rel="noopener noreferrer nofollow">${echapper(src.nom)}</a></div>` : ''}
         <div class="actions">
           <button class="refCharger">${t('gal.charger')}</button>
           <button class="refCode">${t('gal.code')}</button>
