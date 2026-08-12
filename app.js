@@ -1800,6 +1800,8 @@ function dessinerBuilds() {
         : t('builds.publicNon')}">
         <input type="checkbox" ${b.pub ? 'checked' : ''}
                ${avecCompte ? '' : 'disabled'}><span>pub</span></label>
+      <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
+              title="${t('cmp.mettre')}">⇄</button>
       <button class="suppr" title="${t('builds.supprimer')}">×</button>`;
     const brancher = (sel, cle, cleOui, cleNon) => {
       const c = ligne.querySelector(sel);
@@ -1826,11 +1828,31 @@ function dessinerBuilds() {
       $('noteBuilds').innerHTML = `<span class="pas">${t('builds.chargeOk', { nom: b.nom })}</span>`;
       restituer(b);
     };
+    // Un clic met ce build en A, un clic sur un SECOND le met en B : c'est
+    // la manœuvre « lequel des deux je garde ? », faite sans passer par le
+    // build courant. Recliquer sur un build déjà posé le retire.
+    ligne.querySelector('.cmpB').onclick = () => {
+      if (_cmpA === b.nom) _cmpA = '';
+      else if (_cmpB === b.nom) _cmpB = '';
+      else if (!_cmpA) _cmpA = b.nom;
+      else _cmpB = b.nom;
+      dessinerBuilds();
+      dessinerComparaison();
+      const carte = $('carteComparer');
+      if (carte && !carte.hidden) {
+        carte.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    };
     ligne.querySelector('.suppr').onclick = () => {
       const l = biblio();
       const [parti] = l.splice(i, 1);
       if (!ecrireBiblio(l)) return;
+      // Un build supprimé ne peut plus être un côté de la comparaison :
+      // sans ça la carte resterait sur un build qui n'existe plus.
+      if (_cmpA === b.nom) _cmpA = '';
+      if (_cmpB === b.nom) _cmpB = '';
       dessinerBuilds();
+      dessinerComparaison();
       if (comptesDispo() && window.Comptes.connecte() && parti) {
         // Sinon la prochaine synchro le ferait réapparaître.
         window.Comptes.supprimerBuild(parti.nom).catch(() => {});
@@ -2633,7 +2655,9 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
    d'import : on compare ce qui serait réellement porté, pas ce qui était
    visé.
    ====================================================================== */
-let _comparer = null;   // le build mis de côté, en attente d'un second
+let _comparer = null;   // le build mis de côté par le bouton « Comparer »
+let _cmpA = '';         // nom d'un build enregistré, ou '' = le mis de côté
+let _cmpB = '';         // nom d'un build enregistré, ou '' = le build courant
 
 function etatDepuisCode(code, classe, arme) {
   const lu = decoderCode(code.trim());
@@ -2660,19 +2684,75 @@ function etatDepuisCode(code, classe, arme) {
            classe: lu.classe, arme };
 }
 
+/* Un côté de la comparaison, rejoué depuis son code d'import.
+   `choix` vide veut dire « pas un build enregistré » : c'est alors le
+   repli qui décide — le build mis de côté à gauche, le build courant à
+   droite. C'est ce qui permet aux deux usages de coexister sans que le
+   second casse le premier. */
+function coteComparaison(choix, repli) {
+  if (choix) {
+    const b = biblio().find((x) => x.nom === choix);
+    if (!b) return null;
+    const code = b.code || (b.etat && b.etat.k);
+    if (!code || !b.etat) return null;
+    try {
+      const etat = etatDepuisCode(code, b.etat.c, b.etat.a);
+      // LE VIN DOIT REVENIR AVEC LE BUILD. Le code d'import ne porte que le
+      // stuff : un build visé à Valor 5 dont le vin apporte 2 points est
+      // gravé « Valor 3 » sur les pièces. Sans cette ligne la comparaison
+      // affichait 3 et le joueur ne reconnaissait pas son propre build.
+      // L'état sauvegardé garde la case cochée et l'allocation manuelle :
+      // on rejoue la même répartition, on ne la devine pas.
+      etat.vinPoints = b.etat.v
+        ? repartitionVin(b.etat.t || [], new Map(b.etat.w || []))
+        : new Map();
+      return { nom: b.nom, classe: b.etat.c, etat };
+    } catch (e) { return null; }
+  }
+  return repli();
+}
+
+/* La liste déroulante d'un côté : les builds enregistrés, plus l'entrée
+   par défaut de ce côté-là. Sans build enregistré, le sélecteur ne sert à
+   rien et n'est pas affiché. */
+function optionsComparaison(choix, libelleDefaut) {
+  const l = biblio();
+  if (!l.length) return '';
+  const opts = [`<option value=""${choix ? '' : ' selected'}>${
+    echapper(libelleDefaut)}</option>`];
+  for (const b of l) {
+    opts.push(`<option value="${echapper(b.nom)}"${
+      b.nom === choix ? ' selected' : ''}>${echapper(b.nom)}</option>`);
+  }
+  return opts.join('');
+}
+
 function dessinerComparaison() {
   const carte = $('carteComparer');
   if (!carte) return;
-  if (!_comparer || !dernier) { carte.hidden = true; return; }
-  let gauche;
-  try {
-    gauche = etatDepuisCode(_comparer.code, _comparer.classe, _comparer.arme);
-  } catch (e) { carte.hidden = true; return; }
 
-  const classeG = gauche.classe;
-  const classeD = Number($('classe').value);
+  const A = coteComparaison(_cmpA, () => {
+    if (!_comparer) return null;
+    try {
+      const etat = etatDepuisCode(_comparer.code, _comparer.classe,
+                                  _comparer.arme);
+      etat.vinPoints = _comparer.vinPoints || new Map();
+      return { nom: _comparer.nom || t('cmp.miseDeCote'),
+               classe: _comparer.classe, etat };
+    } catch (e) { return null; }
+  });
+  const B = coteComparaison(_cmpB, () => (dernier
+    ? { nom: t('cmp.courant'), classe: Number($('classe').value), etat: dernier }
+    : null));
+
+  if (!A || !B) { carte.hidden = true; return; }
+
+  const gauche = A.etat;
+  const droite = B.etat;
+  const classeG = A.classe;
+  const classeD = B.classe;
   const fg = window.Fiche.ficheDe(gauche, classeG, D);
-  const fd = window.Fiche.ficheDe(dernier, classeD, D);
+  const fd = window.Fiche.ficheDe(droite, classeD, D);
 
   const LIGNES = [
     ['fiche.attaque', (f) => f.attaque, 0],
@@ -2700,11 +2780,12 @@ function dessinerComparaison() {
 
   // Les affixes obtenus des deux côtés, réunis.
   const noms = [...new Set([...Object.keys(gauche.couvert),
-                            ...Object.keys(dernier.couvert)])].sort();
+                            ...Object.keys(droite.couvert)])].sort();
   const aff = noms.map((n) => {
-    const a = Math.min(plafond(n), gauche.couvert[n] || 0);
-    const vd = (dernier.vinPoints && dernier.vinPoints.get(n)) || 0;
-    const b = Math.min(plafond(n), (dernier.couvert[n] || 0) + vd);
+    const va = (gauche.vinPoints && gauche.vinPoints.get(n)) || 0;
+    const a = Math.min(plafond(n), (gauche.couvert[n] || 0) + va);
+    const vd = (droite.vinPoints && droite.vinPoints.get(n)) || 0;
+    const b = Math.min(plafond(n), (droite.couvert[n] || 0) + vd);
     if (!a && !b) return '';
     const d = b - a;
     const signe = d === 0 ? 'nul' : (d > 0 ? 'plus' : 'moins');
@@ -2715,30 +2796,52 @@ function dessinerComparaison() {
   }).join('');
 
   const rarG = sommeRaretes(gauche.slotItems);
-  const rarD = sommeRaretes(dernier.slotItems);
+  const rarD = sommeRaretes(droite.slotItems);
+  const optA = optionsComparaison(_cmpA, t('cmp.miseDeCote'));
+  const optB = optionsComparaison(_cmpB, t('cmp.courant'));
   carte.hidden = false;
   $('comparaison').innerHTML = `
     <div class="cmpTete">
-      <div><span class="cmpQui">A</span> ${echapper(_comparer.nom)}
+      <div><span class="cmpQui">A</span> ${echapper(A.nom)}
         <small>${D.classes[String(classeG)] || ''} · ${nb(rarG)} ${t('cmp.crans')}</small></div>
-      <div><span class="cmpQui b">B</span> ${t('cmp.courant')}
+      <div><span class="cmpQui b">B</span> ${echapper(B.nom)}
         <small>${D.classes[String(classeD)] || ''} · ${nb(rarD)} ${t('cmp.crans')}</small></div>
       <button id="cmpVider">${t('cmp.vider')}</button>
     </div>
+    ${optA ? `<div class="cmpChoix">
+      <label><span class="cmpQui">A</span>
+        <select id="cmpSelA">${optA}</select></label>
+      <label><span class="cmpQui b">B</span>
+        <select id="cmpSelB">${optB}</select></label>
+    </div>` : ''}
     <table class="cmp"><tr><th>${t('fiche.stat')}</th><th class="n">A</th>
       <th class="n">B</th><th class="n">${t('cmp.ecart')}</th></tr>${lignes}</table>
     <table class="cmp" style="margin-top:10px"><tr><th>${t('table.affixe')}</th>
       <th class="n">A</th><th class="n">B</th><th class="n">${t('cmp.ecart')}</th></tr>
       ${aff}</table>`;
-  $('cmpVider').onclick = () => { _comparer = null; dessinerComparaison(); };
+  $('cmpVider').onclick = () => {
+    _comparer = null; _cmpA = ''; _cmpB = ''; dessinerComparaison();
+  };
+  if ($('cmpSelA')) {
+    $('cmpSelA').onchange = (e) => { _cmpA = e.target.value; dessinerComparaison(); };
+    $('cmpSelB').onchange = (e) => { _cmpB = e.target.value; dessinerComparaison(); };
+  }
 }
 
 /* Mettre le build courant « de côté » : c'est le A de la comparaison. */
 function mettreDeCote() {
   const code = $('code').value;
   if (!code || !dernier) return;
-  _comparer = { code, nom: ($('nomBuild').value || '').trim() || t('cmp.miseDeCote'),
-                classe: Number($('classe').value), arme: $('arme').value || null };
+  // Un build sans nom garde `null` et non le libellé traduit : figer le
+  // texte ici le laisserait en français après un changement de langue.
+  _comparer = { code, nom: ($('nomBuild').value || '').trim() || null,
+                classe: Number($('classe').value), arme: $('arme').value || null,
+                // Le vin du build posé, capturé tel qu'il était calculé : le
+                // code d'import ne le transporte pas.
+                vinPoints: dernier.vinPoints || new Map() };
+  // Poser un build de côté rend forcément A au build posé, sinon le bouton
+  // n'aurait aucun effet visible après un choix dans la liste.
+  _cmpA = '';
   dessinerComparaison();
   $('etat').innerHTML += ` <span class="pas">${t('cmp.pose')}</span>`;
 }
@@ -2773,15 +2876,16 @@ function montrerVue(id) {
   }
 }
 
-/* Les builds de référence, groupés par classe avec l'illustration du jeu.
-   Ils vivent dans le fichier, pas en base : ils doivent s'afficher même
-   sans compte et même si Supabase est injoignable. */
-function dessinerReference() {
+/* Les builds, groupés par classe, avec l'illustration du jeu. Ils vivent
+   dans un fichier et non en base : ils doivent s'afficher sans compte et
+   même si Supabase est injoignable. */
+function dessinerBuildsClasses() {
   const boite = $('listeReference');
-  if (!boite || !window.D_REFERENCE) return;
+  if (!boite || !window.D_BUILDS) return;
   const langue = (window.I18N && I18N.courante()) || 'fr';
+  const INT = window.D_INTENTIONS || {};
   const parClasse = new Map();
-  for (const b of window.D_REFERENCE) {
+  for (const b of window.D_BUILDS) {
     if (!parClasse.has(b.c)) parClasse.set(b.c, []);
     parClasse.get(b.c).push(b);
   }
@@ -2793,15 +2897,17 @@ function dessinerReference() {
     bloc.innerHTML = `<div class="classeTete">
         ${img ? `<img src="icones_classes/${img}.webp" alt="" decoding="async">` : ''}
         <div><h3>${D.classes[String(classe)] || classe}</h3>
-          <small>${[...new Set(liste.map((b) => b.a))].join(' · ')}</small></div>
+          <small>${[...new Set(liste.map((b) => b.a))].join(' · ')}
+            — ${t('ref.combien', { n: liste.length })}</small></div>
       </div>
       <div class="refGrille"></div>`;
     const grille = bloc.querySelector('.refGrille');
     for (const b of liste) {
+      const info = INT[b.i] || {};
+      const nom = (info.nom && (info.nom[langue] || info.nom.fr)) || b.i;
+      const desc = (info.d && (info.d[langue] || info.d.fr)) || '';
       const carte = document.createElement('div');
       carte.className = 'refCarte';
-      const nom = (b.nom && (b.nom[langue] || b.nom.fr)) || b.k;
-      const desc = (b.d && (b.d[langue] || b.d.fr)) || '';
       carte.innerHTML = `<h4>${echapper(nom)}</h4>
         <div class="meta">
           <span class="puce">${echapper(b.a)}</span>
@@ -2814,11 +2920,12 @@ function dessinerReference() {
           <button class="refCode">${t('gal.code')}</button>
           <button class="refCopier">${t('gal.copier')}</button>
         </div>`;
+      const etiquette = `${D.classes[String(b.c)] || ''} — ${nom}`;
       const etat = { k: b.code, c: b.c, a: b.a, g: null, v: true, m: false,
                      pa: false, pg: 6, ps: [], t: b.t, w: [] };
       carte.querySelector('.refCharger').onclick = () => {
         appliquerEtat(etat);
-        restituer({ nom, etat, code: b.code });
+        restituer({ nom: etiquette, etat, code: b.code });
         montrerPage('main');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
@@ -2827,7 +2934,7 @@ function dessinerReference() {
       };
       carte.querySelector('.refCopier').onclick = () => {
         const l = biblio();
-        const n2 = l.some((x) => x.nom === nom) ? `${nom} (copie)` : nom;
+        const n2 = l.some((x) => x.nom === etiquette) ? `${etiquette} (copie)` : etiquette;
         l.push({ nom: n2, etat, code: b.code, pub: false, ami: false });
         if (!ecrireBiblio(l)) return;
         dessinerBuilds();
@@ -2837,6 +2944,39 @@ function dessinerReference() {
       grille.appendChild(carte);
     }
     boite.appendChild(bloc);
+  }
+}
+
+/* Une fiche par classe, écrite à partir des données récoltées. Elles vivent
+   dans un fichier, comme les builds : ni compte ni réseau pour les lire.
+   Elles se replient et ne s'ouvrent qu'à la demande — six pavés dépliés
+   feraient une page illisible. */
+function dessinerGuidesClasses() {
+  const boite = $('guidesClasses');
+  if (!boite || !window.D_GUIDES_CLASSES) return;
+  const langue = (window.I18N && I18N.courante()) || 'fr';
+  const ouverts = new Set();
+  for (const d of boite.querySelectorAll('details')) {
+    if (d.open) ouverts.add(d.dataset.k);
+  }
+  boite.innerHTML = '';
+  for (const g of window.D_GUIDES_CLASSES) {
+    const el = document.createElement('details');
+    el.className = 'guide';
+    el.dataset.k = g.k;
+    el.open = ouverts.has(g.k);
+    const img = CLASSE_IMAGE[g.c];
+    const titre = g.titre[langue] || g.titre.fr;
+    const nb = (window.D_BUILDS || []).filter((b) => b.c === g.c).length;
+    el.innerHTML = `<summary>
+        ${img ? `<img class="vignetteClasse" src="icones_classes/${img}.webp"
+                      alt="" decoding="async" loading="lazy">` : ''}
+        <b>${echapper(titre)}</b>
+        <small>${echapper(D.classes[String(g.c)] || '')}${
+          nb ? ' · ' + t('ref.combien', { n: nb }) : ''}</small>
+      </summary>
+      <div class="corpsGuide">${rendreGuide(g.corps[langue] || g.corps.fr)}</div>`;
+    boite.appendChild(el);
   }
 }
 
@@ -2858,18 +2998,22 @@ function rendreGuide(texte) {
   const sortie = [];
   let liste = false;
   const fermer = () => { if (liste) { sortie.push('</ul>'); liste = false; } };
+  // On échappe D'ABORD, on met en gras ENSUITE : l'étoile n'est jamais
+  // produite par l'échappement, donc aucun texte ne peut fabriquer une
+  // balise en se faisant passer pour du gras.
+  const ligne = (s) => echapper(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   for (const brute of lignes) {
     const l = brute.trim();
     if (!l) { fermer(); continue; }
     if (l.startsWith('#')) {
       fermer();
-      sortie.push(`<h4>${echapper(l.replace(/^#+\s*/, ''))}</h4>`);
-    } else if (l.startsWith('-') || l.startsWith('*')) {
+      sortie.push(`<h4>${ligne(l.replace(/^#+\s*/, ''))}</h4>`);
+    } else if (l.startsWith('-') || (l.startsWith('*') && !l.startsWith('**'))) {
       if (!liste) { sortie.push('<ul>'); liste = true; }
-      sortie.push(`<li>${echapper(l.slice(1).trim())}</li>`);
+      sortie.push(`<li>${ligne(l.slice(1).trim())}</li>`);
     } else {
       fermer();
-      sortie.push(`<p>${echapper(l)}</p>`);
+      sortie.push(`<p>${ligne(l)}</p>`);
     }
   }
   fermer();
@@ -3008,7 +3152,8 @@ function montrerPage(id) {
     b.classList.toggle('actif', b.dataset.page === id);
   }
   if (id === 'pageCommunaute') {
-    dessinerReference();
+    dessinerBuildsClasses();
+    dessinerGuidesClasses();
     // La vue active garde sa place d'une visite à l'autre ; au premier
     // passage c'est la référence, qui a toujours du contenu.
     const active = document.querySelector('#pageCommunaute .vue:not([hidden])');
@@ -3057,7 +3202,8 @@ window.surChangementDeLangue = function () {
   dessinerBuilds();
   // Les builds de référence portent leurs textes dans les trois langues :
   // sans redessin ils restaient dans la langue du premier affichage.
-  dessinerReference();
+  dessinerBuildsClasses();
+  dessinerGuidesClasses();
   dessinerComparaison();
   // Les listes déroulantes portent des libellés traduits : sans ce
   // remplissage, tri et filtres resteraient dans la langue précédente.

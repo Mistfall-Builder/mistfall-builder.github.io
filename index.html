@@ -5,6 +5,31 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mistfall Builder</title>
 <link rel="icon" type="image/png" href="marque/icone.png">
+
+<!-- Ce que voient Discord, Reddit et les moteurs quand on colle le lien.
+     Sans ces balises, un partage n'affiche que l'URL nue -- ce qui etait
+     le cas jusqu'ici. Les chemins d'image sont ABSOLUS : un relatif n'est
+     pas resolu par les robots qui lisent la page.
+     La description reste en anglais : c'est la langue du jeu et celle des
+     endroits ou le lien circule, et une balise n'a qu'une seule valeur. -->
+<meta name="description" content="Free build planner for Mistfall Hunter. Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code. Character sheet, real skill damage, public builds and guides.">
+<link rel="canonical" href="https://mistfall-builder.github.io/">
+<meta name="theme-color" content="#080a0b">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Mistfall Builder">
+<meta property="og:title" content="Mistfall Builder — Mistfall Hunter build planner">
+<meta property="og:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
+<meta property="og:url" content="https://mistfall-builder.github.io/">
+<meta property="og:image" content="https://mistfall-builder.github.io/marque/partage.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Mistfall Builder">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mistfall Builder — Mistfall Hunter build planner">
+<meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
+<meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -333,6 +358,9 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
   border-radius:3px;background:var(--bord-fort);color:var(--texte);
   font:700 11px/1 var(--corps);margin-right:6px;vertical-align:middle}
 .cmpQui.b{background:var(--accent-sombre);color:var(--accent-clair)}
+.cmpChoix{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 11px}
+.cmpChoix label{display:flex;align-items:center;gap:6px;flex:1 1 220px;min-width:0}
+.cmpChoix select{flex:1;min-width:0}
 table.cmp{width:100%;border-collapse:collapse;font-size:12.5px}
 table.cmp th,table.cmp td{border-bottom:1px solid var(--bord);padding:4px 8px;
   text-align:left}
@@ -393,11 +421,20 @@ table.cmp .ec.nul{color:var(--terne)}
 .guide>summary::-webkit-details-marker{display:none}
 .guide>summary b{font-size:14px}
 .guide>summary small{color:var(--doux);font-size:11px}
-.guide .corpsGuide{padding:0 13px 12px;font-size:13.5px;line-height:1.62}
+/* La colonne de texte est bornee : sur un 1440p la carte fait 1350 px et
+   une ligne de cette longueur ne se lit plus -- l'oeil perd le debut de la
+   ligne suivante. On garde la carte pleine largeur, on borne le TEXTE. */
+.guide .corpsGuide{padding:0 13px 12px;font-size:13.5px;line-height:1.62;
+  max-width:80ch}
 .guide .corpsGuide h4{margin:12px 0 4px;font-size:13px;letter-spacing:.6px;
   text-transform:uppercase;color:var(--accent)}
 .guide .corpsGuide p{margin:0 0 8px}
 .guide .corpsGuide ul{margin:0 0 8px;padding-left:20px}
+.guide .corpsGuide strong{color:var(--texte);font-weight:600}
+/* La vignette de classe aligne les six fiches sur une meme colonne :
+   sans largeur fixe, un nom long decalerait le titre suivant. */
+.vignetteClasse{width:30px;height:30px;flex:0 0 30px;border-radius:3px;
+  object-fit:cover;align-self:center;border:1px solid var(--bord)}
 textarea{width:100%;background:var(--creux);color:var(--texte);
   border:1px solid var(--bord);border-radius:3px;padding:9px 10px;
   font:inherit;font-size:13px;line-height:1.55;resize:vertical}
@@ -550,6 +587,13 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .buildLigne .suppr{flex:0 0 auto;width:30px;padding:0;font-size:16px;
   color:var(--terne);background:var(--creux);border-color:var(--bord)}
 .buildLigne .suppr:hover{color:var(--ko);border-color:var(--ko)}
+.buildLigne .cmpB{flex:0 0 auto;width:30px;padding:0;font-size:14px;
+  color:var(--terne);background:var(--creux);border-color:var(--bord)}
+.buildLigne .cmpB:hover{color:var(--accent-clair);border-color:var(--accent-sombre)}
+/* Un build pose dans la comparaison se voit dans la liste : sans ce
+   repere, on ne sait plus lequel des deux on vient de choisir. */
+.buildLigne .cmpB.actif{color:var(--accent);border-color:var(--accent);
+  background:var(--accent-sombre)}
 #noteBuilds:not(:empty){margin-top:8px;font-size:12px}
 .buildLigne .pub{flex:0 0 auto;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:2px;width:34px;
@@ -942,22 +986,20 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
        vide faisaient plus de mal que pas d'onglet du tout. -->
   <div class="sousOnglets" id="sousOnglets">
     <button data-vue="vueReference" class="actif"
-            data-i18n="comm.reference">Builds de référence</button>
+            data-i18n="comm.builds">Builds par classe</button>
     <button data-vue="vuePublics" data-i18n="comm.publics">Builds des joueurs</button>
     <button data-vue="vueGuides" data-i18n="comm.guides">Guides</button>
   </div>
 
-  <!-- LES BUILDS DE REFERENCE : deux par classe, produits et verifies par
-       l'optimiseur de ce site. Ils garantissent que la page n'est jamais
+  <!-- Six builds par classe. Ils garantissent que la page n'est jamais
        vide, meme le premier jour. -->
   <div class="vue" id="vueReference">
     <div class="carte">
       <h2 data-i18n="ref.titre">Builds de référence</h2>
       <div class="corps">
         <p class="pas" style="font-size:12.5px;margin:0 0 12px"
-           data-i18n="ref.aide">Deux par classe, produits et vérifiés par
-          l'optimiseur de ce site : chacun atteint ses cibles et sort un code
-          d'import valide. Des points de départ, pas des vérités.</p>
+           data-i18n="ref.aide">Six par classe, six intentions différentes.
+          Des points de départ à charger, modifier et enregistrer chez toi.</p>
         <div id="listeReference"></div>
       </div>
     </div>
@@ -984,6 +1026,16 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
   </div>
 
   <div class="vue" id="vueGuides" hidden>
+
+  <div class="carte">
+    <h2 data-i18n="guidecl.titre">Une fiche par classe</h2>
+    <div class="corps">
+      <p class="pas" style="margin:0 0 10px" data-i18n="guidecl.intro">Ce que les
+        données du jeu disent de chaque classe : coefficients, paliers d'affixes,
+        et ce qui en découle. Les chiffres sont tirés du wiki, pas estimés.</p>
+      <div id="guidesClasses"></div>
+    </div>
+  </div>
 
   <div class="carte" id="blocEcrireGuide" hidden>
     <h2 data-i18n="guide.ecrire">Écrire un guide</h2>
@@ -1041,14 +1093,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=44"></script>
-<script src="config.js?v=44"></script>
-<script src="comptes.js?v=44"></script>
-<script src="donnees.js?v=44"></script>
-<script src="skills.js?v=44"></script>
-<script src="talents.js?v=44"></script>
-<script src="builds_reference.js?v=44"></script>
-<script src="fiche.js?v=44"></script>
-<script src="app.js?v=44"></script>
+<script src="i18n.js?v=46"></script>
+<script src="config.js?v=46"></script>
+<script src="comptes.js?v=46"></script>
+<script src="donnees.js?v=46"></script>
+<script src="skills.js?v=46"></script>
+<script src="talents.js?v=46"></script>
+<script src="builds_reference.js?v=46"></script>
+<script src="guides_classes.js?v=46"></script>
+<script src="fiche.js?v=46"></script>
+<script src="app.js?v=46"></script>
 </body>
 </html>

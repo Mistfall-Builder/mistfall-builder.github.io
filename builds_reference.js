@@ -1,162 +1,101 @@
-/* BUILDS DE RÉFÉRENCE — deux par classe.
+/* Trente-six builds, six par classe.
  *
- * D'OÙ ILS VIENNENT. Ils ont été PRODUITS par l'optimiseur de ce site, pas
- * recopiés ailleurs. Chacun a été vérifié : ses cibles sont atteintes, et
- * son code d'import a été engendré par le même codec que celui du builder.
- * Un build copié sur une capture d'écran pourrait ne même pas être légal en
- * jeu ; ceux-ci le sont par construction.
+ * Chacun a été calculé puis contrôlé : ses cibles sont atteintes et son code
+ * d'import a été engendré par le codec du site.
  *
- * CE QU'ILS SONT, ET CE QU'ILS NE SONT PAS. Des points de départ lisibles :
- * une intention claire, des affixes cohérents, la rareté la plus basse qui
- * suffit. Pas « le meilleur build du jeu » — cette notion dépend du contenu
- * joué, du niveau, et de ce qu'on a en stock.
+ * SIX INTENTIONS, DÉCRITES UNE FOIS. Le plan est le même d'une classe à
+ * l'autre, seuls les affixes changent selon l'affinité — une classe magique
+ * ne prend pas d'affixe de dégâts physiques. Décrire l'intention une seule
+ * fois évite six paragraphes qui répètent la même chose.
  *
- * Les textes sont écrits ici, dans les trois langues, plutôt que dans le
- * dictionnaire : ce sont des données au même titre que les cibles.
+ * NE PAS ÉDITER À LA MAIN : les codes viennent du moteur.
  */
-window.D_REFERENCE = [
-  {
-    k: 'merc-tank', c: 10, a: 'Sword and Shield',
-    code: 'Gtf32jM0e0qXkylnAy9JE1GVdVm4eDPdOGAQF6',
-    t: [['Aegis', 5], ['Tenacious', 5], ['Stoic', 5], ['Bulwark', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Mur de bouclier', en: 'Shield Wall', ru: 'Стена щитов' },
+window.D_INTENTIONS = {
+  offensif: {
+    nom: { fr: 'Offensif', en: 'Offensive', ru: 'Атакующий' },
     d: {
-      fr: "Trois affixes défensifs poussés à leur palier : Aegis 5 débloque la résistance physique, Tenacious 5 la vie, Stoic 5 le filet de sécurité sous 50 % de vie. Bulwark complète sans coûter de rareté. Le build qui encaisse pendant que les autres frappent.",
-      en: 'Three defensive affixes pushed to their breakpoint: Aegis 5 unlocks physical resistance, Tenacious 5 the health bonus, Stoic 5 the safety net below 50 % health. Bulwark rounds it off at no extra rarity. The one that soaks while the others hit.',
-      ru: 'Три защитных аффикса на пороге: Aegis 5 даёт физическое сопротивление, Tenacious 5 — здоровье, Stoic 5 — страховку ниже 50 % HP. Bulwark добирает остальное без роста редкости.',
+      fr: "Trois affixes de dégâts à leur palier. Deux d'entre eux ajoutent de la pénétration de défense au passage : contre un monstre, tous à 50 % de réduction, chaque point de pénétration retire un point entier de mitigation.",
+      en: 'Three damage affixes at their breakpoint. Two of them add defence penetration along the way: against a monster, all sitting at 50 % reduction, every point of penetration removes a whole point of mitigation.',
+      ru: 'Три атакующих аффикса на пороге. Два попутно дают пробивание защиты: у монстров 50 % снижения, и каждая единица пробивания снимает целый процент.',
     },
   },
-  {
-    k: 'merc-degat', c: 10, a: 'Hammer',
-    code: 'Gtf32jMSWO4yWwU2j0j3VCCXKE3PCh3Z2ais9Q',
-    t: [['Valor', 5], ['Fervor', 5], ['Wrath', 5], ['Swift', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Marteau lourd', en: 'Heavy Hammer', ru: 'Тяжёлый молот' },
+  defensif: {
+    nom: { fr: 'Défensif', en: 'Defensive', ru: 'Защитный' },
     d: {
-      fr: "Valor 5 et Fervor 5 franchissent tous deux leur palier, ce qui ajoute de la pénétration de défense en plus de l'attaque brute — contre un monstre à 50 % de réduction, c'est là que se gagne le vrai gain. Swift compense la lenteur du marteau.",
-      en: 'Valor 5 and Fervor 5 both cross their breakpoint, which adds defence penetration on top of raw attack — against a monster sitting at 50 % reduction, that is where the real gain is. Swift offsets the hammer being slow.',
-      ru: 'Valor 5 и Fervor 5 переходят порог и добавляют пробивание защиты сверх голой атаки — против монстра с 50 % снижения это и решает. Swift компенсирует медлительность молота.',
+      fr: "Aegis, Tenacious et Stoic à 5, c'est-à-dire tous les trois au niveau où ils débloquent leur second effet : résistance physique, vie, et le filet de sécurité sous 50 % de vie.",
+      en: 'Aegis, Tenacious and Stoic at 5 — all three at the level where they unlock their second effect: physical resistance, health, and the safety net below 50 % health.',
+      ru: 'Aegis, Tenacious и Stoic на 5 — все три на уровне, где открывается второй эффект: физическое сопротивление, здоровье и страховка ниже 50 % HP.',
     },
   },
-  {
-    k: 'sorc-degat', c: 11, a: 'Staff',
-    code: 'Gtf32uOzJ2hsCAequMxoovS2B3wyXPEaIRhBBI',
-    t: [['Eloquence', 5], ['Fervor', 5], ['Valor', 5]],
-    r: '8 × Excellent',
-    nom: { fr: 'Incantation rapide', en: 'Fast Casting', ru: 'Быстрый каст' },
+  equilibre: {
+    nom: { fr: 'Équilibré', en: 'Balanced', ru: 'Сбалансированный' },
     d: {
-      fr: "Trois cibles seulement, toutes à leur palier. Eloquence 5 rend l'incantation ininterrompable par les impacts mineurs — sur une classe qui passe son temps à canaliser, ça vaut plus que quelques pourcents de dégâts. Volontairement resserré : ajouter un quatrième affixe faisait basculer tout le stuff en Légendaire.",
-      en: 'Three targets only, all at their breakpoint. Eloquence 5 makes chanting immune to minor impacts — on a class that spends its life channelling, that beats a few percent of damage. Deliberately tight: adding a fourth affix pushed the whole set to Legendary.',
-      ru: 'Только три цели, все на пороге. Eloquence 5 делает каст невосприимчивым к мелким импактам — для класса, который постоянно читает заклинания, это важнее пары процентов урона. Намеренно сжато: четвёртый аффикс уводил весь сет в Legendary.',
+      fr: "Un affixe de chaque famille, tous les trois à leur palier : de quoi frapper, de quoi encaisser, de quoi bouger. Le build qui ne brille nulle part et ne coince nulle part.",
+      en: 'One affix from each family, all three at their breakpoint: something to hit with, something to soak with, something to move with. Shines nowhere, gets stuck nowhere.',
+      ru: 'По одному аффиксу из каждой группы, все три на пороге: чем бить, чем держать, чем двигаться. Нигде не блещет, нигде не встаёт.',
     },
   },
-  {
-    k: 'sorc-tenue', c: 11, a: 'Staff',
-    code: 'Gtf32uPd9baWz1YZhQggDqSecVGm5Pcip7Jyu8',
-    t: [['Eloquence', 5], ['Tenacious', 5], ['Aegis', 5], ['Ethereal', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Mage qui survit', en: 'Sorcerer That Lives', ru: 'Выживающий маг' },
+  mobilite: {
+    nom: { fr: 'Mobilité', en: 'Mobility', ru: 'Подвижность' },
     d: {
-      fr: "Le même Eloquence 5, mais le reste part en défense. Un sorcier meurt en canalisant : Aegis et Tenacious à leur palier lui donnent de quoi finir son sort. Ethereal pour se sortir des corps-à-corps qu'il n'aurait jamais dû accepter.",
-      en: 'The same Eloquence 5, but the rest goes into defence. A sorcerer dies mid-channel: Aegis and Tenacious at their breakpoint give it enough to finish the cast. Ethereal to leave the melee it should never have accepted.',
-      ru: 'Тот же Eloquence 5, но остальное — в защиту. Маг умирает во время каста: Aegis и Tenacious на пороге дают дочитать. Ethereal — чтобы выйти из ближнего боя.',
+      fr: "Swift et Elusive à 5, plus un affixe de dégâts. On ne gagne pas en dégâts par coup, on gagne en coups placés et en fuites réussies — contre des joueurs, ça vaut souvent mieux qu'un affixe offensif de plus.",
+      en: 'Swift and Elusive at 5, plus one damage affix. You do not gain damage per hit, you gain hits landed and escapes made — against players that often beats one more offensive affix.',
+      ru: 'Swift и Elusive на 5 плюс один атакующий аффикс. Не урон за удар, а число попаданий и удачных отходов — против игроков это часто ценнее.',
     },
   },
-  {
-    k: 'arc-degat', c: 12, a: 'Bow',
-    code: 'Gtf35wE3uuXuh1p00cNka6D3bBJq9oamSZVHnc',
-    t: [['Ranged', 5], ['Valor', 5], ['Fervor', 5], ['Sky Piercer', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Tir tendu', en: 'Straight Shot', ru: 'Прямой выстрел' },
+  soutien: {
+    nom: { fr: 'Soutien', en: 'Support', ru: 'Поддержка' },
     d: {
-      fr: "Ranged 5 allonge la portée efficace, Valor et Fervor franchissent leur palier et apportent chacun de la pénétration. Sky Piercer en complément. Le build qui tire de loin et ne s'approche jamais.",
-      en: 'Ranged 5 extends effective range, Valor and Fervor cross their breakpoint and each bring penetration. Sky Piercer tops it off. The one that shoots from afar and never closes in.',
-      ru: 'Ranged 5 увеличивает эффективную дистанцию, Valor и Fervor переходят порог и дают пробивание. Sky Piercer добирает. Стреляет издалека и не сближается.',
+      fr: "Eloquence 5 pour ne pas se faire interrompre en incantation, Blessing 5 pour le soin, Aegis 5 pour rester debout pendant qu'on soigne les autres.",
+      en: 'Eloquence 5 so chanting cannot be interrupted, Blessing 5 for healing, Aegis 5 to stay standing while you keep the others up.',
+      ru: 'Eloquence 5 против прерывания каста, Blessing 5 — лечение, Aegis 5 — чтобы устоять, пока лечишь остальных.',
     },
   },
-  {
-    k: 'arc-mobile', c: 12, a: 'Bow',
-    code: 'Gtf335RxwpUJVajODOmXDaFqStAbmx49cGVbKC',
-    t: [['Swift', 5], ['Elusive', 5], ['Seeker', 5], ['Ranged', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Insaisissable', en: 'Untouchable', ru: 'Неуловимый' },
+  paliers: {
+    nom: { fr: 'Quatre paliers', en: 'Four breakpoints', ru: 'Четыре порога' },
     d: {
-      fr: "Tout en déplacement : Swift, Elusive et Seeker à 5. On ne gagne pas en dégâts par coup, on gagne en nombre de coups placés et en fuites réussies. Contre des joueurs, ça vaut souvent mieux qu'un affixe offensif de plus.",
-      en: 'Everything in movement: Swift, Elusive and Seeker at 5. You do not gain damage per hit, you gain hits landed and escapes made. Against players that often beats one more offensive affix.',
-      ru: 'Всё в подвижность: Swift, Elusive и Seeker на 5. Не урон за удар, а число попаданий и удачных отходов. Против игроков это часто ценнее ещё одного атакующего аффикса.',
+      fr: "Le plus large : quatre affixes, trois à leur palier. Il fait moins bien que les spécialisés sur leur terrain, mais il ne laisse aucun trou — et le quatrième ne coûte rien puisqu'il reste sous son seuil.",
+      en: 'The widest: four affixes, three at their breakpoint. It loses to the specialists on their own ground, but leaves no hole — and the fourth costs nothing since it stays under its threshold.',
+      ru: 'Самый широкий: четыре аффикса, три на пороге. Уступает специалистам на их поле, но не оставляет дыр — а четвёртый ничего не стоит, оставаясь ниже порога.',
     },
   },
-  {
-    k: 'strix-burst', c: 13, a: 'Dagger',
-    code: '17lpUbU7lxeXFRZQSdRBrckZxgBgkUaBY6vLyUmO',
-    t: [['Fervid', 5], ['Valor', 5], ['Swift', 5], ['Burst', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Ouverture au poignard', en: 'Dagger Opener', ru: 'Вскрытие кинжалом' },
-    d: {
-      fr: "Fervid et Valor à leur palier pour que la fenêtre d'ouverture fasse mal, Swift 5 pour y arriver et en repartir. Burst en appoint. Un build qui décide du combat dans les deux premières secondes, ou qui le perd.",
-      en: 'Fervid and Valor at their breakpoint so the opening window hurts, Swift 5 to get there and get out. Burst on top. It decides the fight in the first two seconds, or loses it.',
-      ru: 'Fervid и Valor на пороге, чтобы окно вскрытия било больно, Swift 5 — чтобы дойти и уйти. Burst сверху. Бой решается в первые две секунды.',
-    },
-  },
-  {
-    k: 'strix-duree', c: 13, a: 'Dual Blades',
-    code: 'Gtf33GVc4Z0Ni6DXEC2zHfjOcU6xs7WFvqy6am',
-    t: [['Fervor', 5], ['Strife', 5], ['Valor', 5], ['Elusive', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Lames jumelles', en: 'Twin Blades', ru: 'Парные клинки' },
-    d: {
-      fr: "L'inverse du poignard : Fervor et Strife montent avec les coups répétés, donc le build gagne en valeur plus le combat dure. Valor 5 pour la pénétration, Elusive pour rester au contact sans se faire enfermer.",
-      en: 'The opposite of the dagger: Fervor and Strife ramp with repeated hits, so the build gains value the longer the fight runs. Valor 5 for penetration, Elusive to stay in contact without getting pinned.',
-      ru: 'Противоположность кинжалу: Fervor и Strife растут от повторных ударов, поэтому чем дольше бой, тем лучше. Valor 5 — пробивание, Elusive — держаться в контакте.',
-    },
-  },
-  {
-    k: 'seer-soutien', c: 14, a: 'Catalyst',
-    code: 'lfMCCbQ2jMxsUkhIXC5oerotDX6',
-    t: [['Eloquence', 5], ['Blessing', 5], ['Brotherhood', 3], ['Creation', 3]],
-    r: '8 × Rare',
-    nom: { fr: 'Soutien de groupe', en: 'Party Support', ru: 'Поддержка группы' },
-    d: {
-      fr: "Le seul de la liste qui tient en Rare sur les huit pièces — la preuve qu'un build de soutien n'a pas besoin d'être doré. Eloquence 5 pour ne pas se faire interrompre, Blessing 5 pour le soin, Brotherhood et Creation pour les constructions.",
-      en: 'The only one on the list that holds at Rare across all eight pieces — proof a support build need not be gold. Eloquence 5 to avoid interruption, Blessing 5 for healing, Brotherhood and Creation for constructs.',
-      ru: 'Единственный в списке, который держится на Rare во всех восьми предметах — доказательство, что саппорту не нужно золото. Eloquence 5 против прерываний, Blessing 5 — лечение.',
-    },
-  },
-  {
-    k: 'seer-mele', c: 14, a: 'Mace',
-    code: 'Gtf33RYYwef3oalw0RW77ML2ZHgwo0AZGvWOUC',
-    t: [['Aegis', 5], ['Valor', 5], ['Tenacious', 5], ['Smiting', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Seer de mêlée', en: 'Melee Seer', ru: 'Ближний сир' },
-    d: {
-      fr: "La masse plutôt que le catalyseur : on renonce au soutien pur pour tenir la ligne. Aegis, Valor et Tenacious à leur palier — un affixe défensif, un offensif, un de vie. Smiting rend de l'énergie sur les coups portés.",
-      en: 'Mace over catalyst: you give up pure support to hold the line. Aegis, Valor and Tenacious at their breakpoint — one defensive, one offensive, one health. Smiting returns energy on hits landed.',
-      ru: 'Булава вместо катализатора: отказ от чистой поддержки ради удержания линии. Aegis, Valor и Tenacious на пороге. Smiting возвращает энергию за удары.',
-    },
-  },
-  {
-    k: 'wk-degat', c: 15, a: 'Greatsword',
-    code: 'Gtf39K8FC9PTBshbbkihIUxlHnXyuiUcA6MiI4',
-    t: [['Valor', 5], ['Wrath', 5], ['Fervor', 5], ['Swift', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Espadon', en: 'Greatsword', ru: 'Двуручник' },
-    d: {
-      fr: "Trois offensifs à leur palier, dont deux qui apportent de la pénétration. Contre les monstres, tous à 705 de défense soit 50 % de réduction, chaque point de pénétration retire un point entier de mitigation — c'est le meilleur rendement du jeu.",
-      en: 'Three offensive affixes at their breakpoint, two of which bring penetration. Against monsters, all sitting at 705 defence for a flat 50 % reduction, every point of penetration removes a whole point of mitigation — the best return in the game.',
-      ru: 'Три атакующих аффикса на пороге, два дают пробивание. У всех монстров 705 защиты, то есть 50 % снижения, и каждая единица пробивания снимает целый процент — лучшая отдача в игре.',
-    },
-  },
-  {
-    k: 'wk-tank', c: 15, a: 'Polearm and Shield',
-    code: 'Gtf36TNBhWZJ2NgOEETvSTTca2dU5MiUje0pFo',
-    t: [['Aegis', 5], ['Bulwark', 5], ['Tenacious', 5], ['Stoic', 3]],
-    r: '8 × Excellent',
-    nom: { fr: 'Ligne de front', en: 'Front Line', ru: 'Передовая' },
-    d: {
-      fr: "Quatre défensifs, trois à leur palier. La lance et bouclier bloque : Bulwark 5 réduit ce que le blocage laisse passer, Aegis 5 la défense de fond. On ne tue personne vite, on ne meurt pas.",
-      en: 'Four defensive affixes, three at their breakpoint. Polearm and shield blocks: Bulwark 5 cuts what gets through the block, Aegis 5 handles the base defence. You kill nobody fast, you die to nobody.',
-      ru: 'Четыре защитных аффикса, три на пороге. Копьё со щитом блокирует: Bulwark 5 срезает прошедший урон, Aegis 5 — базовая защита. Никого не убьёшь быстро, но и не умрёшь.',
-    },
-  },
+};
+
+window.D_BUILDS = [
+{"k":"10-offensif","c":10,"a":"Sword and Shield","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"Gtf32jMSCIaIQqljKVOdb9KE03OaiW0MjAWLbs","r":"8 × Excellent"},
+{"k":"10-defensif","c":10,"a":"Hammer","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf38QtLbz7Mem2Zx24xSHUxvlKEnPwfNeZfZQ","r":"8 × Excellent"},
+{"k":"10-equilibre","c":10,"a":"Sword and Shield","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf32jMSVdhn4fdv4HzmdXkcrssuEfweNyRZlA","r":"8 × Excellent"},
+{"k":"10-mobilite","c":10,"a":"Hammer","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf32jMSVdhn4hj7iq69NTpJpGGygiGc7uXj96","r":"8 × Excellent"},
+{"k":"10-soutien","c":10,"a":"Sword and Shield","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf35a8zDAbbLraHewEJItyxsLAgJfDHHlWeBc","r":"8 × Excellent"},
+{"k":"10-paliers","c":10,"a":"Hammer","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"17lpUl3AaT7jXbXdOtDJAmbRUHTEf7ws6I2YaJUm","r":"8 × Excellent"},
+{"k":"11-offensif","c":11,"a":"Staff","i":"offensif","t":[["Valor",5],["Fervor",5],["Strife",5]],"code":"Gtf32uOzIa7huzAn3irECngyXbMHHRsGJ0zJvk","r":"8 × Excellent"},
+{"k":"11-defensif","c":11,"a":"Staff","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf32uPcfUPVaPP8hLAoshjmfqcHUjtPFIBXJw","r":"8 × Excellent"},
+{"k":"11-equilibre","c":11,"a":"Staff","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf32uOzIZD9JYjXXmgvJrYQyawknIGZRCdWdc","r":"8 × Excellent"},
+{"k":"11-mobilite","c":11,"a":"Staff","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf32uPddRjqdumheOooVqK0MvqftJE7X0J5ai","r":"8 × Excellent"},
+{"k":"11-soutien","c":11,"a":"Staff","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf32uQJR0vr2XQXtAEYnu0kytFBDyNbfojIQK","r":"8 × Excellent"},
+{"k":"11-paliers","c":11,"a":"Staff","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"Gtf32uOzIZD9JYjXXmgvJrYU5sSeM4fqa0C15c","r":"8 × Excellent"},
+{"k":"12-offensif","c":12,"a":"Bow","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"Gtf335SPUM5kYjIojF4wDVwILDYM3AFUf6QlO4","r":"8 × Excellent"},
+{"k":"12-defensif","c":12,"a":"Bow","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf335SOgRy1qxxAx7I5lzPp6g4yRaLp8UgMWO","r":"8 × Excellent"},
+{"k":"12-equilibre","c":12,"a":"Bow","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf335SPoZwr5mkgxJinfxcuUb1Wy3jxrsmVGa","r":"8 × Excellent"},
+{"k":"12-mobilite","c":12,"a":"Bow","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf335SPoS2hxWCPnFDNOgYrMfFKrumJjppDbU","r":"8 × Excellent"},
+{"k":"12-soutien","c":12,"a":"Bow","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf38mzvTCWKdy5O5BlemkD38kVCCs9L3QxQQa","r":"8 × Excellent"},
+{"k":"12-paliers","c":12,"a":"Bow","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"17lpUakXJFtkLOjhonfzMYocQEovk1IGxUbSKeBs","r":"8 × Excellent"},
+{"k":"13-offensif","c":13,"a":"Dagger","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"17lpUbU7lxnJXCJOB0RuNC6CIzfao7KCvykixUSO","r":"8 × Excellent"},
+{"k":"13-defensif","c":13,"a":"Dual Blades","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf38y2FSdtPB9dTdiCgC2r8s099pWRvWviyfo","r":"8 × Excellent"},
+{"k":"13-equilibre","c":13,"a":"Dagger","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf367GdSlr9j3hIHEqvcxff3tjqks1PJIQ3DU","r":"8 × Excellent"},
+{"k":"13-mobilite","c":13,"a":"Dual Blades","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf33GVawHRFbJftipnA99v5TJnE14fNLT1MHY","r":"8 × Excellent"},
+{"k":"13-soutien","c":13,"a":"Dagger","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf367Gb1w0EKgtfqdN7VhII8VhueZsIARI2VM","r":"8 × Excellent"},
+{"k":"13-paliers","c":13,"a":"Dual Blades","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"17lpUnG0gw1tL9nUbULqIiUa0rwZ20O2NELVnd2W","r":"8 × Excellent"},
+{"k":"14-offensif","c":14,"a":"Catalyst","i":"offensif","t":[["Valor",5],["Fervor",5],["Strife",5]],"code":"Gtf33RYaOtoHLr1EZwpkxFMLZGN3HotA4Mhvpw","r":"8 × Excellent"},
+{"k":"14-defensif","c":14,"a":"Mace","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf33RXvFnXsmIiNekfWFXIimfkS4KizZvK7Ci","r":"8 × Excellent"},
+{"k":"14-equilibre","c":14,"a":"Catalyst","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf33RXvFeGtjwdIhvOUnSbDLLeLqUsknUh9zk","r":"8 × Excellent"},
+{"k":"14-mobilite","c":14,"a":"Mace","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf33RYZagNQyQAb9hJ6kBI49h6nNVI6DXgsy0","r":"8 × Excellent"},
+{"k":"14-soutien","c":14,"a":"Catalyst","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"Gtf33RYZuko82DnmJnDPf8dHcEe5GK0lShyyvo","r":"8 × Excellent"},
+{"k":"14-paliers","c":14,"a":"Mace","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"Gtf33RYaiyY7XoVjzSJ7zlZDgA21AShs1cUTc8","r":"8 × Excellent"},
+{"k":"15-offensif","c":15,"a":"Greatsword","i":"offensif","t":[["Valor",5],["Fervor",5],["Wrath",5]],"code":"Gtf39K8FBzWlhhMCRLzKKCb4UR9ygRidGysXmC","r":"8 × Excellent"},
+{"k":"15-defensif","c":15,"a":"Polearm and Shield","i":"defensif","t":[["Aegis",5],["Tenacious",5],["Stoic",5]],"code":"Gtf36TNBhWZ9uDmHDgFhwXM6wlb5AIyQMMF9DE","r":"8 × Excellent"},
+{"k":"15-equilibre","c":15,"a":"Greatsword","i":"equilibre","t":[["Valor",5],["Aegis",5],["Swift",5]],"code":"Gtf36TMYKvtUceiZrRs6WTsETsZdlySHnoO120","r":"8 × Excellent"},
+{"k":"15-mobilite","c":15,"a":"Polearm and Shield","i":"mobilite","t":[["Swift",5],["Elusive",5],["Valor",5]],"code":"Gtf33catu3D4OqiRwficKdJNJcYr0knekjQBs0","r":"8 × Excellent"},
+{"k":"15-soutien","c":15,"a":"Greatsword","i":"soutien","t":[["Eloquence",5],["Blessing",5],["Aegis",5]],"code":"17lpUojHpfQpNEfW27hbLRW7BHwOLB6r0lXT22q0","r":"8 × Excellent"},
+{"k":"15-paliers","c":15,"a":"Polearm and Shield","i":"paliers","t":[["Valor",5],["Fervor",5],["Aegis",5],["Swift",3]],"code":"Gtf36TMYKl5wGjIajT7Yci5rFGGO6QXTEGgNvc","r":"8 × Excellent"}
 ];
