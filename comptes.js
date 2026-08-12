@@ -209,11 +209,29 @@
     return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 
+  /* LA COLONNE `code` PEUT NE PAS ENCORE EXISTER. La migration est appliquée
+     par l'intégration GitHub de Supabase, qui n'est pas instantanée : entre
+     la mise en ligne du site et celle de la base, demander une colonne
+     absente ferait échouer tout le bloc compte. On retombe donc sur le seul
+     pseudo, et le code ami apparaîtra tout seul une fois la base à jour. */
+  let _sansColonneCode = false;
+  let _sansColonnePartage = false;
+
   async function monProfilComplet() {
     const s = connecte();
     if (!s) return null;
+    if (!_sansColonneCode) {
+      try {
+        const r = await avecReprise(() => appeler(
+          `/rest/v1/profiles?select=pseudo,code&user_id=eq.${s.user.id}`, {}, true));
+        return (r && r[0]) || null;
+      } catch (e) {
+        if (!/column|42703|does not exist/i.test(e.message)) throw e;
+        _sansColonneCode = true;
+      }
+    }
     const r = await avecReprise(() => appeler(
-      `/rest/v1/profiles?select=pseudo,code&user_id=eq.${s.user.id}`, {}, true));
+      `/rest/v1/profiles?select=pseudo&user_id=eq.${s.user.id}`, {}, true));
     return (r && r[0]) || null;
   }
 
@@ -253,16 +271,28 @@
   async function envoyerBuilds(liste) {
     if (!liste.length) return [];
     const s = connecte();
-    const lignes = liste.map((b) => ({
-      user_id: s.user.id, nom: b.nom, etat: b.etat, code: b.code || '',
-      public: !!b.pub, partage: !!b.ami,
-    }));
-    return avecReprise(() => appeler(
+    const lignes = liste.map((b) => {
+      const l = { user_id: s.user.id, nom: b.nom, etat: b.etat,
+                  code: b.code || '', public: !!b.pub };
+      // Même prudence que pour `profiles.code` : tant que la migration n'est
+      // pas passée, envoyer `partage` ferait échouer TOUT l'enregistrement.
+      if (!_sansColonnePartage) l.partage = !!b.ami;
+      return l;
+    });
+    const envoyer = () => avecReprise(() => appeler(
       '/rest/v1/builds?on_conflict=user_id,nom', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify(lignes),
       }, true));
+    try {
+      return await envoyer();
+    } catch (e) {
+      if (!/partage|column|42703|does not exist/i.test(e.message)) throw e;
+      _sansColonnePartage = true;
+      for (const l of lignes) delete l.partage;
+      return envoyer();
+    }
   }
 
   async function supprimerBuild(nom) {
