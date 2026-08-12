@@ -45,7 +45,6 @@
       'affixes.auto': 'auto',
       'affixes.niveauVise': 'Niveau visé',
       'affixes.vinTitre': 'Points de Victory Wine sur cet affixe (au plus {max} affixes, {bonus} points chacun).',
-      'affixes.vinSansCible': "Choisis d'abord un niveau visé pour cet affixe.",
       'affixes.vinEteint': "Coche « Compter le Victory Wine » pour t'en servir.",
 
       'vin.auto': 'Vin réparti automatiquement ({total}/{budget} points).',
@@ -395,7 +394,6 @@
       'affixes.auto': 'auto',
       'affixes.niveauVise': 'Target level',
       'affixes.vinTitre': 'Victory Wine points on this affix (at most {max} affixes, {bonus} points each).',
-      'affixes.vinSansCible': 'Pick a target level for this affix first.',
       'affixes.vinEteint': 'Tick “Count Victory Wine” to use it.',
 
       'vin.auto': 'Wine allocated automatically ({total}/{budget} points).',
@@ -745,7 +743,6 @@
       'affixes.auto': 'авто',
       'affixes.niveauVise': 'Нужный уровень',
       'affixes.vinTitre': 'Очки Victory Wine на этот аффикс (не более {max} аффиксов, по {bonus} очка).',
-      'affixes.vinSansCible': 'Сначала выбери нужный уровень для этого аффикса.',
       'affixes.vinEteint': 'Отметь «Учитывать Victory Wine», чтобы им пользоваться.',
 
       'vin.auto': 'Вино распределено автоматически ({total}/{budget} очков).',

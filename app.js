@@ -810,13 +810,14 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
    D.vin.max × D.vin.bonus au total. Une consigne qui déborde est rognée —
    un build calculé sur un vin impossible serait faux. */
 function repartitionVin(cibleListe, manuel) {
-  // Le vin posé sur un affixe qu'on ne vise plus ne compte pas. Sans ce
-  // filtre, retirer une cible laissait son allocation derrière elle : on
-  // dépassait les 4 affixes sans comprendre pourquoi, et le rognage
-  // sacrifiait une cible réelle au profit d'une cible fantôme.
-  const vises = new Set(cibleListe.map(([n]) => n));
+  // UNE CONSIGNE DE VIN VAUT SANS CIBLE. On visait autrefois les seuls
+  // affixes ciblés, pour qu'une allocation oubliée ne mange pas une des
+  // quatre places. Mais c'est un geste légal du jeu : verser deux points sur
+  // un affixe que le stuff ne porte pas du tout, et le voir monter à 2. Le
+  // filtre l'interdisait. Ce qu'il protégeait est maintenant tenu par le
+  // bandeau de budget, qui montre en clair les places occupées.
   const utile = manuel
-    ? [...manuel.entries()].filter(([n]) => vises.has(n))
+    ? [...manuel.entries()].filter(([, p]) => p > 0)
     : [];
   if (!utile.length) {
     return new Map([...choisirVin(cibleListe)].map((n) => [n, D.vin.bonus]));
@@ -974,21 +975,20 @@ function infobulle(it) {
   return bouts.filter(Boolean).join('\n');
 }
 
-/* Le vin ne se règle que sur un affixe qu'on VISE. Griser la case le dit à
-   l'écran plutôt que de laisser croire à un réglage qui ne compte pas. */
+/* LE VIN NE DÉPEND PAS DU STUFF. Sigrid pose ses points sur l'affixe qu'on
+   lui demande, qu'on ait déjà quelque chose dessus ou rien du tout : un
+   affixe absent de tout l'équipement monte quand même à 2 avec deux points
+   de vin. Griser la case tant qu'un niveau n'était pas visé interdisait ce
+   geste, qui est pourtant légal dans le jeu.
+   Seule la case « compter le Victory Wine », décochée, grise la colonne —
+   là c'est vrai, aucun point ne compte. */
 function majEtatVin(ligne) {
-  const nom = ligne.dataset.affixe;
   const vin = ligne.querySelector('.vin');
   if (!vin) return;
   const compte = $('vin').checked;
-  const vise = cibles.has(nom);
-  vin.disabled = !vise || !compte;
-  // On remet la case sur « auto » : la laisser afficher « +2 » alors que
-  // l'affixe n'est plus visé donnerait un réglage qui ne compte pas.
-  if (!vise) vin.value = '';
-  vin.title = !compte ? t('affixes.vinEteint')
-    : (vise ? t('affixes.vinTitre', { max: D.vin.max, bonus: D.vin.bonus })
-            : t('affixes.vinSansCible'));
+  vin.disabled = !compte;
+  vin.title = compte ? t('affixes.vinTitre', { max: D.vin.max, bonus: D.vin.bonus })
+                     : t('affixes.vinEteint');
 }
 
 /* Dit en clair où en est le budget de vin, faute de quoi une consigne rognée
@@ -1007,8 +1007,14 @@ function majBudgetVin() {
   const total = [...retenu.values()].reduce((s, v) => s + v, 0);
   const budget = D.vin.max * D.vin.bonus;
   const demande = [...vinManuel.values()].reduce((s, v) => s + v, 0);
-  const auto = !vinManuel.size;
-  const trop = !auto && (demande > budget || vinManuel.size > D.vin.max);
+  // ZÉRO POINT N'OCCUPE PAS UNE PLACE. Régler un affixe sur « — » veut dire
+  // « pas de vin ici », pas « une des quatre fioles part là-dessus ». Compter
+  // ces zéros faisait dire au bandeau, mot pour mot : « 8/8 points sur 4/4
+  // affixes — la consigne dépasse les règles du jeu ». Il s'accusait de
+  // déborder en affichant lui-même qu'il ne débordait pas.
+  const poses = [...vinManuel.values()].filter((v) => v > 0).length;
+  const auto = !poses;
+  const trop = !auto && (demande > budget || poses > D.vin.max);
   el.className = trop ? 'ko' : 'pas';
   el.textContent = auto
     ? t('vin.auto', { total, budget })
@@ -1068,10 +1074,11 @@ function dessinerAffixes() {
       if (sel.value) {
         cibles.set(nom, Number(sel.value));
       } else {
-        // On retire aussi le vin : le garder sur un affixe abandonné faisait
-        // sauter le plafond de 4 sans que rien ne l'explique à l'écran.
+        // Le vin RESTE. Il ne dépend plus d'une cible : retirer le niveau
+        // visé veut dire « le stuff n'a plus à chercher cet affixe », pas
+        // « jette la fiole ». La case garde sa valeur, visible, et le
+        // bandeau de budget dit ce qui est occupé.
         cibles.delete(nom);
-        vinManuel.delete(nom);
       }
       ligne.classList.toggle('actif', cibles.has(nom));
       majEtatVin(ligne);
@@ -1084,8 +1091,7 @@ function dessinerAffixes() {
     // mettre 2 partout : « auto » laisse choisir, sinon c'est toi qui décides.
     const vin = document.createElement('select');
     vin.className = 'vin';
-    vin.title = `Points de Victory Wine sur cet affixe (au plus ${D.vin.max} `
-      + `affixes, ${D.vin.bonus} points chacun).`;
+    // L'infobulle est posée par majEtatVin, plus bas, dans la langue courante.
     vin.innerHTML = `<option value="">${t('affixes.auto')}</option>`
       + Array.from({ length: D.vin.bonus + 1 },
                    (_, i) => `<option value="${i}">${i ? '+' + i : '—'}</option>`).join('');
@@ -1157,19 +1163,30 @@ function afficher(res, classe) {
     pd.appendChild(carte);
   }
 
-  const lignes = [...cibles.entries()].sort((a, b) => b[1] - a[1]).map(([nom, vise]) => {
+  // UN AFFIXE MONTÉ AU VIN SEUL DOIT FIGURER ICI. On ne parcourait que les
+  // cibles ; verser deux points sur un affixe qu'on ne vise pas donnait donc
+  // un réglage sans aucune trace à l'écran. Il entre dans le tableau avec un
+  // tiret dans la colonne « visé » : rien n'était demandé, et pourtant il est
+  // là.
+  const vinSeul = [...((res.vinPoints || new Map()).entries())]
+    .filter(([n, p]) => p > 0 && !cibles.has(n))
+    .map(([n]) => n);
+  const rangs = [...[...cibles.entries()].sort((a, b) => b[1] - a[1])
+                   .map(([n, v]) => [n, v]),
+                 ...vinSeul.sort().map((n) => [n, null])];
+  const lignes = rangs.map(([nom, vise]) => {
     const eq = res.couvert[nom] || 0;
     const v = (res.vinPoints && res.vinPoints.get(nom)) || 0;
     const total = Math.min(plafond(nom), eq + v);
-    const cls = total >= vise ? 'ok' : 'ko';
+    const cls = vise == null ? '' : (total >= vise ? 'ok' : 'ko');
     const cat = (D.affixes[nom] || {}).cat;
     return `<tr><td><span style="display:flex;align-items:center;gap:8px">
               ${pastille(cat)}${nom}</span></td>
-            <td class="n">${vise}</td><td class="n">${eq}</td>
+            <td class="n">${vise == null ? '—' : vise}</td><td class="n">${eq}</td>
             <td class="n">${v || ''}</td><td class="n ${cls}">${total}</td></tr>`;
   }).join('');
   const bonus = Object.entries(res.couvert)
-    .filter(([n]) => !cibles.has(n))
+    .filter(([n]) => !cibles.has(n) && !vinSeul.includes(n))
     .sort((a, b) => b[1] - a[1])
     .map(([n, v]) => `${n} ${v}`).join(' · ');
   $('tableauAffixes').innerHTML = lignes
@@ -1658,7 +1675,14 @@ function restituer(b) {
   const code = b && (b.code || (b.etat && b.etat.k));
   if (code) {
     try {
-      afficherCode(code);
+      // LE CODE D'IMPORT NE TRANSPORTE PAS LE VIN. Il ne décrit que du stuff.
+      // Rouvrir un build visé à Valor 5 le montrait donc « Valor 3 » avec une
+      // colonne Vin vide, alors que ses deux points étaient bien enregistrés.
+      // Tous les appelants passent par appliquerEtat juste avant : cibles et
+      // vinManuel décrivent déjà ce build, on rejoue la même répartition.
+      afficherCode(code, $('vin').checked
+        ? repartitionVin([...cibles.entries()], vinManuel)
+        : new Map());
       return;
     } catch (e) {
       // Code devenu illisible (données du jeu changées) : on retombe sur le
@@ -2181,8 +2205,11 @@ function importer() {
  * le PREMIER : sinon un panaché 6 Épique + 2 Légendaire réenregistré puis
  * rouvert ressortait tout en Légendaire, parce que seule la liste d'affixes
  * avait été gardée et que l'optimiseur repartait de zéro. */
-function afficherCode(code) {
+function afficherCode(code, vinPoints) {
   {
+    // Sans second argument on affiche un code nu — celui qu'un inconnu vient
+    // de coller. On ne lui prête aucun vin : rien dans le code ne le dit.
+    const vp = vinPoints || new Map();
     const lu = decoderCode(code.trim());
     const parId = new Map();
     for (const pool of Object.values(D.objets)) for (const it of pool) parId.set(it.id, it);
@@ -2204,8 +2231,13 @@ function afficherCode(code) {
         sockets.push({ slot, index: idx, type: sk[0], level: sk[1], gem: g || null });
       });
     }
+    // Ce que ce build A, stuff ET vin réunis : c'est le total que le joueur
+    // verra en jeu, et donc le niveau visé qu'on réaffiche.
     cibles.clear();
-    for (const [nom, v] of Object.entries(couvert)) cibles.set(nom, Math.min(v, plafond(nom)));
+    for (const nom of new Set([...Object.keys(couvert), ...vp.keys()])) {
+      const total = Math.min((couvert[nom] || 0) + (vp.get(nom) || 0), plafond(nom));
+      if (total > 0) cibles.set(nom, total);
+    }
     $('classe').value = String(lu.classe);
     majArmes();
     const arme = slotItems[SLOT_ARME];
@@ -2217,7 +2249,8 @@ function afficherCode(code) {
     }
     dessinerAffixes();
     majBudgetVin();
-    dernier = { slotItems, sockets, couvert, vin: new Set(), suffisant: true, sources: [] };
+    dernier = { slotItems, sockets, couvert, vin: new Set(vp.keys()), vinPoints: vp,
+                suffisant: true, sources: [] };
     afficher(dernier, lu.classe);
     const raretes = {};
     for (const it of Object.values(slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
