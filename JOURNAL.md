@@ -268,6 +268,47 @@ autant, donc il descend en rareté.
 
 Contrôle ajouté : les trois dictionnaires ont 187 clés chacun, aucun trou.
 
+### Base Supabase en place
+Migration `20260812010000_par_pseudo.sql` appliquée à la main dans SQL
+Editor, l'intégration GitHub n'ayant jamais réagi. Vérifié par appel REST :
+`builds.partage` répond 200, les trois fonctions `security definer` aussi,
+`profiles.code` a disparu, et la lecture directe de `profiles` comme de
+`builds` ne renvoie plus aucune ligne. `mailer_autoconfirm` vaut `true` :
+la confirmation par e-mail est coupée, ce qui règle la boucle « trop
+d'essais ».
+
+La migration `20260812000000_code_ami.sql` a été supprimée : le code ami est
+abandonné, elle n'a jamais tourné, elle aurait créé une colonne morte.
+
+**Piège mesuré, à ne pas refaire.** Le premier `verifier.py` tenait pour
+preuve qu'un `GET /profiles` échoue quand la table est fermée. C'est faux :
+sous RLS, une table fermée répond **200 avec une liste vide**, exactement
+comme une table ouverte mais vide. Les deux sont indiscernables tant
+qu'aucun profil n'existe. La vraie preuve demande une ligne : la fonction
+`joueur_existe` doit trouver le pseudo (elle traverse RLS) là où la lecture
+directe ne renvoie rien — d'où l'argument optionnel du script.
+
+### Un seul mot, et une case qui dit ce qu'elle fait
+Le même identifiant s'appelait « pseudo public » quand on le choisissait,
+« pseudo exact de ton ami » quand on le tapait, et « code » dans les messages
+d'erreur — restes du code ami supprimé. C'est **pseudonyme** partout, dans
+les trois langues (nickname / никнейм). Les deux clés orphelines laissées par
+le code ami sont retirées.
+
+`perso.vin` perd sa parenthèse « (+2 sur 4 affixes) » : elle décrivait la
+règle du jeu, pas l'effet de la case. L'explication passe en infobulle sur le
+libellé. Surtout, décochée, la case laissait la colonne « Vin » cliquable et
+la ligne de budget annonçait « vin réparti automatiquement (8/8) » alors que
+le build n'en tenait aucun compte — la colonne s'éteint maintenant, et la
+ligne dit « Victory Wine non compté ».
+
+Mesuré : Aegis 6 + Blessing 6 + Block Energy Cost Reduction 6 donne
+1 Damaged + 2 Common + 5 Rare vin compté, **8 Rare** sans. C'est exactement
+ce que fait la case : les 8 points de Sigrid dispensent le stuff de fournir
+autant, donc il descend en rareté.
+
+Contrôle ajouté : les trois dictionnaires ont 187 clés chacun, aucun trou.
+
 ### État réel de la base Supabase (mesuré, pas supposé)
 Migrations 1 et 2 appliquées (`builds` avec `public`, `profiles.pseudo`).
 Migration `20260812010000_par_pseudo.sql` **jamais appliquée** :
