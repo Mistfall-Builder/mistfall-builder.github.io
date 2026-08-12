@@ -179,6 +179,25 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .buildLigne .pub:has(input:checked) span{color:var(--accent-clair)}
 .buildLigne .pub:has(input:disabled){opacity:.4;cursor:default}
 #notePartage:not(:empty),#notePseudo:not(:empty){margin-top:8px;font-size:12px}
+
+/* ---------------------------------------------------------- suggestions -- */
+.sugg{display:flex;align-items:center;gap:11px;padding:9px 10px;
+  background:var(--creux);border:1px solid var(--bord);border-radius:3px;
+  margin-bottom:7px;transition:border-color .12s}
+.sugg:hover{border-color:var(--accent-sombre)}
+.sugg .txt{flex:1;min-width:0}
+.sugg .ou{font:800 10px/1 var(--condense);letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--terne);margin-bottom:3px}
+.sugg .ou em{color:var(--avert);font-style:normal;letter-spacing:.5px}
+.sugg .qui{font-size:12.5px;font-weight:600;line-height:1.35}
+.sugg .pu{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px}
+.puceG,.puceP{font-size:10.5px;padding:1px 7px;border-radius:20px;
+  border:1px solid;white-space:nowrap}
+.puceG{color:var(--ok);border-color:#2c4a2c;background:#0d160d}
+.puceG.palier{color:#141a22;background:var(--accent);border-color:var(--accent);
+  font-weight:700}
+.puceP{color:var(--ko);border-color:#4a2c2c;background:#160d0d}
+.sugg .appl{flex:0 0 auto}
 .separateur{margin:14px 0 9px;color:var(--terne);
   font:800 10px/1 var(--condense);letter-spacing:1.7px;text-transform:uppercase;
   display:flex;align-items:center;gap:9px}
@@ -369,6 +388,17 @@ footer .don a:hover{text-decoration:underline}
       </div>
     </div>
 
+    <div class="carte" id="blocSuggestions" hidden>
+      <h2>Suggestions</h2>
+      <div class="corps">
+        <div id="listeSuggestions"></div>
+        <div class="pas" style="margin-top:9px;font-size:12px">
+          Des échanges d'une seule pièce qui font gagner quelque chose sans
+          faire perdre de cible. Rien n'est appliqué tant que tu ne cliques pas.
+        </div>
+      </div>
+    </div>
+
     <div class="carte">
       <h2>Mélanges possibles</h2>
       <div class="corps">
@@ -431,9 +461,9 @@ footer .don a:hover{text-decoration:underline}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="config.js?v=9"></script>
-<script src="comptes.js?v=9"></script>
-<script src="donnees.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="comptes.js?v=10"></script>
+<script src="donnees.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

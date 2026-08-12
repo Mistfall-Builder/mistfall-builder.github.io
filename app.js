@@ -541,6 +541,62 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
   return res;
 }
 
+/* « En changeant CETTE pièce, tu gagnerais ça. »
+ *
+ * L'optimiseur rend un build ; il ne dit pas ce qui se jouait à un cheveu.
+ * On essaie donc, pour chaque emplacement, les autres pièces disponibles, et
+ * on garde celles qui font gagner quelque chose sans faire perdre de cible.
+ *
+ * À rareté figée on ne propose JAMAIS plus rare : « Épique » est une
+ * consigne, pas une suggestion. En panaché, un cran est autorisé — les
+ * raretés y sont déjà mêlées — et son coût est affiché.
+ *
+ * Rien n'est appliqué automatiquement : chaque suggestion est un bouton. */
+function suggestions(res, classe, arme, cibleListe, planchers, vinPoints, mixte) {
+  const want = Object.fromEntries(cibleListe);
+  const items = { ...res.slotItems };
+  // La référence est mesurée COMME les essais (pose gloutonne). Comparer une
+  // pose exacte à des poses gloutonnes faisait paraître perdant tout
+  // échange, et la fonction ne rendait jamais rien.
+  const base = assembler(items, want, false).couvert;
+  const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vinPoints.get(n) || 0));
+  const tient = (cov) => cibleListe.every(([n, l]) => tot(cov, n) >= l);
+
+  const sortie = [];
+  for (const slot of D.ordreSlots) {
+    const actuel = items[slot];
+    if (!actuel) continue;
+    const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
+    const plafondAlt = actuel.g + (mixte ? 1 : 0);
+    let meilleur = null;
+    for (const alt of opts) {
+      if (alt === actuel || alt.g > plafondAlt) continue;
+      const essai = { ...items, [slot]: alt };
+      const cov = assembler(essai, want, false).couvert;
+      if (!tient(cov)) continue;
+      const gains = [], pertes = [], paliers = [];
+      for (const n of new Set([...Object.keys(cov), ...Object.keys(base)])) {
+        const a = tot(base, n), b = tot(cov, n);
+        if (a === b) continue;
+        (b > a ? gains : pertes).push([n, a, b]);
+        const p = palier(n);
+        if (p && b >= p && a < p) paliers.push(n);
+      }
+      if (!gains.length || (pertes.length && !paliers.length)) continue;
+      let valeur = 0;
+      for (const [n, a, b] of gains) valeur += (b - a) * (want[n] ? 3 : 1);
+      for (const [n, a, b] of pertes) valeur -= (a - b) * (want[n] ? 3 : 1);
+      valeur += paliers.length * 5;
+      valeur -= (alt.g - actuel.g) * 2;
+      const e = { slot, avant: actuel, apres: alt, gains, pertes, paliers,
+                  valeur, cran: alt.g - actuel.g };
+      if (!meilleur || e.valeur > meilleur.valeur) meilleur = e;
+    }
+    if (meilleur) sortie.push(meilleur);
+  }
+  return sortie.sort((a, b) => b.valeur - a.valeur).slice(0, 6);
+}
+
 /* Tous les mélanges de raretés qui atteignent les cibles, du moins cher au
    plus cher. Un même objectif s'atteint de plusieurs façons : beaucoup de
    pièces moyennes, ou peu de pièces très rares — et ce n'est pas forcément
@@ -834,6 +890,8 @@ function afficher(res, classe) {
     ? `<table><tr><th>Affixe</th><th>Visé</th><th>Équip.</th><th>Vin</th><th>Total</th></tr>${lignes}</table>`
       + (bonus ? `<div style="margin-top:6px" class="pas">En prime, non demandés : ${bonus}</div>` : '')
     : '<span class="pas">Aucun affixe visé.</span>';
+
+  dessinerSuggestions(res, classe);
 
   const libres = res.sockets.filter((s) => !s.gem).length;
   const compte = {};
@@ -1182,6 +1240,66 @@ function lirePermalien() {
   } catch (err) {
     return false;
   }
+}
+
+/* Les suggestions à l'écran. On PROPOSE : chaque ligne a son bouton, rien
+   n'est appliqué tant qu'on ne clique pas. Une carte vide disparaît plutôt
+   que d'afficher « aucune suggestion » à longueur de build. */
+function dessinerSuggestions(res, classe) {
+  const carte = $('blocSuggestions');
+  const boite = $('listeSuggestions');
+  if (!carte || !res || !res.slotItems) return;
+  let liste = [];
+  try {
+    const pl = {};
+    if ($('mixte').checked && $('plancherActif').checked) {
+      const gr = Number($('plancherGrade').value);
+      for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
+        pl[c.value] = gr;
+      }
+    }
+    liste = suggestions(res, classe, $('arme').value || null,
+                        [...cibles.entries()], pl,
+                        res.vinPoints || new Map(), $('mixte').checked);
+  } catch (e) {
+    liste = [];
+  }
+  carte.hidden = !liste.length;
+  if (!liste.length) return;
+  boite.innerHTML = '';
+  liste.forEach((e) => {
+    const couleurA = D.couleurs[String(e.avant.g)] || '#9fb0c4';
+    const couleurB = D.couleurs[String(e.apres.g)] || '#9fb0c4';
+    const puces = e.gains.map(([n, a, b]) =>
+      `<span class="puceG${e.paliers.includes(n) ? ' palier' : ''}">`
+      + `${n} ${a}→${b}${e.paliers.includes(n) ? ' · palier' : ''}</span>`).join('')
+      + e.pertes.map(([n, a, b]) =>
+        `<span class="puceP">${n} ${a}→${b}</span>`).join('');
+    const div = document.createElement('div');
+    div.className = 'sugg';
+    div.innerHTML = `
+      <div class="txt">
+        <div class="ou">${D.nomsSlots[e.slot] || e.slot}${
+          e.cran > 0 ? ' <em>+1 rareté</em>' : ''}</div>
+        <div class="qui"><span style="color:${couleurA}">${e.avant.n}</span>
+          → <span style="color:${couleurB}">${e.apres.n}</span></div>
+        <div class="pu">${puces}</div>
+      </div>
+      <button class="appl">Appliquer</button>`;
+    div.querySelector('.appl').onclick = () => {
+      const neufs = { ...res.slotItems, [e.slot]: e.apres };
+      const a = assembler(neufs, Object.fromEntries(cibles), true);
+      const majeur = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
+                       sources: a.sources, vin: res.vin,
+                       vinPoints: res.vinPoints, suffisant: true };
+      dernier = majeur;
+      afficher(majeur, classe);
+      $('etat').innerHTML = '<span class="ok">Suggestion appliquée</span>'
+        + `<span class="pas"> — ${e.avant.n} remplacé par ${e.apres.n}. `
+        + '« Calculer » repart des affixes visés.</span>';
+    };
+    boite.appendChild(div);
+  });
 }
 
 function calculer() {
