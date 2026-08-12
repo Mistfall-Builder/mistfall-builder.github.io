@@ -419,6 +419,79 @@ table.cmp .ec.nul{color:var(--terne)}
 .vote[disabled]{opacity:.45;cursor:default}
 .vote .n{font-variant-numeric:tabular-nums;font-weight:600}
 
+/* ------------------------------------------------- grille des affixes -- */
+.loupe{width:38px;padding:0;font-size:15px;line-height:1;color:var(--doux)}
+.loupe:hover{color:var(--accent);border-color:var(--accent-sombre)}
+.voile{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);
+  display:flex;align-items:center;justify-content:center;padding:18px}
+.voile[hidden]{display:none}
+.grilleBoite{background:var(--panneau);border:1px solid var(--bord);
+  border-radius:4px;width:min(1500px,100%);height:min(92vh,100%);
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 24px 70px -18px #000}
+.grilleTete{display:flex;gap:11px;align-items:center;flex-wrap:wrap;
+  padding:12px 15px;border-bottom:1px solid var(--bord);background:var(--panneau2)}
+.grilleTete h2{margin:0;font-size:16px;flex:0 0 auto}
+.grilleTete input{flex:1;min-width:170px}
+.grilleTete button{width:auto;flex:0 0 auto;padding:7px 15px}
+.grilleCompte{font-size:12px;color:var(--terne);flex:0 0 auto}
+/* Le corps defile, la tete et le pied restent : on garde la recherche et
+   le budget sous les yeux pendant qu'on parcourt la grille. */
+.grilleCorps{flex:1;overflow-y:auto;padding:11px 13px;
+  display:grid;gap:5px 9px;
+  /* 285 px ne fixe PAS la largeur des tuiles, seulement le nombre de
+     colonnes : `1fr` les etire ensuite sur toute la place. Descendre ce
+     seuil fait donc passer un 1280 px de 3 a 4 colonnes -- ce qui fait
+     tenir les 44 affixes sans defilement -- sans rien retrecir sur un
+     ecran plus large. */
+  grid-template-columns:repeat(auto-fill,minmax(285px,1fr));
+  align-content:start}
+.grillePied{display:flex;gap:11px;align-items:center;justify-content:space-between;
+  padding:10px 15px;border-top:1px solid var(--bord);background:var(--panneau2)}
+.grillePied button{width:auto;padding:6px 13px;font-size:12px}
+
+/* UNE SEULE LIGNE PAR AFFIXE. Sur deux lignes, les 44 tuiles depassaient
+   la hauteur de l'ecran et il fallait encore faire defiler -- ce que cette
+   grille est justement censee supprimer. */
+.gAff{border:1px solid var(--bord);border-radius:3px;padding:4px 7px;
+  background:var(--creux);display:flex;align-items:center;gap:8px;
+  transition:opacity .12s,border-color .12s,box-shadow .12s}
+.gAff .gNom{display:flex;align-items:center;gap:6px;font-size:12px;
+  color:var(--texte);flex:1;min-width:0}
+/* Les noms longs (« Energy Recovery Speed Increase ») sont coupes plutot
+   que de pousser les boutons hors de la tuile ; l'infobulle donne le nom
+   entier et l'effet de chaque niveau. */
+.gAff .gNom span.txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gAff.actif{border-color:var(--accent-sombre);background:var(--panneau2)}
+/* La recherche ne FILTRE pas, elle designe : la grille garde ses positions
+   d'une frappe a l'autre, donc l'oeil retrouve ou il en etait. */
+.gAff.terne{opacity:.24}
+.gAff.brille{border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent),0 0 22px -6px var(--accent)}
+.gPref{width:20px;min-width:20px;padding:2px 0;font-size:12px;flex:0 0 auto;
+  background:none;border:none;color:var(--terne)}
+.gPref[data-etat="bonus"]{color:var(--accent)}
+.gPref[data-etat="non"]{color:var(--ko)}
+.gPref:hover{color:var(--texte)}
+/* Les puces de tri par preference, communes aux deux vues. */
+.chipsPref{display:flex;gap:2px;flex:0 0 auto}
+.chipsPref button{width:26px;min-width:26px;padding:5px 0;font-size:11px;
+  background:var(--creux);border-color:var(--bord);color:var(--terne)}
+.chipsPref button:hover{color:var(--texte);border-color:var(--accent-sombre)}
+.chipsPref button.actif{background:var(--accent-sombre);border-color:var(--accent);
+  color:var(--texte)}
+.gNiv{display:flex;gap:2px;flex:0 0 auto}
+.gNiv button{width:20px;min-width:20px;padding:3px 0;font-size:10.5px;
+  background:var(--fond);border-color:var(--bord);color:var(--terne)}
+.gNiv button:hover{border-color:var(--accent-sombre);color:var(--texte)}
+.gNiv button.choisi{background:var(--accent-sombre);border-color:var(--accent);
+  color:var(--texte);font-weight:700}
+/* Le palier est marque d'un point : c'est le niveau ou l'affixe gagne son
+   second effet, et c'est l'information qui decide d'un build. */
+.gNiv button.palier::after{content:'';display:block;width:3px;height:3px;
+  border-radius:50%;background:var(--accent);margin:2px auto 0}
+.gNiv button.choisi.palier::after{background:var(--texte)}
+
 /* ---------------------------------------------------------------- guides -- */
 .guide{border:1px solid var(--bord);border-radius:3px;margin-bottom:8px;
        background:rgba(255,255,255,.02)}
@@ -662,9 +735,21 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 #blocCompte .qui b{color:var(--accent-clair);font-weight:600}
 #noteCompte:not(:empty){margin-top:8px;font-size:12px}
 
+/* Le code n'est pas fait pour etre LU, il est fait pour etre COPIE. Le
+   champ se fait donc discret et c'est le bouton qui prend la place. */
 #code{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;
-  color:var(--accent-clair);background:var(--creux);letter-spacing:.5px;
-  font-size:13px}
+  color:var(--doux);background:var(--creux);letter-spacing:.3px;
+  font-size:11px;padding:6px 8px;flex:1;min-width:0;
+  text-overflow:ellipsis}
+/* Au repos le bouton est eteint ; il s'allume quand un code existe. La
+   classe `.pret` est posee par le script EN MEME TEMPS que `disabled`, et
+   c'est elle qui porte la couleur : certains moteurs ne recalculent pas
+   le style sur un simple changement de propriete `disabled`. */
+#copier{flex:0 0 auto;padding:11px 26px;font-size:14px;letter-spacing:.4px;
+  background:var(--creux);border-color:var(--bord);color:var(--terne)}
+#copier.pret{background:var(--accent-sombre);border-color:var(--accent);
+  color:var(--texte);font-weight:700}
+#copier.pret:hover{background:var(--accent);color:#140b04}
 #noteCode:not(:empty){margin-top:8px;color:var(--avert);font-size:12.5px}
 
 table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -788,7 +873,14 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <summary><span data-i18n="affixes.titre">Affixes visés</span>
         <span class="compte" id="compteCibles"></span></summary>
       <div class="corps">
-        <input type="text" id="recherche" data-i18n-ph="affixes.filtrer" placeholder="filtrer la liste…">
+        <div class="rangee">
+          <input type="text" id="recherche" data-i18n-ph="affixes.filtrer"
+                 placeholder="filtrer la liste…" style="flex:1">
+          <div class="chipsPref" id="triPref"></div>
+          <button id="ouvrirGrille" class="loupe" style="flex:0 0 auto"
+                  data-i18n-title="grille.ouvrir"
+                  title="Tout voir d'un coup">⛶</button>
+        </div>
         <div class="entetes"><span data-i18n="affixes.col.nom">Affixe</span><span data-i18n="affixes.col.niveau">Niveau</span><span data-i18n="affixes.col.vin">Vin</span>
           <span data-i18n="affixes.col.pref" title="★">★</span></div>
         <div id="listeAffixes"></div>
@@ -888,7 +980,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <div class="rangee">
           <input type="text" id="code" readonly
                  data-i18n-ph="code.place" placeholder="Calcule un build pour obtenir son code.">
-          <button id="copier" style="flex:0 0 auto" disabled data-i18n="code.copier">Copier</button>
+          <button id="copier" disabled data-i18n="code.copier">Copier le code</button>
         </div>
         <div id="noteCode"></div>
       </div>
@@ -1081,6 +1173,28 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
   </div>
 </section>
 
+<!-- La grille plein écran des affixes. Elle n'existe que pour supprimer
+     l'aller-retour de la colonne étroite : 44 affixes sur une seule vue,
+     réglables sur place. Elle travaille sur le MÊME état que la liste de
+     gauche — il n'y a rien à « valider », fermer suffit. -->
+<div id="grilleAffixes" class="voile" hidden>
+  <div class="grilleBoite" role="dialog" aria-modal="true" aria-labelledby="grilleTitre">
+    <div class="grilleTete">
+      <h2 id="grilleTitre" data-i18n="grille.titre">Tous les affixes</h2>
+      <input type="search" id="grilleRecherche" data-i18n-ph="grille.chercher"
+             placeholder="tape un nom ou un effet…">
+      <div class="chipsPref" id="triPrefGrille"></div>
+      <span class="grilleCompte" id="grilleCompte"></span>
+      <button id="grilleFermer" data-i18n="grille.fermer">Terminé</button>
+    </div>
+    <div id="grilleCorps" class="grilleCorps"></div>
+    <div class="grillePied">
+      <span id="grilleBudget" class="pas"></span>
+      <button id="grilleVider" data-i18n="affixes.vider">Tout vider</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   <span data-i18n="pied.texte">Le code produit ici se colle dans</span> <em>Prepare → Manage/Import</em>. <span data-i18n="pied.texte2">Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.</span>
   <span class="don">
@@ -1099,15 +1213,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=49"></script>
-<script src="config.js?v=49"></script>
-<script src="comptes.js?v=49"></script>
-<script src="donnees.js?v=49"></script>
-<script src="skills.js?v=49"></script>
-<script src="talents.js?v=49"></script>
-<script src="builds_reference.js?v=49"></script>
-<script src="guides_classes.js?v=49"></script>
-<script src="fiche.js?v=49"></script>
-<script src="app.js?v=49"></script>
+<script src="i18n.js?v=56"></script>
+<script src="config.js?v=56"></script>
+<script src="comptes.js?v=56"></script>
+<script src="donnees.js?v=56"></script>
+<script src="skills.js?v=56"></script>
+<script src="talents.js?v=56"></script>
+<script src="builds_reference.js?v=56"></script>
+<script src="guides_classes.js?v=56"></script>
+<script src="fiche.js?v=56"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>

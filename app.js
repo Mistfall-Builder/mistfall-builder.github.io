@@ -27,6 +27,16 @@ const vinManuel = new Map();        // affixe -> points de vin imposés
  */
 const prefs = new Map();            // affixe -> 'bonus' | 'non'
 const CYCLE_PREF = [undefined, 'bonus', 'non'];
+
+/* Le tri par préférence, partagé par la colonne de gauche et la grille
+   plein écran. Marquer un affixe d'une étoile ne servait à rien tant
+   qu'on ne pouvait pas ensuite ne voir que ceux-là. */
+let filtrePref = '';                // '' | 'bonus' | 'non' | 'vise'
+function passeFiltrePref(nom) {
+  if (!filtrePref) return true;
+  if (filtrePref === 'vise') return cibles.has(nom);
+  return prefs.get(nom) === filtrePref;
+}
 let dernier = null;                 // dernier build calculé
 
 const $ = (id) => document.getElementById(id);
@@ -1054,6 +1064,7 @@ function dessinerAffixes() {
     // ou « Focused » : chercher « speed » doit les trouver. On balaie donc
     // la description et les libellés d'effet de chaque niveau.
     if (filtre && !correspondAffixe(nom, filtre)) continue;
+    if (!passeFiltrePref(nom)) continue;
     const info = D.affixes[nom];
     const ligne = document.createElement('div');
     ligne.dataset.affixe = nom;
@@ -1126,6 +1137,196 @@ function dessinerAffixes() {
     majEtatVin(ligne);
     conteneur.appendChild(ligne);
   }
+  dessinerChipsPref($('triPref'), () => {
+    dessinerAffixes();
+    // La grille suit le même filtre quand elle est ouverte.
+    if ($('grilleAffixes') && !$('grilleAffixes').hidden) dessinerGrilleAffixes();
+  });
+  // Un filtre qui ne laisse rien passer doit se dire, sinon la liste vide
+  // ressemble à une panne.
+  if (filtrePref && !conteneur.children.length) {
+    conteneur.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
+  }
+}
+
+/* ======================================================================
+   LA GRILLE PLEIN ÉCRAN
+
+   La colonne de gauche montre quatre affixes à la fois sur quarante-quatre.
+   Choisir une poignée de cibles y demande de faire défiler entre chaque
+   clic, et de perdre de vue ce qu'on a déjà pris. La grille les met tous
+   sous les yeux d'un coup.
+
+   DEUX PARTIS PRIS.
+
+   Les niveaux sont des BOUTONS, pas une liste déroulante : poser Valor 5
+   devient un clic au lieu de trois, et on voit d'un coup d'œil où en est
+   chaque affixe sans rien ouvrir.
+
+   La recherche DÉSIGNE au lieu de filtrer. Filtrer réorganise la grille à
+   chaque frappe et fait perdre les repères ; ici les positions ne bougent
+   jamais, les correspondances s'allument et le reste s'efface. On garde
+   ainsi la mémoire visuelle d'une recherche à l'autre.
+   ====================================================================== */
+function tuileAffixe(nom) {
+  const info = D.affixes[nom];
+  const el = document.createElement('div');
+  el.className = 'gAff';
+  el.dataset.affixe = nom;
+  el.title = (info.desc || '')
+    + (info.eff ? '\n\n' + info.eff.map((e, i) => `${i + 1}. ${e}`).join('\n') : '');
+  // Le nombre de boutons DIT déjà le maximum de l'affixe : répéter
+  // « max 7 » à côté prendrait la place du nom pour ne rien apprendre.
+  el.innerHTML = `<button class="gPref"></button>
+    <div class="gNom">${pastille(info.cat)}
+      <span class="txt">${echapper(nom)}</span></div>
+    <div class="gNiv"></div>`;
+  const rangee = el.querySelector('.gNiv');
+
+  // L'étoile est aussi ici : sans elle, on ne pourrait marquer ses favoris
+  // que dans la colonne étroite, donc jamais depuis la vue qui sert à les
+  // parcourir tous.
+  const bp = el.querySelector('.gPref');
+  const majPref = () => {
+    const v = prefs.get(nom);
+    bp.dataset.etat = v || 'neutre';
+    bp.textContent = v === 'bonus' ? '★' : (v === 'non' ? '✕' : '☆');
+    bp.title = t(v === 'bonus' ? 'pref.bonus' : (v === 'non' ? 'pref.non' : 'pref.neutre'));
+  };
+  bp.onclick = () => {
+    const i = CYCLE_PREF.indexOf(prefs.get(nom));
+    const suivant = CYCLE_PREF[(i + 1) % CYCLE_PREF.length];
+    if (suivant) prefs.set(nom, suivant); else prefs.delete(nom);
+    majPref();
+    dessinerAffixes();
+    // Sous filtre, l'affixe qu'on vient de démarquer n'a plus sa place ici.
+    if (filtrePref) dessinerGrilleAffixes();
+  };
+  majPref();
+
+  const peindre = () => {
+    const vise = cibles.get(nom);
+    el.classList.toggle('actif', cibles.has(nom));
+    for (const b of rangee.children) {
+      const v = b.dataset.niveau === '' ? undefined : Number(b.dataset.niveau);
+      b.classList.toggle('choisi', v === undefined ? !cibles.has(nom) : v === vise);
+    }
+  };
+
+  const poser = (v) => {
+    if (v === null) cibles.delete(nom); else cibles.set(nom, v);
+    peindre();
+    majCompteursGrille();
+    // La colonne de gauche montre le même état : elle se refait tout de
+    // suite, pour qu'on ne découvre pas l'écart en refermant la grille.
+    dessinerAffixes();
+    majBudgetVin();
+  };
+
+  const bouton = (libelle, valeur, palier) => {
+    const b = document.createElement('button');
+    b.textContent = libelle;
+    b.dataset.niveau = valeur === null ? '' : String(valeur);
+    if (palier) b.classList.add('palier');
+    b.title = palier ? t('grille.palier', { n: valeur }) : '';
+    // Recliquer le niveau déjà posé le retire : c'est le geste attendu, et
+    // ça évite d'aller chercher le tiret à l'autre bout de la rangée.
+    b.onclick = () => poser(cibles.get(nom) === valeur ? null : valeur);
+    rangee.appendChild(b);
+  };
+  bouton('—', null, false);
+  for (let i = 1; i <= info.cap; i += 1) bouton(String(i), i, info.palier === i);
+  peindre();
+  return el;
+}
+
+function majCompteursGrille() {
+  const c = $('grilleCompte');
+  if (c) c.textContent = t('grille.compte', { n: cibles.size });
+  const b = $('grilleBudget');
+  if (b) { b.textContent = $('budgetVin').textContent; b.className = $('budgetVin').className; }
+}
+
+function dessinerGrilleAffixes() {
+  const corps = $('grilleCorps');
+  if (!corps) return;
+  corps.innerHTML = '';
+  for (const nom of Object.keys(D.affixes).sort()) {
+    if (!passeFiltrePref(nom)) continue;
+    corps.appendChild(tuileAffixe(nom));
+  }
+  dessinerChipsPref($('triPrefGrille'), () => {
+    dessinerGrilleAffixes(); dessinerAffixes();
+  });
+  majCompteursGrille();
+  eclairerGrille($('grilleRecherche').value || '');
+}
+
+/* Les puces de tri, identiques des deux côtés. Le filtre est une seule
+   variable partagée : choisir « ★ » dans la grille laisse la colonne de
+   gauche sur les mêmes affixes en refermant, ce qui évite de se demander
+   pourquoi la liste a changé. */
+function dessinerChipsPref(boite, apres) {
+  if (!boite) return;
+  const OPTS = [['', '—', 'pref.tous'], ['bonus', '★', 'pref.filtreFav'],
+                ['non', '✕', 'pref.filtreNon'], ['vise', '●', 'pref.filtreVise']];
+  boite.innerHTML = '';
+  for (const [v, sym, cle] of OPTS) {
+    const b = document.createElement('button');
+    b.className = 'chipPref' + (filtrePref === v ? ' actif' : '');
+    b.textContent = sym;
+    b.title = t(cle);
+    // Recliquer la puce active revient à « tout » : pas besoin de viser le
+    // tiret pour sortir d'un filtre.
+    b.onclick = () => { filtrePref = (filtrePref === v ? '' : v); apres(); };
+    boite.appendChild(b);
+  }
+}
+
+function eclairerGrille(filtre) {
+  const corps = $('grilleCorps');
+  if (!corps) return;
+  const f = (filtre || '').trim().toLowerCase();
+  let premier = null;
+  let trouves = 0;
+  for (const tuile of corps.children) {
+    const ok = !f || correspondAffixe(tuile.dataset.affixe, f);
+    tuile.classList.toggle('brille', !!f && ok);
+    tuile.classList.toggle('terne', !!f && !ok);
+    if (f && ok) { trouves += 1; if (!premier) premier = tuile; }
+  }
+  const c = $('grilleCompte');
+  if (c) {
+    c.textContent = f
+      ? t(trouves ? 'grille.trouves' : 'grille.aucun', { n: trouves })
+      : t('grille.compte', { n: cibles.size });
+  }
+  // On amène la première correspondance sous les yeux, sans sauter : si
+  // elle est déjà visible, `nearest` ne bouge rien.
+  if (premier) premier.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function ouvrirGrille() {
+  const v = $('grilleAffixes');
+  if (!v) return;
+  dessinerGrilleAffixes();
+  v.hidden = false;
+  // La page derrière ne doit pas défiler pendant qu'on est dans la grille.
+  document.body.style.overflow = 'hidden';
+  const ch = $('grilleRecherche');
+  if (ch) { ch.value = ($('recherche').value || ''); ch.focus(); ch.select(); }
+  eclairerGrille(ch ? ch.value : '');
+}
+
+function fermerGrille() {
+  const v = $('grilleAffixes');
+  if (!v || v.hidden) return;
+  v.hidden = true;
+  document.body.style.overflow = '';
+  // Rien à valider : la grille écrivait déjà dans le même état. On remet
+  // seulement la colonne de gauche et le budget au propre.
+  dessinerAffixes();
+  majBudgetVin();
 }
 
 function materiau(type, niveau) {
@@ -1228,13 +1429,24 @@ function afficher(res, classe) {
       objets[Number(codeSlot)] = { cfg: Number(it.id), gemmes };
     }
     $('code').value = encoderCode(classe, objets);
-    $('copier').disabled = false;
+    // La classe DOUBLE la pseudo-classe :disabled. Certains moteurs ne
+    // recalculent pas le style quand `disabled` change par script : le
+    // bouton restait alors gris alors qu'il était devenu cliquable. Une
+    // classe posée explicitement, elle, invalide toujours.
+    activerCopie(true);
     $('noteCode').textContent = '';
   } catch (err) {
     $('code').value = '';
-    $('copier').disabled = true;
+    activerCopie(false);
     $('noteCode').textContent = t('code.impossible', { message: err.message });
   }
+}
+
+function activerCopie(oui) {
+  const b = $('copier');
+  if (!b) return;
+  b.disabled = !oui;
+  b.classList.toggle('pret', !!oui);
 }
 
 /* La marge à l'écran. Cliquer une ligne pose l'affixe comme cible au niveau
@@ -3244,6 +3456,9 @@ window.surChangementDeLangue = function () {
   dessinerBuildsClasses();
   dessinerGuidesClasses();
   dessinerComparaison();
+  // Le compteur de la grille et les infobulles des paliers sont posés en
+  // JS : sans redessin ils restaient dans la langue précédente.
+  if ($('grilleAffixes') && !$('grilleAffixes').hidden) dessinerGrilleAffixes();
   // Les listes déroulantes portent des libellés traduits : sans ce
   // remplissage, tri et filtres resteraient dans la langue précédente.
   remplirSelect($('sortsCible'), [
@@ -3368,6 +3583,25 @@ function demarrer(donnees) {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
   };
   $('calculer').onclick = calculer;
+
+  // La grille plein écran.
+  if ($('ouvrirGrille')) {
+    $('ouvrirGrille').onclick = ouvrirGrille;
+    $('grilleFermer').onclick = fermerGrille;
+    $('grilleRecherche').oninput = (e) => eclairerGrille(e.target.value);
+    $('grilleVider').onclick = () => {
+      cibles.clear(); vinManuel.clear();
+      dessinerGrilleAffixes(); dessinerAffixes(); majBudgetVin();
+    };
+    // Cliquer le voile ferme, cliquer la boîte non : sinon le moindre clic
+    // à côté d'un bouton refermerait la grille en pleine sélection.
+    $('grilleAffixes').onclick = (e) => {
+      if (e.target === $('grilleAffixes')) fermerGrille();
+    };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') fermerGrille();
+    });
+  }
   // Les sous-onglets de la page Communauté, et le bouton de comparaison.
   for (const b of document.querySelectorAll('#sousOnglets button')) {
     b.onclick = () => montrerVue(b.dataset.vue);
