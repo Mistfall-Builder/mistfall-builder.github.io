@@ -1,134 +1,16 @@
 # Mistfall Builder
 
-Composeur de stuff pour *Mistfall Hunter*. Tu choisis tes affixes et leur
-niveau, il te sort l'équipement, les gemmes et le **code d'import** à coller
-dans le jeu (*Prepare → Manage/Import*). Aucun prix, aucun marché.
+Composeur de stuff pour *Mistfall Hunter*.
 
-Le site est **entièrement statique** : tout le calcul se fait dans ton
-navigateur, il n'y a aucun serveur derrière. Il fonctionne aussi hors ligne —
-double-cliquer sur `index.html` suffit.
+**https://mistfall-builder.github.io/**
 
-## Mettre en ligne
+Tu choisis les affixes que tu veux et à quel niveau, il te sort l'équipement
+avec les gemmes déjà posées et le code d'import à coller dans le jeu
+(*Prepare → Manage/Import*). Il cherche le **minimum** qui atteint tes
+cibles, pas le maximum.
 
-Le dossier est prêt tel quel, il n'y a rien à compiler.
+Le site est entièrement statique : tout le calcul se fait dans le navigateur.
 
-### GitHub Pages
-
-Le site est publié depuis
-[`mistfall-builder/mistfall-builder.github.io`](https://github.com/mistfall-builder/mistfall-builder.github.io)
-et sert à l'adresse **https://mistfall-builder.github.io/**.
-
-Pour republier après une modification, depuis ce dossier :
-
-```
-git add -A
-git commit -m "ce qui a changé"
-git push
-```
-
-Pour repartir de zéro ailleurs : crée un dépôt **vide** nommé
-`<organisation>.github.io` (le nom compte — c'est lui qui donne une adresse
-à la racine plutôt qu'un sous-chemin), puis `git remote add origin …` et
-`git push -u origin main`. Enfin, dépôt → *Settings* → *Pages* →
-*Deploy from a branch*, branche `main`, dossier `/ (root)`.
-
-### Netlify ou Cloudflare Pages
-
-Une fois le dépôt sur GitHub : *Add new site* → *Import an existing project*
-→ choisir le dépôt. Laisse la commande de build **vide** et le dossier de
-publication à `.` (`netlify.toml` le dit déjà). Ces deux-là acceptent aussi
-un simple glisser-déposer du dossier, sans passer par git.
-
-## Ce que contient le dossier
-
-| Fichier | Rôle |
-|---|---|
-| `index.html` | la page |
-| `app.js` | le moteur de build et l'interface |
-| `donnees.js` | les données du jeu, chargées par balise `<script>` |
-| `icones/` | les icônes d'objets et de gemmes |
-| `fond/` | l'illustration de fond |
-
-`donnees.json` est la même chose que `donnees.js` au format JSON, gardée en
-local pour les tests hors navigateur et volontairement exclue du dépôt.
-
-## Mes builds
-
-Les builds enregistrés vivent dans le **stockage local du navigateur** : ils
-restent sur la machine et ne partent nulle part. Trois façons de les
-déplacer :
-
-- **Lien de partage** — tout le build tient dans l'adresse. Le lien marche
-  chez qui le reçoit, sans rien installer.
-- **Exporter / Importer** — un fichier `.json` avec toute la bibliothèque.
-  L'import fusionne au lieu d'écraser.
-- **Le code d'import du jeu** — pour rejouer le stuff en jeu directement.
-
-## Comptes (facultatif)
-
-Sans configuration, le bloc « Compte » n'apparaît pas et le site reste
-100 % local. Pour activer la synchronisation entre appareils :
-
-**1. Créer le projet.** Sur [supabase.com](https://supabase.com), nouveau
-projet (gratuit). Note la région la plus proche.
-
-**2. Créer la table.** Si l'intégration GitHub de Supabase est activée
-(*Settings → Integrations*, dépôt connecté, *Deploy to production* actif),
-il n'y a **rien à faire** : `supabase/migrations/` est appliqué tout seul au
-prochain push sur `main`.
-
-Sinon, dans *SQL Editor*, exécute le même contenu — c'est le fichier
-[`supabase/migrations/20260811000000_builds.sql`](supabase/migrations/20260811000000_builds.sql) :
-
-```sql
-create table public.builds (
-  id      uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users on delete cascade
-          default auth.uid(),
-  nom     text not null,
-  etat    jsonb not null,
-  code    text default '',
-  maj     timestamptz not null default now(),
-  unique (user_id, nom)
-);
-
-alter table public.builds enable row level security;
-
--- Chacun ne voit et ne modifie QUE ses propres builds. Sans cette
--- politique, la table serait lisible par n'importe qui avec la clé anon.
-create policy "chacun ses builds" on public.builds
-  for all
-  using      (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-```
-
-**3. Brancher le site.** Dans *Project Settings → API*, copie le
-**Project URL** et la clé **Publishable** (`sb_publishable_…`) dans
-`config.js`.
-
-Cette clé est faite pour être publique : elle ne donne accès à rien toute
-seule, c'est la politique RLS ci-dessus qui décide. N'y mets **jamais** la
-clé **Secret** (`sb_secret_…`) — elle contourne toutes les protections, et
-`config.js` est lisible par n'importe qui une fois le site en ligne. Si une
-clé secrète a été exposée ne serait-ce qu'une fois (capture d'écran, copie
-dans un message), il faut la révoquer : *API Keys → Secret keys → ⋮ →
-Revoke*.
-
-**4. L'adresse du site.** Dans *Authentication → URL Configuration*, ajoute
-l'adresse GitHub Pages en *Site URL* et en *Redirect URL*, sinon les liens de
-confirmation par e-mail renverront vers `localhost`.
-
-Par défaut Supabase exige une confirmation par e-mail à l'inscription. Pour
-s'en passer : *Authentication → Providers → Email* → décocher *Confirm
-email*.
-
-## Régénérer les données
-
-Depuis la racine du projet :
-
-```
-python tools/generer_site.py
-```
-
-Il relit les données du jeu, retrouve les identifiants manquants, recopie les
-icônes réellement utilisées et réécrit `donnees.js` et `donnees.json`.
+Les données de jeu (compétences, talents, formules de dégâts) viennent du
+wiki communautaire [mistfallhunter.gamedb.wiki](https://mistfallhunter.gamedb.wiki),
+et les tables des codes d'import de [gyldforge.com](https://gyldforge.com).
