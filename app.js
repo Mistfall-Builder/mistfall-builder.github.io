@@ -2037,7 +2037,7 @@ function dessinerFiche(res, classeId) {
     const it = res.slotItems[slot];
     if (!it) return '';
     const couleur = D.couleurs[String(it.g)] || '#9fb2c4';
-    return `<span class="mini" style="--tinte:${couleur}" title="${infobulle(it)}">
+    return `<span class="piecette" style="--tinte:${couleur}" title="${infobulle(it)}">
       ${it.ic ? `<img src="icones/${it.ic}" alt="" decoding="async">`
               : '<i></i>'}</span>`;
   }).join('');
