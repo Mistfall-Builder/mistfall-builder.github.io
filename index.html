@@ -616,15 +616,24 @@ textarea:focus{outline:none;border-color:var(--accent)}
 label{display:block;color:var(--terne);font:600 11px/1 var(--condense);
       letter-spacing:1.3px;text-transform:uppercase;margin:12px 0 5px}
 .corps>label:first-child{margin-top:0}
-select,input[type=text],input[type=email],input[type=password]{
+/* `input[type=search]` manquait a la liste : les quatre champs de
+   recherche du site heritaient donc du style natif du navigateur -- fond
+   blanc, coins arrondis, hauteur differente -- au milieu d'une charte
+   sombre. `appearance:none` retire en plus la petite croix et la loupe que
+   certains moteurs ajoutent d'office. */
+select,input[type=text],input[type=email],input[type=password],
+input[type=search]{
   width:100%;background:var(--creux);color:var(--texte);
   font:400 14px/1.4 var(--corps);border:1px solid var(--bord-fort);
-  border-radius:3px;padding:7px 9px;transition:border-color .12s}
+  border-radius:3px;padding:7px 9px;transition:border-color .12s;
+  -webkit-appearance:none;appearance:none}
+input[type=search]::-webkit-search-decoration,
+input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none}
 select:hover,input[type=text]:hover,input[type=email]:hover,
-input[type=password]:hover{border-color:#43494d}
+input[type=password]:hover,input[type=search]:hover{border-color:#43494d}
 select:focus,input[type=text]:focus,input[type=email]:focus,
-input[type=password]:focus{outline:none;border-color:var(--accent);
-  box-shadow:0 0 0 1px var(--accent-sombre)}
+input[type=password]:focus,input[type=search]:focus{outline:none;
+  border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-sombre)}
 select:disabled{opacity:.4}
 /* UNE RANGEE PASSE A LA LIGNE PLUTOT QUE DE DEBORDER. Un element flex a
    par defaut `min-width:auto`, donc il refuse de retrecir sous la largeur
@@ -637,7 +646,22 @@ select:disabled{opacity:.4}
 /* Les puces de tri gardent leur largeur naturelle : `.rangee>*` l'emporte
    sur `.chipsPref`, et sans cette ligne elles s'etiraient en volant sa
    place au champ de recherche. */
-.rangee>.chipsPref{flex:0 0 auto}
+/* Le champ, les puces et la loupe sont sur la meme ligne : ils doivent
+   faire la MEME hauteur. `stretch` ne suffisait pas -- un input ne s'etire
+   pas comme un bouton, et on obtenait 36 px contre 44. On aligne donc tout
+   sur la hauteur reelle du champ : 7 px de marge haute et basse, 14 px de
+   texte en interligne 1,4, plus la bordure. */
+/* On ne laisse rien a l'arrondi : les trois controles recoivent la MEME
+   hauteur explicite, champ compris. Les caler par `align-self` laissait
+   4 px d'ecart entre le champ et les boutons, visible a l'oeil. */
+.rangee>.chipsPref{flex:0 0 auto;align-self:center}
+.rangee>.chipsPref button,
+.rangee>.loupe,
+.rangee>input[type=search],
+.grilleTete>.chipsPref button,
+.grilleTete>input[type=search]{height:36px;padding-top:0;padding-bottom:0}
+.rangee>.loupe,.rangee>.chipsPref button{align-self:center}
+.grilleTete>.chipsPref{align-self:center}
 /* Les rangees de boutons d'action gardent une largeur lisible : sous
    ~120 px un libelle se coupe en deux lignes, autant passer a la ligne. */
 .rangeeBoutons>*{flex:1 1 120px}
@@ -666,7 +690,16 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
   color:#160c05}
 
 /* ------------------------------------------------------------- affixes --- */
-#recherche{margin-bottom:8px}
+/* Reste de l'epoque ou le champ etait seul au-dessus de la liste. Depuis
+   qu'il partage sa ligne avec les puces et la loupe, cette marge basse le
+   faisait remonter de 4 px par rapport a elles : centrer une boite de 36 px
+   qui traine 8 px de marge sous elle ne la met pas au meme niveau qu'une
+   boite de 36 px sans marge. L'espacement vient du `gap` de la rangee. */
+#recherche{margin-bottom:0}
+/* L'espacement sous la ligne de recherche appartient desormais a la
+   RANGEE, pas au champ : porte par le champ, il le decalait de 4 px par
+   rapport aux boutons voisins. */
+#carteAffixes .rangee:first-child{margin-bottom:9px}
 /* Les 44 affixes du jeu, tous listés : on ne tape rien, on règle un niveau
    et, si on veut, les points de vin — exactement comme dans l'outil. */
 .entetes{display:flex;gap:9px;padding:0 8px 4px;color:var(--terne);
@@ -1104,6 +1137,13 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
+    <details class="carte pliable" open>
+      <summary><span data-i18n="table.titre">Affixes obtenus</span></summary>
+      <div class="corps defil" id="tableauAffixes">
+        <span class="pas" data-i18n="table.vide">Choisis des affixes, puis « Calculer le build ».</span>
+      </div>
+    </details>
+
   </div>
 
 </main>
@@ -1143,12 +1183,6 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
-    <details class="carte pliable" open>
-      <summary><span data-i18n="table.titre">Affixes obtenus</span></summary>
-      <div class="corps defil" id="tableauAffixes">
-        <span class="pas" data-i18n="table.vide">Choisis des affixes, puis « Calculer le build ».</span>
-      </div>
-    </details>
 </section>
 
 
@@ -1290,15 +1324,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=69"></script>
-<script src="config.js?v=69"></script>
-<script src="comptes.js?v=69"></script>
-<script src="donnees.js?v=69"></script>
-<script src="skills.js?v=69"></script>
-<script src="talents.js?v=69"></script>
-<script src="builds_reference.js?v=69"></script>
-<script src="guides_classes.js?v=69"></script>
-<script src="fiche.js?v=69"></script>
-<script src="app.js?v=69"></script>
+<script src="i18n.js?v=74"></script>
+<script src="config.js?v=74"></script>
+<script src="comptes.js?v=74"></script>
+<script src="donnees.js?v=74"></script>
+<script src="skills.js?v=74"></script>
+<script src="talents.js?v=74"></script>
+<script src="builds_reference.js?v=74"></script>
+<script src="guides_classes.js?v=74"></script>
+<script src="fiche.js?v=74"></script>
+<script src="app.js?v=74"></script>
 </body>
 </html>
