@@ -1,5 +1,4 @@
-# donnees.js est ce que la page charge réellement (une balise <script>, qui
-# marche même en file://). donnees.json n'est qu'une copie du même contenu,
-# gardée en local pour les tests hors navigateur : l'envoyer doublerait le
-# poids du site pour rien.
-donnees.json
+# Le journal de bord reste LOCAL. Il détaille la démarche, les pièges et les
+# décisions : c'est une note de travail, pas une page publique. Il vit à la
+# racine du projet, hors du dépôt du site.
+JOURNAL.md
