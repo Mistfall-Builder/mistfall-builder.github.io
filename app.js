@@ -793,6 +793,53 @@ function marge(res, vinPoints) {
     || a.nom.localeCompare(b.nom));
 }
 
+/* TOUT CE QUI EST ENCORE GAGNABLE, PAR N'IMPORTE QUEL MOYEN.
+ *
+ * `marge()` ne regarde que les gemmes. Elle ne pouvait donc pas voir qu'un
+ * affixe etait accessible par l'INNE d'une autre piece — et elle sautait
+ * meme entierement les affixes qu'aucune gemme ne porte. Resultat : un
+ * Focused montable a 5 n'apparaissait nulle part, alors que la carte est
+ * censee repondre a « qu'est-ce que je peux encore prendre ? ».
+ *
+ * Ce balayage complete la reponse par la seconde voie : remplacer une piece
+ * par une autre du MEME cran, a condition que toutes les cibles tiennent
+ * encore. Il ne garde pas « le meilleur echange par emplacement » comme le
+ * fait la liste de recommandations — ici on inventorie, on ne conseille
+ * pas, donc une piece qui n'apporte qu'un affixe non demande compte quand
+ * meme : c'est justement ce que l'utilisateur veut savoir.
+ */
+function gainsParPiece(res, classe, arme, planchers, vinPoints) {
+  const cibleListe = [...cibles.entries()];
+  const wantGear = Object.fromEntries(cibleListe
+    .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
+    .filter(([, l]) => l > 0));
+  const items = { ...res.slotItems };
+  const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vinPoints.get(n) || 0));
+  const tient = (cov) => cibleListe.every(([n, l]) => tot(cov, n) >= l);
+  const base = assembler(items, wantGear, false).couvert;
+
+  const meilleur = new Map();   // affixe -> { niveau, slot, piece }
+  for (const slot of D.ordreSlots) {
+    const actuel = items[slot];
+    if (!actuel) continue;
+    // Une piece verrouillee ne bouge pas : ne rien proposer dessus.
+    if (verrouilles.has(slot)) continue;
+    const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
+    for (const alt of opts) {
+      if (alt === actuel || alt.g !== actuel.g) continue;
+      const cov = assembler({ ...items, [slot]: alt }, wantGear, false).couvert;
+      if (!tient(cov)) continue;
+      for (const n of Object.keys(cov)) {
+        const gagne = tot(cov, n);
+        if (gagne <= tot(base, n)) continue;
+        const vu = meilleur.get(n);
+        if (!vu || gagne > vu.niveau) meilleur.set(n, { niveau: gagne, slot, piece: alt });
+      }
+    }
+  }
+  return meilleur;
+}
+
 /* « En changeant CETTE pièce, tu gagnerais ça. »
  *
  * L'optimiseur rend un build ; il ne dit pas ce qui se jouait à un cheveu.
@@ -1658,24 +1705,73 @@ function dessinerMarge(res) {
     return;
   }
 
-  const liste = marge(res, res.vinPoints || new Map());
+  /* DEUX VOIES, UN SEUL INVENTAIRE. Les gemmes des emplacements
+   * reaffectables, ET l'inne des pieces qu'on pourrait echanger. Un affixe
+   * n'apparaissait pas du tout si aucune gemme ne le portait ou si aucun
+   * emplacement libre ne l'acceptait — alors qu'une autre piece du meme
+   * cran l'apportait. Chaque ligne dit desormais par quel moyen. */
+  const vp = res.vinPoints || new Map();
+  const parGemme = marge(res, vp);
+  let parPiece = new Map();
+  try {
+    const pl = {};
+    if ($('mixte').checked && $('plancherActif').checked) {
+      const gr = Number($('plancherGrade').value);
+      for (const c of document.querySelectorAll('#plancherSlots input:checked')) pl[c.value] = gr;
+    }
+    parPiece = gainsParPiece(res, Number($('classe').value),
+                             $('arme').value || null, pl, vp);
+  } catch (e) { parPiece = new Map(); }
+
+  const fusion = new Map();
+  for (const m of parGemme) {
+    fusion.set(m.nom, { nom: m.nom, actuel: m.actuel, atteignable: m.atteignable,
+                        gain: m.gain, palier: m.palier, via: 'gemme' });
+  }
+  for (const [nom, g] of parPiece.entries()) {
+    const actuel = Math.min(plafond(nom), (res.couvert[nom] || 0) + (vp.get(nom) || 0));
+    if (g.niveau <= actuel) continue;
+    const vu = fusion.get(nom);
+    // A niveau egal la gemme l'emporte : elle ne coute pas un changement de
+    // piece. La piece ne s'affiche que si elle mene PLUS HAUT.
+    if (vu && vu.atteignable >= g.niveau) continue;
+    fusion.set(nom, { nom, actuel, atteignable: g.niveau, gain: g.niveau - actuel,
+                      palier: palier(nom), via: 'piece', slot: g.slot, piece: g.piece });
+  }
+  const liste = [...fusion.values()].sort((x, y) => (y.gain - x.gain)
+    || ((y.palier && y.atteignable >= y.palier ? 1 : 0)
+        - (x.palier && x.atteignable >= x.palier ? 1 : 0))
+    || x.nom.localeCompare(y.nom));
+
   _nbMarge = liste.length;
   if (mot) {
     mot.className = 'pas'; mot.style.fontSize = '12px';
-    mot.textContent = liste.length ? t('marge.aideCourt') : t('marge.rien');
+    mot.textContent = liste.length ? t('marge.aideCourt2') : t('marge.rien');
   }
   // Une dizaine suffit : au-delà, la liste devient un annuaire et personne
   // ne la lit. Les plus gros gains sont en tête.
-  for (const m of liste.slice(0, 12)) {
+  for (const m of liste.slice(0, 16)) {
     const b = document.createElement('button');
     const franchit = m.palier && m.atteignable >= m.palier && m.actuel < m.palier;
-    b.className = 'lm' + (franchit ? ' pal' : '');
-    b.title = t('marge.poser', { nom: m.nom, n: m.atteignable });
+    b.className = 'lm' + (franchit ? ' pal' : '') + (m.via === 'piece' ? ' viaPiece' : '');
+    // On nomme la piece qui rend l'affixe accessible : c'est l'explication,
+    // pas une promesse de la poser telle quelle.
+    b.title = m.via === 'piece'
+      ? t('marge.parPiece', { nom: m.nom, n: m.atteignable,
+                              piece: m.piece.n, slot: D.nomsSlots[m.slot] || m.slot })
+      : t('marge.poser', { nom: m.nom, n: m.atteignable });
     b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
       <span class="nomA">${m.nom}</span>
       ${franchit ? `<span class="marquePal"
         title="${t('palier.quoi', { n: m.palier })}">${t('sugg.palier')}</span>` : ''}
+      <span class="moyen">${t(m.via === 'piece' ? 'marge.viaPiece' : 'marge.viaGemme')}</span>
       <span class="fleche">${m.actuel} → <span class="cible">${m.atteignable}</span></span>`;
+    /* LES DEUX VOIES SE CLIQUENT PAREIL : on pose la cible et on relance le
+     * moteur. Poser la piece a la main paraissait plus direct, mais ça
+     * revenait a re-repartir les gemmes hors du moteur : le premier essai
+     * montait bien Stoic de 3 a 5 et faisait tomber Aegis et Fervor au
+     * passage. Le moteur, lui, resout l'ensemble — quitte a monter d'un
+     * cran de rarete, ce qu'il annonce. */
     b.onclick = () => {
       cibles.set(m.nom, m.atteignable);
       dessinerAffixes();
