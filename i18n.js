@@ -55,6 +55,8 @@
 
       'calculer': 'Calculer le build',
       'etat.pret': 'Prêt.',
+      'maj.dispo': 'Une nouvelle version du site est en ligne.',
+      'maj.recharger': 'Recharger',
       'etat.choisir': 'Choisis au moins un affixe.',
       'etat.calcul': 'Calcul…',
       'etat.ok': 'Toutes les cibles sont atteintes.',
@@ -377,6 +379,8 @@
 
       'calculer': 'Build it',
       'etat.pret': 'Ready.',
+      'maj.dispo': 'A new version of the site is available.',
+      'maj.recharger': 'Reload',
       'etat.choisir': 'Pick at least one affix.',
       'etat.calcul': 'Computing…',
       'etat.ok': 'All targets reached.',
@@ -699,6 +703,8 @@
 
       'calculer': 'Собрать',
       'etat.pret': 'Готово.',
+      'maj.dispo': 'Доступна новая версия сайта.',
+      'maj.recharger': 'Обновить',
       'etat.choisir': 'Выбери хотя бы один аффикс.',
       'etat.calcul': 'Расчёт…',
       'etat.ok': 'Все цели достигнуты.',

@@ -247,6 +247,27 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Builds des amis rangés, et un guetteur de version
+
+**« Builds de mes amis »** descend sous « Mes builds », dans la colonne de
+gauche, replié et d'un cran plus discret : consulter la bibliothèque d'un ami
+est occasionnel, et la carte occupait une largeur entière dans la colonne
+principale.
+
+**Le guetteur.** GitHub Pages sert `index.html` avec `max-age=600` : pendant
+dix minutes après une mise en ligne, un visiteur déjà venu garde l'ancienne
+page. Cet en-tête ne se change pas. Le site relit donc `version.txt` sans
+cache à chaque chargement et le compare au `?v=` de son propre script ; s'ils
+diffèrent, un bandeau discret le dit.
+
+Il ne recharge **jamais** tout seul : une page qui se recharge sous les doigts
+fait perdre le réglage en cours. Vérifié dans les deux sens — pas de bandeau
+quand tout est à jour, bandeau quand la version distante est plus récente.
+
+`bump.py` incrémente maintenant les `?v=` **et** `version.txt` d'un seul
+geste. Les séparer, c'est garantir qu'un jour l'un avance sans l'autre et que
+tout le monde voit le bandeau en boucle.
+
 ### Cartes repliables, et le palier expliqué
 
 **Suggestions** devient un dépliant, **replié par défaut** : six propositions

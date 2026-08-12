@@ -2754,8 +2754,45 @@ window.surChangementDeLangue = function () {
   if (dernier) afficher(dernier, Number($('classe').value));
 };
 
+/* « J'AI RECHARGÉ ET JE VOIS ENCORE L'ANCIENNE VERSION. »
+ *
+ * GitHub Pages sert index.html avec `max-age=600` : pendant dix minutes
+ * après une mise en ligne, un visiteur déjà venu garde l'ancienne page —
+ * donc l'ancien balisage, avec les nouveaux scripts ou non. On ne peut pas
+ * changer cet en-tête, mais on peut s'en apercevoir.
+ *
+ * `version.txt` est relu à chaque chargement en contournant le cache, et
+ * comparé au `?v=` du script courant. S'ils diffèrent, on le DIT au lieu de
+ * laisser quelqu'un croire à un bug. On ne recharge jamais tout seul : une
+ * page qui se recharge sous les doigts fait perdre ce qu'on était en train
+ * de régler. */
+function guetterVersion() {
+  const src = document.querySelector('script[src*="app.js"]');
+  const ici = src && (src.src.match(/[?&]v=(\d+)/) || [])[1];
+  if (!ici) return;
+  fetch('version.txt', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.text() : null))
+    .then((t) => {
+      const la = t && t.trim();
+      if (!la || la === ici) return;
+      const b = document.createElement('div');
+      b.className = 'majDispo';
+      b.innerHTML = `<span>${t2('maj.dispo')}</span>
+        <button type="button">${t2('maj.recharger')}</button>`;
+      b.querySelector('button').onclick = () => location.reload(true);
+      document.body.appendChild(b);
+    })
+    .catch(() => {});
+}
+// Un `t` qui survit même si le dictionnaire n'a pas encore été chargé : ce
+// bandeau doit pouvoir s'afficher précisément quand le reste va mal.
+function t2(cle) {
+  try { return t(cle); } catch (e) { return cle; }
+}
+
 function demarrer(donnees) {
   D = donnees;
+  guetterVersion();
   // Le compteur de visites, si et seulement si on l'a allumé. Une erreur ici
   // ne doit jamais empêcher le site de fonctionner : c'est accessoire.
   if (comptesDispo() && window.MISTFALL_CONFIG.compterVisites) {
