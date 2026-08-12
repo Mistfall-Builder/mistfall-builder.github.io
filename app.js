@@ -2746,6 +2746,17 @@ window.surChangementDeLangue = function () {
 
 function demarrer(donnees) {
   D = donnees;
+  // Le compteur de visites, si et seulement si on l'a allumé. Une erreur ici
+  // ne doit jamais empêcher le site de fonctionner : c'est accessoire.
+  if (comptesDispo() && window.MISTFALL_CONFIG.compterVisites) {
+    fetch(`${window.MISTFALL_CONFIG.supabaseUrl}/rest/v1/rpc/compter_visite`, {
+      method: 'POST',
+      headers: { apikey: window.MISTFALL_CONFIG.supabaseAnonKey,
+                 Authorization: 'Bearer ' + window.MISTFALL_CONFIG.supabaseAnonKey,
+                 'Content-Type': 'application/json' },
+      body: '{}',
+    }).catch(() => {});
+  }
   if (window.I18N) { I18N.appliquer(); poserLangues(); }
   poserNavigation();
   for (const g of D.gemmes) {

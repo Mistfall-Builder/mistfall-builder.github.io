@@ -16,4 +16,16 @@
 window.MISTFALL_CONFIG = {
   supabaseUrl: 'https://grnndksniashncksyzvv.supabase.co',
   supabaseAnonKey: 'sb_publishable_o-6QtPqCK624RcH96KsFxA_qHHdbgRx',
+
+  /* COMPTEUR DE VISITES — ÉTEINT.
+   *
+   * Passé à true, le site incrémente un compteur quotidien : une ligne par
+   * JOUR, un entier, rien d'autre. Ni adresse IP, ni cookie, ni identifiant
+   * de navigateur, ni page consultée — on ne peut pas reconstituer un
+   * visiteur à partir de ça, même en le voulant.
+   *
+   * Il reste éteint tant que personne ne l'allume : le site a été annoncé
+   * « sans pistage », et ce n'est pas à un fichier de configuration de
+   * revenir là-dessus tout seul. */
+  compterVisites: false,
 };
