@@ -219,13 +219,88 @@
     };
   }
 
-  /* La galerie : uniquement ce qui est explicitement publié. */
-  async function galerie(limite) {
-    const r = await rpc('galerie_publique', { limite: Number(limite) || 60 });
-    return (r || []).map((b) => ({
+  /* La galerie : uniquement ce qui est explicitement publié.
+   *
+   * Le TOTAL revient avec chaque ligne, calculé côté base sur l'ensemble
+   * filtré. Sans lui, l'interface ne saurait pas s'il existe une page
+   * suivante sans redemander, et à mille builds cela ferait deux requêtes
+   * pour chaque clic. */
+  async function galerie(opt) {
+    const o = opt || {};
+    const r = await rpc('galerie_publique', {
+      p_limite: Number(o.limite) || 24,
+      p_decalage: Number(o.decalage) || 0,
+      p_tri: o.tri || 'recent',
+      p_classe: (o.classe === 0 || o.classe) ? Number(o.classe) : null,
+      p_recherche: o.recherche || null,
+    });
+    const lignes = (r || []).map((b) => ({
       nom: b.nom, etat: b.etat, code: b.code || '',
-      auteur: b.auteur || '?', maj: b.maj,
+      auteur: b.auteur || null, maj: b.maj,
     }));
+    return { lignes, total: (r && r[0] && Number(r[0].total)) || 0 };
+  }
+
+  /* Un simple compte, sans une seule identité. Il sert à distinguer deux
+   * vides que rien ne différencie autrement : « personne n'a publié » et
+   * « ton filtre ne ramène rien ». */
+  async function combienDeBuildsPublics() {
+    const r = await rpc('combien_de_builds_publics', {});
+    return typeof r === 'number' ? r : Number(r) || 0;
+  }
+
+  /* ------------------------------------------------------------ guides --
+   * Mêmes règles que les builds : la table est fermée, on publie en
+   * cochant, et la liste ne transporte jamais le corps des guides — il fait
+   * des milliers de caractères et n'a rien à faire dans un index. */
+  async function mesGuides() {
+    const s = connecte();
+    if (!s) return [];
+    return (await avecReprise(() => appeler(
+      '/rest/v1/guides?select=id,titre,classe,corps,public,maj&order=maj.desc',
+      {}, true))) || [];
+  }
+
+  async function enregistrerGuide(g) {
+    const s = connecte();
+    const ligne = {
+      user_id: s.user.id, titre: g.titre, classe: g.classe ?? null,
+      corps: g.corps, public: !!g.public,
+      maj: new Date().toISOString(),
+    };
+    if (g.id) ligne.id = g.id;
+    return avecReprise(() => appeler(
+      '/rest/v1/guides?on_conflict=user_id,titre', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify([ligne]),
+      }, true));
+  }
+
+  async function supprimerGuide(id) {
+    return avecReprise(() => appeler(
+      `/rest/v1/guides?id=eq.${encodeURIComponent(id)}`,
+      { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true));
+  }
+
+  async function guidesPublics(opt) {
+    const o = opt || {};
+    const r = await rpc('guides_publics', {
+      p_limite: Number(o.limite) || 20,
+      p_decalage: Number(o.decalage) || 0,
+      p_classe: (o.classe === 0 || o.classe) ? Number(o.classe) : null,
+      p_recherche: o.recherche || null,
+    });
+    const lignes = (r || []).map((g) => ({
+      id: g.id, titre: g.titre, classe: g.classe,
+      auteur: g.auteur || null, maj: g.maj, taille: g.taille,
+    }));
+    return { lignes, total: (r && r[0] && Number(r[0].total)) || 0 };
+  }
+
+  async function guideComplet(id) {
+    const r = await rpc('guide_complet', { gid: id });
+    return (r && r[0]) || null;
   }
 
   async function envoyerBuilds(liste) {
