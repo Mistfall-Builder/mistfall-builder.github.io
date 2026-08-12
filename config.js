@@ -27,5 +27,5 @@ window.MISTFALL_CONFIG = {
    * Il reste éteint tant que personne ne l'allume : le site a été annoncé
    * « sans pistage », et ce n'est pas à un fichier de configuration de
    * revenir là-dessus tout seul. */
-  compterVisites: false,
+  compterVisites: true,
 };
