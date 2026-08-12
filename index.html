@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mistfall Builder</title>
+<link rel="icon" type="image/png" href="marque/icone.png">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -54,8 +55,11 @@ header{position:sticky;top:0;z-index:30;height:64px;
 .barre{max-width:1460px;height:100%;margin:0 auto;padding:0 22px;
        display:flex;align-items:center;gap:14px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
-.logo .sig{width:30px;height:30px;flex:0 0 auto;display:grid;place-items:center;
-  border:1px solid var(--accent-sombre);background:#12100d;border-radius:3px}
+/* Le dragon déborde volontairement de la barre : posé dedans il aurait
+   fallu le réduire au point de le rendre illisible. Le débordement le garde
+   net sans agrandir l'en-tête. */
+.logo .dragon{flex:0 0 auto;width:44px;height:auto;margin:-6px 2px -10px 0;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.6))}
 .logo .mot{font:800 17px/1 var(--condense);letter-spacing:.6px;text-transform:uppercase}
 .logo .mot em{color:var(--accent);font-style:normal}
 .logo .sous{display:block;font:400 11px/1.4 var(--corps);color:var(--terne);
@@ -360,6 +364,11 @@ footer .don a{display:inline-flex;align-items:center;gap:8px;
 footer .don a:hover{background:var(--accent);border-color:var(--accent);
   color:#160c05;transform:translateY(-1px)}
 footer .don svg{width:17px;height:17px;flex:0 0 auto}
+/* Le logo complet n'a sa place que sur une page qu'on ouvre volontairement :
+   dans le builder il prendrait la place du travail. */
+.banniere{text-align:center;margin:4px 0 20px}
+.banniere img{max-width:min(320px,80vw);height:auto;
+  filter:drop-shadow(0 3px 12px rgba(0,0,0,.7))}
 </style>
 </head>
 <body>
@@ -367,15 +376,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
 <header>
   <div class="barre">
     <a class="logo" href="#">
-      <span class="sig">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2 21 6.5v6.8C21 18.6 17.1 21.8 12 23 6.9 21.8 3 18.6 3 13.3V6.5L12 2Z"
-                stroke="#f07b30" stroke-width="1.6" fill="rgba(240,123,48,.10)"/>
-          <path d="M12 7.5v9M8.6 10.6 12 7.5l3.4 3.1M8.6 14.4 12 17.5l3.4-3.1"
-                stroke="#f19a61" stroke-width="1.5" stroke-linecap="round"
-                stroke-linejoin="round"/>
-        </svg>
-      </span>
+      <img class="dragon" src="marque/dragon_petit.png" alt="" width="44" height="47">
       <span class="mot">Mistfall<em>Builder</em>
         <span class="sous" data-i18n="entete.sous">Compose ton stuff, récupère le code d'import</span></span>
     </a>
@@ -547,6 +548,9 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
 </main>
 
 <section id="pageGalerie" class="page" hidden>
+  <div class="banniere">
+    <img src="marque/logo_petit.png" alt="Mistfall Hunter Builder" width="320">
+  </div>
   <div class="carte">
     <h2 data-i18n="gal.titre">Builds publics</h2>
     <div class="corps">
@@ -575,10 +579,10 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=17"></script>
-<script src="config.js?v=17"></script>
-<script src="comptes.js?v=17"></script>
-<script src="donnees.js?v=17"></script>
-<script src="app.js?v=17"></script>
+<script src="i18n.js?v=18"></script>
+<script src="config.js?v=18"></script>
+<script src="comptes.js?v=18"></script>
+<script src="donnees.js?v=18"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>
