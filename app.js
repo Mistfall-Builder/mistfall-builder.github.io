@@ -1646,15 +1646,152 @@ let _nbEchanges = 0;
 let _nbMarge = 0;
 let _nbBaisse = 0;
 
+/* L'INVENTAIRE COMPLET, A LA DEMANDE.
+ *
+ * Les deux voies rapides — gemme sur emplacement reaffectable, inne d'une
+ * piece echangeable — ne disent pas tout. Mesure sur un build reel : 41
+ * affixes etaient reellement montables d'un cran a rarete constante, la
+ * carte n'en annoncait que 16. Les 25 manquants demandaient au moteur de
+ * redisposer PLUSIEURS pieces a la fois, ce qu'aucune des deux voies ne
+ * sait voir.
+ *
+ * La seule reponse exacte est donc de poser la question au moteur, affixe
+ * par affixe : « si je demande un cran de plus sur celui-la, tu y arrives
+ * sans rien perdre et sans monter en rarete ? ». C'est exactement ce que
+ * fera le clic, donc la reponse ne peut pas mentir.
+ *
+ * Ca coute 161 ms par affixe, ~7 s au total : hors de question a chaque
+ * build. Mais la carte est repliee par defaut — on ne paie qu'a
+ * l'ouverture, par tranches, et les lignes apparaissent au fur et a mesure
+ * plutot que de figer la page.
+ */
+let _analyse = null;
+
+function arreterAnalyse() {
+  if (_analyse) { _analyse.stop = true; _analyse = null; }
+}
+
+function lancerAnalyseComplete(res) {
+  arreterAnalyse();
+  const boite = $('listeMarge');
+  const note = $('margeMot');
+  if (!boite || !res || !res.slotItems) return;
+  const jeton = { stop: false };
+  _analyse = jeton;
+
+  const classe = Number($('classe').value);
+  const arme = $('arme').value || null;
+  const vp = res.vinPoints || new Map();
+  const pieces = Object.values(res.slotItems).filter(Boolean);
+  if (!pieces.length) return;
+  const grade = Math.min(...pieces.map((i) => i.g));
+  const mixte = $('mixte').checked;
+  const vin = $('vin').checked;
+  const cibleBase = [...cibles.entries()];
+  const actuelDe = (n) => Math.min(plafond(n),
+    (res.couvert[n] || 0) + (vp.get(n) || 0));
+
+  const aTester = Object.keys(D.affixes)
+    .filter((n) => actuelDe(n) < plafond(n))
+    .sort((a, b) => (cibles.has(b) ? 1 : 0) - (cibles.has(a) ? 1 : 0)
+                 || a.localeCompare(b));
+  // Les lignes deja posees par les deux voies rapides sont des ESTIMATIONS :
+  // « il reste un emplacement qui accepte cette gemme ». Elles ne savent pas
+  // que cet emplacement est peut-etre convoite par une autre cible. Le
+  // moteur, lui, tranche. On les fait donc toutes confirmer, et celle qu'il
+  // dement disparait au lieu de rester la a mentir.
+  const dejaLa = new Map([...boite.querySelectorAll('.lm')]
+    .map((e) => [e.dataset.affixe, e]));
+  let i = 0;
+
+  const tranche = () => {
+    if (jeton.stop) return;
+    const t0 = performance.now();
+    // On s'arrete au bout de 90 ms pour rendre la main : la page reste
+    // reactive pendant que la recherche continue.
+    while (i < aTester.length && performance.now() - t0 < 90) {
+      const nom = aTester[i]; i += 1;
+      const a = actuelDe(nom);
+      let ok = false;
+      try {
+        const r = construire(classe, arme,
+          cibleBase.filter(([x]) => x !== nom).concat([[nom, a + 1]]),
+          grade, vin, mixte, {}, vinManuel, verrousObjet());
+        ok = !!(r && r.suffisant);
+      } catch (e) { ok = false; }
+      const existante = dejaLa.get(nom);
+      if (!ok) {
+        // Le moteur dement l'estimation : la ligne s'en va.
+        if (existante) { existante.remove(); dejaLa.delete(nom); }
+        continue;
+      }
+      // Confirmee : on garde la ligne rapide, qui en dit plus (elle nomme le
+      // moyen, et va parfois plus haut que +1).
+      if (existante) continue;
+      boite.appendChild(ligneMarge({ nom, actuel: a, atteignable: a + 1,
+                                     gain: 1, palier: palier(nom), via: 'moteur' }));
+    }
+    if (note) {
+      note.className = 'pas';
+      note.textContent = i < aTester.length
+        ? t('marge.recherche', { fait: i, total: aTester.length })
+        : t('marge.aideCourt2');
+    }
+    _nbMarge = boite.querySelectorAll('.lm').length;
+    majCompteMarge();
+    if (i < aTester.length) setTimeout(tranche, 0);
+    else if (_analyse === jeton) _analyse = null;
+  };
+  if (note) { note.className = 'pas';
+              note.textContent = t('marge.recherche', { fait: 0, total: aTester.length }); }
+  setTimeout(tranche, 0);
+}
+
+/* Une ligne de la marge, quelle que soit sa provenance : gemme, inne d'une
+   piece, ou reponse directe du moteur. Toutes se cliquent pareil — on pose
+   la cible et on relance. Poser la piece a la main paraissait plus direct,
+   mais ça revenait a re-repartir les gemmes hors du moteur : le premier
+   essai montait bien Stoic de 3 a 5 et faisait tomber Aegis et Fervor au
+   passage. */
+function ligneMarge(m) {
+  const b = document.createElement('button');
+  const franchit = m.palier && m.atteignable >= m.palier && m.actuel < m.palier;
+  b.className = 'lm' + (franchit ? ' pal' : '') + (m.via === 'piece' ? ' viaPiece' : '');
+  b.dataset.affixe = m.nom;
+  b.title = m.via === 'piece'
+    ? t('marge.parPiece', { nom: m.nom, n: m.atteignable,
+                            piece: m.piece.n, slot: D.nomsSlots[m.slot] || m.slot })
+    : t('marge.poser', { nom: m.nom, n: m.atteignable });
+  const moyen = m.via === 'piece' ? 'marge.viaPiece'
+              : (m.via === 'moteur' ? 'marge.viaMoteur' : 'marge.viaGemme');
+  b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
+    <span class="nomA">${m.nom}</span>
+    ${franchit ? `<span class="marquePal"
+      title="${t('palier.quoi', { n: m.palier })}">${t('sugg.palier')}</span>` : ''}
+    <span class="moyen">${t(moyen)}</span>
+    <span class="fleche">${m.actuel} → <span class="cible">${m.atteignable}</span></span>`;
+  b.onclick = () => {
+    cibles.set(m.nom, m.atteignable);
+    dessinerAffixes();
+    majBudgetVin();
+    calculer();
+  };
+  return b;
+}
+
 function majCompteMarge() {
   const c = $('compteMarge');
   if (!c) return;
   if (_nbBaisse) { c.textContent = t('marge.compteBas', { n: _nbBaisse }); return; }
-  const n = _nbMarge + _nbEchanges;
-  c.textContent = n ? t('marge.compteHaut', { n }) : '';
+  // On compte l'inventaire, pas les echanges : ceux-la ont leur propre
+  // section et leur propre titre. Additionner les deux donnait « 46 » a
+  // cote d'une liste de 41 lignes.
+  c.textContent = _nbMarge ? t('marge.compteHaut', { n: _nbMarge }) : '';
 }
 
 function dessinerMarge(res) {
+  // Un nouveau build rend l'analyse precedente caduque.
+  arreterAnalyse();
   const carte = $('carteMarge');
   const boite = $('listeMarge');
   const mot = $('margeMot');
@@ -1750,37 +1887,11 @@ function dessinerMarge(res) {
   }
   // Une dizaine suffit : au-delà, la liste devient un annuaire et personne
   // ne la lit. Les plus gros gains sont en tête.
-  for (const m of liste.slice(0, 16)) {
-    const b = document.createElement('button');
-    const franchit = m.palier && m.atteignable >= m.palier && m.actuel < m.palier;
-    b.className = 'lm' + (franchit ? ' pal' : '') + (m.via === 'piece' ? ' viaPiece' : '');
-    // On nomme la piece qui rend l'affixe accessible : c'est l'explication,
-    // pas une promesse de la poser telle quelle.
-    b.title = m.via === 'piece'
-      ? t('marge.parPiece', { nom: m.nom, n: m.atteignable,
-                              piece: m.piece.n, slot: D.nomsSlots[m.slot] || m.slot })
-      : t('marge.poser', { nom: m.nom, n: m.atteignable });
-    b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
-      <span class="nomA">${m.nom}</span>
-      ${franchit ? `<span class="marquePal"
-        title="${t('palier.quoi', { n: m.palier })}">${t('sugg.palier')}</span>` : ''}
-      <span class="moyen">${t(m.via === 'piece' ? 'marge.viaPiece' : 'marge.viaGemme')}</span>
-      <span class="fleche">${m.actuel} → <span class="cible">${m.atteignable}</span></span>`;
-    /* LES DEUX VOIES SE CLIQUENT PAREIL : on pose la cible et on relance le
-     * moteur. Poser la piece a la main paraissait plus direct, mais ça
-     * revenait a re-repartir les gemmes hors du moteur : le premier essai
-     * montait bien Stoic de 3 a 5 et faisait tomber Aegis et Fervor au
-     * passage. Le moteur, lui, resout l'ensemble — quitte a monter d'un
-     * cran de rarete, ce qu'il annonce. */
-    b.onclick = () => {
-      cibles.set(m.nom, m.atteignable);
-      dessinerAffixes();
-      majBudgetVin();
-      calculer();
-    };
-    boite.appendChild(b);
-  }
+  for (const m of liste) boite.appendChild(ligneMarge(m));
   majCompteMarge();
+  // Carte deja ouverte : on enchaine sur l'inventaire complet sans attendre
+  // qu'on la referme et la rouvre.
+  if (carte.open) lancerAnalyseComplete(res);
 }
 
 /* ------------------------------------------------------------ mes builds --
@@ -3928,6 +4039,15 @@ function demarrer(donnees) {
   majBudgetVin();
 
   brancherPlis();
+  /* L'INVENTAIRE COMPLET SE PAIE A L'OUVERTURE, PAS AVANT. Sept secondes de
+   * calcul a chaque build seraient insupportables ; la carte etant repliee
+   * par defaut, on ne les depense que si quelqu'un veut vraiment savoir. */
+  if ($('carteMarge')) {
+    $('carteMarge').addEventListener('toggle', () => {
+      if ($('carteMarge').open && dernier) lancerAnalyseComplete(dernier);
+      else arreterAnalyse();
+    });
+  }
   /* LE FILTRE REPART TOUJOURS VIDE.
    *
    * Le navigateur remplissait ce champ tout seul — une fois un code
