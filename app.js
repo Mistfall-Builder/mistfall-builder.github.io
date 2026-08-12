@@ -1184,11 +1184,10 @@ async function ajouterAmi() {
 async function dessinerAmis() {
   const boite = $('listeAmis');
   const liste = amis();
-  if (!liste.length) {
-    boite.innerHTML = `<div class="vide-liste">${t('ami.aucun')}</div>`;
-    return;
-  }
+  // Pas de message quand la liste est vide : le champ juste au-dessus dit
+  // déjà quoi faire, et une phrase de plus n'apprend rien.
   boite.innerHTML = '';
+  if (!liste.length) return;
   for (const a of liste) {
     const bloc = document.createElement('div');
     bloc.className = 'amiBloc';
@@ -1787,6 +1786,12 @@ window.surChangementDeLangue = function () {
   dessinerAffixes();
   majBudgetVin();
   dessinerBuilds();
+  // Les listes distantes aussi : elles contiennent des libellés traduits
+  // (« Charger », « Copier chez moi ») que seul un redessin met à jour.
+  if (comptesDispo()) {
+    dessinerAmis();
+    if (_galerieChargee) chargerGalerie();
+  }
   if (dernier) afficher(dernier, Number($('classe').value));
 };
 
