@@ -247,6 +247,22 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Les groupes de compétences se refermaient tout seuls
+
+Signalé aussitôt : « pourquoi je vois plus les skills ». Ils étaient là, mais
+leur groupe était replié — on voyait une barre de titre et plus rien.
+
+**Cause.** Je retenais les groupes OUVERTS, et n'ouvrais par défaut que si
+l'ensemble était vide. Dès qu'on touchait un seul groupe, l'ensemble cessait
+d'être vide et tous les autres se refermaient au redessin suivant.
+
+**Correctif.** On retient ce qui est FERMÉ. Le défaut devient l'ouverture :
+un groupe n'est replié que si on l'a replié soi-même. Vérifié — trois écoles
+ouvertes au départ, en replier une laisse les deux autres ouvertes.
+
+Le panneau des talents s'ouvre aussi : il n'apparaît que sous un sort qu'on a
+délibérément cliqué, le replier n'économisait rien.
+
 ### Quatre chantiers d'un bloc
 
 **1. Les suggestions disent enfin ce qui change.** 340 groupes de noms sur

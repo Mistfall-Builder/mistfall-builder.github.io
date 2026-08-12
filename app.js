@@ -2232,9 +2232,17 @@ let _galerieChargee = false;
    vérifier ne vaut rien.
    ====================================================================== */
 let _sortChoisi = null;
-// Quels groupes l'utilisateur a ouverts : un redessin ne doit pas les
-// refermer sous ses doigts.
-const _ecolesOuvertes = new Set();
+/* ON RETIENT CE QUI EST FERMÉ, PAS CE QUI EST OUVERT.
+ *
+ * La version d'avant retenait les groupes OUVERTS et n'ouvrait par défaut
+ * que si l'ensemble était vide. Conséquence : dès qu'on touchait un seul
+ * groupe, l'ensemble cessait d'être vide et TOUS les autres se refermaient
+ * au redessin suivant. On voyait alors une barre de titre et plus une seule
+ * compétence.
+ *
+ * En retenant les groupes FERMÉS, le défaut est l'ouverture : un groupe
+ * n'est replié que si on l'a replié soi-même. */
+const _ecolesFermees = new Set();
 let _brancheChoisie = 0;
 
 function nb(x, dec) {
@@ -2425,14 +2433,13 @@ function dessinerSorts(res, classeId, f) {
     bloc.className = 'ecole';
     // Ouvert par défaut si l'arme du build en fait partie : c'est le groupe
     // qu'on vient consulter. Les autres restent repliés.
-    const pertinent = !arme || membres.some(memeArme);
-    bloc.open = _ecolesOuvertes.has(titre) || (!_ecolesOuvertes.size && pertinent);
+    bloc.open = !_ecolesFermees.has(titre);
     const chiffrees = membres.filter((s) => s.coups.length).length;
     bloc.innerHTML = `<summary><b>${echapper(titre)}</b>
       <small>${membres.length} · ${t('sorts.chiffrees', { n: chiffrees })}</small></summary>
       <div class="grilleSorts"></div>`;
     bloc.addEventListener('toggle', () => {
-      if (bloc.open) _ecolesOuvertes.add(titre); else _ecolesOuvertes.delete(titre);
+      if (bloc.open) _ecolesFermees.delete(titre); else _ecolesFermees.add(titre);
     });
     boite.appendChild(bloc);
     remplirGroupe(bloc.querySelector('.grilleSorts'), membres,
@@ -2488,7 +2495,7 @@ function tableauTalents(s) {
              || tous.find((t) => t.nom === n))
     .filter(Boolean);
   if (!fiches.length) return '';
-  return `<details class="talentsSort">
+  return `<details class="talentsSort" open>
     <summary>${t('talent.titre', { n: fiches.length })}</summary>
     <div class="corpsTal">
       <p class="pas" style="font-size:11.5px;margin:0 0 8px">${t('talent.horsCalcul')}</p>
