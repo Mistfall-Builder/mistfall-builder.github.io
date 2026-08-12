@@ -417,6 +417,54 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
   return { slotItems: items, ...final, options };
 }
 
+/* Redescend chaque pièce aussi bas que possible SANS perdre une cible.
+ *
+ * La recherche d'objets optimise la couverture ; la rareté n'y est qu'un
+ * départage de dernier recours, donc elle sur-améliore. Une fois les cibles
+ * atteintes, tout cran de rareté en trop est du gaspillage. Un échange n'est
+ * accepté que s'il garde TOUTES les cibles : la passe ne peut donc jamais
+ * dégrader un build, seulement l'alléger. Mesuré : 8 Légendaires -> 2
+ * Légendaires + 5 Épiques + 1 Excellent sur un build réel. */
+function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tours) {
+  const want = Object.fromEntries(cibleListe);
+  const tient = (items) => {
+    const a = assembler(items, want, false);
+    return cibleListe.every(([n, l]) =>
+      (a.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
+  };
+  if (!tient(slotItems)) return slotItems;
+
+  let courant = { ...slotItems };
+  const options = {};
+  for (const slot of D.ordreSlots) {
+    options[slot] = poolDe(classe, slot, arme,
+                           Math.max(1, planchers[slot] || 0), true);
+  }
+  for (let t = 0; t < (tours || 4); t += 1) {
+    let bouge = false;
+    const ordre = [...D.ordreSlots].sort(
+      (a, b) => ((courant[b] && courant[b].g) || 0) - ((courant[a] && courant[a].g) || 0));
+    for (const slot of ordre) {
+      const actuel = courant[slot];
+      if (!actuel) continue;
+      const sol = planchers[slot] || 0;
+      const cands = options[slot]
+        .filter((o) => o.g < actuel.g && o.g >= sol)
+        .sort((a, b) => a.g - b.g);
+      for (const alt of cands) {
+        const essai = { ...courant, [slot]: alt };
+        if (tient(essai)) { courant = essai; bouge = true; break; }
+      }
+    }
+    if (!bouge) break;
+  }
+  return courant;
+}
+
+function sommeRaretes(slotItems) {
+  return Object.values(slotItems).reduce((s, it) => s + (it ? it.g : 0), 0);
+}
+
 function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi) {
   const want = Object.fromEntries(cibleListe);
   const affinite = D.affinites[String(classe)] || null;
@@ -470,10 +518,57 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
       if (np[0] > nr[0] || (np[0] === nr[0] && np[1] > nr[1])) res = pan;
     }
   }
+  res.suffisant = suffit(res);
+
+  // ALLÈGEMENT FINAL, uniquement en panaché : à rareté unique toutes les
+  // pièces partagent le même cran, il n'y a rien à rendre.
+  if (mixte && res.suffisant) {
+    const legers = alleger(res.slotItems, classe, arme, cibleListe,
+                           planchers, vinPoints);
+    if (sommeRaretes(legers) < sommeRaretes(res.slotItems)) {
+      const a = assembler(legers, want, true);
+      const candidat = { slotItems: legers, sockets: a.sockets,
+                         couvert: a.couvert, sources: a.sources };
+      if (cibleListe.every(([n, l]) =>
+          (candidat.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l)) {
+        res = candidat;
+        res.suffisant = true;
+      }
+    }
+  }
   res.vin = vinNoms;
   res.vinPoints = vinPoints;
-  res.suffisant = suffit(res);
   return res;
+}
+
+/* Tous les mélanges de raretés qui atteignent les cibles, du moins cher au
+   plus cher. Un même objectif s'atteint de plusieurs façons : beaucoup de
+   pièces moyennes, ou peu de pièces très rares — et ce n'est pas forcément
+   celle que l'outil choisit qu'on a sous la main. */
+function variantes(classe, arme, cibleListe, vin, planchers, vinChoisi) {
+  const vues = new Map();
+  for (let plancher = 1; plancher <= 6; plancher += 1) {
+    for (const mx of [true, false]) {
+      let r;
+      try {
+        r = construire(classe, arme, cibleListe, plancher, vin, mx,
+                       planchers, vinChoisi);
+      } catch (e) { continue; }
+      if (!r.suffisant) continue;
+      const sig = Object.values(r.slotItems)
+        .filter(Boolean).map((it) => it.g).sort().join(',');
+      if (vues.has(sig)) continue;
+      const par = {};
+      for (const it of Object.values(r.slotItems)) {
+        if (it) par[it.g] = (par[it.g] || 0) + 1;
+      }
+      r.libelle = Object.entries(par).sort((a, b) => b[0] - a[0])
+        .map(([g, n]) => `${n} ${D.raretes[g]}`).join(' + ');
+      r.cout = sommeRaretes(r.slotItems);
+      vues.set(sig, r);
+    }
+  }
+  return [...vues.values()].sort((a, b) => a.cout - b.cout);
 }
 
 /* Combien de points de vin chaque affixe reçoit. Mêmes règles que l'outil de
@@ -1304,6 +1399,58 @@ function demarrer(donnees) {
   };
   $('calculer').onclick = calculer;
   $('vin').onchange = majBudgetVin;
+
+  // ------------------------------------------------ mélanges possibles
+  let _variantes = [];
+  $('chercherVariantes').onclick = () => {
+    if (!cibles.size) {
+      $('noteVariantes').innerHTML =
+        '<span class="ko">Choisis d\'abord des affixes.</span>';
+      return;
+    }
+    $('noteVariantes').innerHTML =
+      '<span class="pas">Recherche des mélanges… (quelques secondes)</span>';
+    $('chercherVariantes').disabled = true;
+    // En différé : la recherche bloque le fil d'exécution, et sans ce délai
+    // le message ci-dessus ne s'afficherait jamais.
+    setTimeout(() => {
+      try {
+        const pl = {};
+        if ($('mixte').checked && $('plancherActif').checked) {
+          const gr = Number($('plancherGrade').value);
+          for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
+            pl[c.value] = gr;
+          }
+        }
+        _variantes = variantes(Number($('classe').value), $('arme').value || null,
+                               [...cibles.entries()], $('vin').checked, pl, vinManuel);
+        const sel = $('listeVariantes');
+        sel.disabled = !_variantes.length;
+        sel.innerHTML = _variantes.length
+          ? _variantes.map((v, i) =>
+              `<option value="${i}">${v.libelle} — coût ${v.cout}</option>`).join('')
+          : '<option value="">aucun mélange n\'atteint ces cibles</option>';
+        $('noteVariantes').innerHTML = _variantes.length
+          ? `<span class="ok">${_variantes.length} mélange(s) trouvé(s)</span>`
+            + '<span class="pas"> — le premier est le moins coûteux en crans '
+            + 'de rareté. Choisis-en un pour l\'afficher.</span>'
+          : '<span class="ko">Aucun mélange n\'atteint ces cibles.</span>';
+      } catch (e) {
+        $('noteVariantes').innerHTML = `<span class="ko">Erreur : ${e.message}</span>`;
+      } finally {
+        $('chercherVariantes').disabled = false;
+      }
+    }, 30);
+  };
+  $('listeVariantes').onchange = () => {
+    const v = _variantes[Number($('listeVariantes').value)];
+    if (!v) return;
+    dernier = v;
+    afficher(v, Number($('classe').value));
+    $('noteVariantes').innerHTML =
+      `<span class="ok">${v.libelle}</span><span class="pas"> affiché — `
+      + 'le code d\'import au-dessus correspond à ce mélange.</span>';
+  };
 
   // ------------------------------------------------------- mes builds
   dessinerBuilds();
