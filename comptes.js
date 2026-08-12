@@ -209,6 +209,18 @@
     });
   }
 
+  /* LE MEME APPEL, MAIS SIGNE. Certaines fonctions ont besoin de savoir QUI
+     appelle : `basculer_vote` refuse un `auth.uid()` nul, et
+     `galerie_publique` s'en sert pour dire « toi, tu as déjà voté ». Sans
+     jeton, la première échoue et la seconde répond toujours non.
+     Non connecté, on retombe sur l'appel anonyme plutôt que d'échouer. */
+  function rpcSigne(nom, corps) {
+    if (!connecte()) return rpc(nom, corps);
+    return avecReprise(() => appeler(`/rest/v1/rpc/${nom}`, {
+      method: 'POST', body: JSON.stringify(corps || {}),
+    }, true));
+  }
+
   /* Les builds d'UN joueur, retrouvé par son pseudo exact. */
   async function parPseudo(pseudo) {
     const propre = String(pseudo || '').trim();
@@ -231,7 +243,7 @@
    * pour chaque clic. */
   async function galerie(opt) {
     const o = opt || {};
-    const r = await rpc('galerie_publique', {
+    const r = await rpcSigne('galerie_publique', {
       p_limite: Number(o.limite) || 24,
       p_decalage: Number(o.decalage) || 0,
       p_tri: o.tri || 'recent',
@@ -239,10 +251,20 @@
       p_recherche: o.recherche || null,
     });
     const lignes = (r || []).map((b) => ({
-      nom: b.nom, etat: b.etat, code: b.code || '',
+      id: b.id, nom: b.nom, etat: b.etat, code: b.code || '',
       auteur: b.auteur || null, maj: b.maj,
+      votes: Number(b.votes || 0), jaiVote: !!b.jai_vote,
     }));
     return { lignes, total: (r && r[0] && Number(r[0].total)) || 0 };
+  }
+
+  /* UN VOTE PAR COMPTE ET PAR BUILD. La garantie n'est pas ici mais dans la
+     clé primaire de la table : (build, votant). Revoter bascule au lieu de
+     s'ajouter, et le navigateur ne peut rien y changer. */
+  async function basculerVote(id) {
+    const r = await rpcSigne('basculer_vote', { p_build: id });
+    const l = Array.isArray(r) ? r[0] : r;
+    return { total: Number((l && l.total) || 0), jaiVote: !!(l && l.jai_vote) };
   }
 
   /* Un simple compte, sans une seule identité. Il sert à distinguer deux
@@ -395,7 +417,7 @@
     actif, connecte, courriel, inscrire, connecter, deconnecter,
     listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
     monProfil, monProfilComplet, definirPseudo, parPseudo,
-    galerie, combienDeBuildsPublics,
+    galerie, combienDeBuildsPublics, basculerVote,
     mesGuides, enregistrerGuide, supprimerGuide, guidesPublics, guideComplet,
   };
 }());

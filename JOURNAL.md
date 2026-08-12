@@ -247,6 +247,60 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Quatre chantiers d'un bloc
+
+**1. Les suggestions disent enfin ce qui change.** 340 groupes de noms sur
+388 contiennent plusieurs pièces différentes — « Commander Sword and Shield »
+désigne huit objets. « X → X » n'apprenait donc rien. Une *signature*
+remplace le nom : `Creation · Agate II, Peridot I → Fervid · Agate II,
+Moonstone I`. Appliqué aussi aux pièces interchangeables.
+
+**2. Les talents, récoltés et affichés.** 241 talents, 157 avec des effets
+chiffrés, 89 compétences liées via le tableau « Talents that change how X
+plays » de chaque page de sort. Ils apparaissent sous le sort concerné, dans
+un dépliant.
+
+**Ils ne sont PAS appliqués aux dégâts, et l'écran le dit.** On sait que le
+jeu donne 8 points au niveau 12 et que les branches ouvrent à des niveaux
+différents, mais ni les prérequis ni les exclusivités ne sont publiés. Un
+simulateur bâti là-dessus aurait l'air officiel sans l'être.
+
+Deux pièges du wiki, les mêmes que pour les compétences : le sommaire répète
+les titres de section (« Exact values » y figure avant la vraie section — les
+241 talents ressortaient sans un chiffre), et les liens internes découpent
+les descriptions (« Focus Fire » se résumait à « Rapid Arrows »).
+
+**3. Un onglet Communauté, trois vues.** Les deux onglets qui ouvraient sur
+du vide sont fusionnés. Rien n'est supprimé : les identifiants des anciennes
+pages sont conservés, le code qui les pilotait tourne tel quel.
+
+La première vue ne peut pas être vide : **12 builds de référence**, deux par
+classe, avec l'illustration de classe du jeu. Ils ont été **produits par
+l'optimiseur de ce site**, pas recopiés : chacun atteint ses cibles et sort
+un code d'import valide. Un build copié sur une capture pourrait ne même pas
+être légal en jeu.
+
+**Les votes.** Un par compte et par build, garanti par la clé primaire
+`(build, votant)` — pas par une règle du navigateur, qui se contourne. Un
+second vote bascule au lieu de s'ajouter. Le votant n'est jamais exposé : les
+fonctions ne rendent qu'un compte et un « et toi ? » calculé pour l'appelant.
+Tri « les plus votés » ajouté.
+
+Défaut attrapé : `rpc()` n'envoyait pas le jeton, donc `auth.uid()` aurait
+été nul et tout vote refusé. Un `rpcSigne()` s'en charge, et retombe sur
+l'appel anonyme hors connexion.
+
+**4. Comparer deux builds.** « Le mien ou celui-là ? ». Un bouton met le
+build courant de côté, le suivant s'affiche à côté avec l'**écart** coloré,
+sur dix statistiques et tous les affixes. Les deux sont rejoués depuis leur
+code d'import : on compare ce qui serait porté, pas ce qui était visé.
+
+**Vérifié avant publication** : 6 classes sur 6 calculent, sortent un code,
+affichent fiche et compétences ; aucun débordement horizontal ; les trois
+langues à 322 clés sans écart ; zéro erreur console. Et le site fonctionne
+**avant** que les migrations soient appliquées — le bouton de vote ne
+s'affiche que si la base rend un identifiant.
+
 ### Builds des amis rangés, et un guetteur de version
 
 **« Builds de mes amis »** descend sous « Mes builds », dans la colonne de

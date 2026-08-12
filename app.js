@@ -926,6 +926,45 @@ function nomMateriau(type) {
   const b = D.materiaux[`${type},2`];
   return a === b ? a : `${a} / ${b}`;
 }
+/* CE QUI DISTINGUE DEUX PIÈCES DU MÊME NOM.
+ *
+ * 340 groupes de noms sur 388 contiennent plusieurs pièces différentes :
+ * « Commander Sword and Shield » désigne huit objets, qui ne diffèrent que
+ * par leur inné et leurs emplacements. Afficher « X → X » dans une
+ * suggestion ne dit donc rigoureusement rien.
+ *
+ * On décrit ce qui change réellement : l'inné, puis les emplacements. */
+function signature(it) {
+  if (!it) return '—';
+  const bouts = [it.i ? it.i : t('piece.sansInne')];
+  const s = it.s || [];
+  if (!s.length) {
+    bouts.push(t('piece.sansTrou'));
+  } else {
+    // Groupés par matériau : « 2 Moonstone I » se lit, « Moonstone I,
+    // Moonstone I » se compte.
+    const par = new Map();
+    for (const [type, niv] of s) {
+      const k = `${materiau(type, niv)} ${niv === 2 ? 'II' : 'I'}`;
+      par.set(k, (par.get(k) || 0) + 1);
+    }
+    bouts.push([...par.entries()]
+      .map(([k, n]) => (n > 1 ? `${n} × ${k}` : k)).join(', '));
+  }
+  return bouts.join(' · ');
+}
+
+/* Le titre d'un échange : le nom seulement s'il change, sinon ce qui change
+   vraiment. Deux pièces homonymes ne se distinguent que par leur contenu. */
+function titreEchange(avant, apres) {
+  const memeNom = avant && apres && avant.n === apres.n;
+  const nom = memeNom
+    ? `<b>${echapper(apres.n)}</b>`
+    : `<b>${echapper(avant ? avant.n : '—')}</b> → <b>${echapper(apres.n)}</b>`;
+  return `${nom}<span class="quoiChange">${signature(avant)}`
+    + ` <i>→</i> ${signature(apres)}</span>`;
+}
+
 function infobulle(it) {
   const bouts = [it.n, D.raretes[String(it.g)]];
   const st = statsLisibles(it.at);
@@ -1287,6 +1326,10 @@ function ecrireBiblio(liste) {
    La bibliothèque locale reste la référence : elle marche hors ligne et sans
    compte. Le compte n'ajoute qu'UNE chose, la synchronisation entre
    appareils. Se déconnecter ne doit donc rien effacer. */
+function connecteMaintenant() {
+  return comptesDispo() && !!window.Comptes.connecte();
+}
+
 function comptesDispo() {
   return window.Comptes && window.Comptes.actif();
 }
@@ -1443,6 +1486,21 @@ function carteBuildDistant(b, auteur) {
     appliquerEtat(b.etat);
     restituer(b);
   };
+  const vote = el.querySelector('.vote');
+  if (vote && b.id && connecteMaintenant()) {
+    vote.onclick = async () => {
+      vote.disabled = true;
+      try {
+        const r = await window.Comptes.basculerVote(b.id);
+        b.votes = r.total; b.jaiVote = r.jaiVote;
+        vote.querySelector('.n').textContent = r.total;
+        vote.dataset.mien = r.jaiVote ? '1' : '0';
+      } catch (e) {
+        $('noteGalerie').innerHTML = `<span class="ko">${e.message}</span>`;
+      }
+      vote.disabled = false;
+    };
+  }
   el.querySelector('.bdCopier').onclick = () => {
     const liste = biblio();
     const nom = liste.some((x) => x.nom === b.nom) ? `${b.nom} (copie)` : b.nom;
@@ -1488,6 +1546,10 @@ function carteBuildGalerie(b) {
       <button class="bdCharger">${t('gal.charger')}</button>
       <button class="bdCode" ${b.code ? '' : 'disabled'}>${t('gal.code')}</button>
       <button class="bdCopier">${t('gal.copier')}</button>
+      ${b.id ? `<button class="vote" data-mien="${b.jaiVote ? 1 : 0}"
+        ${connecteMaintenant() ? '' : 'disabled'}
+        title="${connecteMaintenant() ? t('vote.aide') : t('vote.connexion')}">
+        ▲ <span class="n">${b.votes || 0}</span></button>` : ''}
     </div>`;
   el.querySelector('.bdCharger').onclick = () => {
     appliquerEtat(b.etat);
@@ -1892,8 +1954,8 @@ function dessinerSuggestions(res, classe) {
     div.innerHTML = `
       <div class="txt">
         <div class="ou">${D.nomsSlots[e.slot] || e.slot}</div>
-        <div class="qui"><span style="color:${couleurA}">${e.avant.n}</span>
-          → <span style="color:${couleurB}">${e.apres.n}</span></div>
+        <div class="qui" style="--a:${couleurA};--b:${couleurB}">${
+          titreEchange(e.avant, e.apres)}</div>
         <div class="pu">${puces}</div>
       </div>
       <button class="appl">Appliquer</button>`;
@@ -1953,8 +2015,7 @@ function dessinerAlternatives(res, classe) {
       const el = document.createElement('button');
       el.className = 'altItem' + (b.actuel ? ' actuel' : '');
       el.style.color = couleur;
-      el.innerHTML = `${b.item.n}<small>${b.item.i
-        ? t('equip.inne') + ' ' + b.item.i : t('equip.aucunInne')}</small>`;
+      el.innerHTML = `${echapper(b.item.n)}<small>${signature(b.item)}</small>`;
       el.title = b.actuel ? t('alt.actuel') : t('alt.poser');
       if (!b.actuel) {
         el.onclick = () => {
@@ -2308,6 +2369,7 @@ function dessinerFiche(res, classeId) {
             .join(' — ') })}</p>` : ''}`;
 
   dessinerSorts(res, classeId, f);
+  dessinerComparaison();
 }
 
 /* ======================================================================
@@ -2406,6 +2468,44 @@ function remplirGroupe(boite, membres, f, cible, memeArme, res, classeId) {
   }
 }
 
+/* LES TALENTS QUI TOUCHENT CE SORT.
+ *
+ * Ils ne sont PAS comptés dans les dégâts affichés, et c'est dit. Les
+ * appliquer demanderait de simuler la sélection en jeu : on sait qu'on
+ * dispose de 8 points au niveau 12 et que les branches s'ouvrent à des
+ * niveaux différents, mais ni les prérequis ni les exclusivités exactes ne
+ * sont documentés. Un simulateur bâti là-dessus aurait l'air officiel sans
+ * l'être — on montre donc les talents et leurs valeurs, et on laisse le
+ * joueur faire le calcul qu'il est le seul à pouvoir faire juste. */
+function tableauTalents(s) {
+  const par = window.D_TALENTS_PAR_SORT || {};
+  const tous = window.D_TALENTS || [];
+  const slug = (s.url || '').replace(/\/$/, '').split('/').pop();
+  const noms = par[slug] || [];
+  if (!noms.length) return '';
+  const fiches = noms
+    .map((n) => tous.find((t) => t.nom === n && t.classe === s.classe)
+             || tous.find((t) => t.nom === n))
+    .filter(Boolean);
+  if (!fiches.length) return '';
+  return `<details class="talentsSort">
+    <summary>${t('talent.titre', { n: fiches.length })}</summary>
+    <div class="corpsTal">
+      <p class="pas" style="font-size:11.5px;margin:0 0 8px">${t('talent.horsCalcul')}</p>
+      ${fiches.map((x) => `<div class="tal">
+        <div class="talTete"><b>${echapper(x.nom)}</b>
+          ${x.branche ? `<span class="jeton">${echapper(x.branche)}</span>` : ''}
+          ${x.niveau ? `<span class="jeton">${t('talent.niveau', { n: x.niveau })}</span>` : ''}
+        </div>
+        ${x.desc ? `<div class="talDesc">${echapper(x.desc)}</div>` : ''}
+        ${x.effets.length ? `<table>${x.effets.map(([k, v]) =>
+          `<tr><td>${echapper(k)}</td><td class="n">${echapper(v)}</td></tr>`)
+          .join('')}</table>` : ''}
+      </div>`).join('')}
+    </div>
+  </details>`;
+}
+
 function dessinerDetailSort(s, f, cible, res, classeId) {
   const boite = $('detailSort');
   if (!boite) return;
@@ -2441,9 +2541,11 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
   };
 
   if (!s.coups.length) {
+    // Un sort sans dégâts publiés a quand même ses talents : les cacher
+    // aurait privé de talents la moitié des soins et des déplacements.
     boite.innerHTML = entete + description
       + `<p class="pas">${t('sorts.riendePublie')}</p>`
-      + tableauEffets();
+      + tableauEffets() + tableauTalents(s);
     return;
   }
 
@@ -2500,13 +2602,234 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
                   ? f.bonusMagique : f.bonusPhysique) })}
       ${dps ? ' · ' + t('sorts.dps', { n: nb(dps, 1) }) : ''}
     </p>
-    ${tableauEffets()}`;
+    ${tableauEffets()}
+    ${tableauTalents(s)}`;
 
   for (const b of boite.querySelectorAll('.branches button')) {
     b.onclick = () => {
       _brancheChoisie = Number(b.dataset.b);
       dessinerSorts(res, classeId, f);
     };
+  }
+}
+
+
+
+/* ======================================================================
+   COMPARER DEUX BUILDS
+
+   « Le mien ou celui-là ? » est la question qu'on se pose vraiment. On met
+   les deux fiches côte à côte et on montre l'ÉCART, pas deux colonnes de
+   chiffres à soustraire de tête.
+
+   Les deux builds sont rejoués par le même moteur, depuis leur code
+   d'import : on compare ce qui serait réellement porté, pas ce qui était
+   visé.
+   ====================================================================== */
+let _comparer = null;   // le build mis de côté, en attente d'un second
+
+function etatDepuisCode(code, classe, arme) {
+  const lu = decoderCode(code.trim());
+  const parId = new Map();
+  for (const pool of Object.values(D.objets)) for (const it of pool) parId.set(it.id, it);
+  const slotItems = {};
+  const sockets = [];
+  const couvert = {};
+  for (const e of lu.emplacements) {
+    const slot = D.codec.versGameData[String(e.slot)];
+    if (!slot || !e.cfg) continue;
+    const it = parId.get(String(e.cfg));
+    if (!it) continue;
+    slotItems[slot] = it;
+    if (it.i) couvert[it.i] = (couvert[it.i] || 0) + 1;
+    (e.gemmes || []).forEach((gid, idx) => {
+      const g = gid ? gemParId.get(String(gid)) : null;
+      const sk = (it.s || [])[idx] || [0, 1];
+      sockets.push({ slot, index: idx, type: sk[0], level: sk[1], gem: g || null });
+      if (g) for (const a of g.a) couvert[a] = (couvert[a] || 0) + 1;
+    });
+  }
+  return { slotItems, sockets, couvert, vinPoints: new Map(),
+           classe: lu.classe, arme };
+}
+
+function dessinerComparaison() {
+  const carte = $('carteComparer');
+  if (!carte) return;
+  if (!_comparer || !dernier) { carte.hidden = true; return; }
+  let gauche;
+  try {
+    gauche = etatDepuisCode(_comparer.code, _comparer.classe, _comparer.arme);
+  } catch (e) { carte.hidden = true; return; }
+
+  const classeG = gauche.classe;
+  const classeD = Number($('classe').value);
+  const fg = window.Fiche.ficheDe(gauche, classeG, D);
+  const fd = window.Fiche.ficheDe(dernier, classeD, D);
+
+  const LIGNES = [
+    ['fiche.attaque', (f) => f.attaque, 0],
+    ['fiche.defense', (f) => f.defense, 0],
+    ['fiche.vie', (f) => f.vie, 0],
+    ['fiche.ehpPhys', (f) => f.ehpPhysique, 0],
+    ['fiche.ehpMag', (f) => f.ehpMagique, 0],
+    ['fiche.degPhys', (f) => f.bonusPhysique, 1],
+    ['fiche.degMag', (f) => f.bonusMagique, 1],
+    ['fiche.resPhys', (f) => f.resistPhysique, 1],
+    ['fiche.resMag', (f) => f.resistMagique, 1],
+    ['fiche.penetration', (f) => f.penetration, 1],
+  ];
+  const lignes = LIGNES.map(([cle, prendre, pct]) => {
+    const a = prendre(fg); const b = prendre(fd);
+    const d = b - a;
+    // Un écart nul se dit « = » : un « +0 » se lit comme un gain.
+    const signe = Math.abs(d) < (pct ? 0.0005 : 0.5) ? 'nul' : (d > 0 ? 'plus' : 'moins');
+    const fmt = (x) => (pct ? pc(x) : nb(x));
+    const ecart = signe === 'nul' ? '=' : (d > 0 ? '+' : '−') + fmt(Math.abs(d));
+    return `<tr><td>${t(cle)}</td><td class="n">${fmt(a)}</td>
+      <td class="n">${fmt(b)}</td>
+      <td class="n ec ${signe}">${ecart}</td></tr>`;
+  }).join('');
+
+  // Les affixes obtenus des deux côtés, réunis.
+  const noms = [...new Set([...Object.keys(gauche.couvert),
+                            ...Object.keys(dernier.couvert)])].sort();
+  const aff = noms.map((n) => {
+    const a = Math.min(plafond(n), gauche.couvert[n] || 0);
+    const vd = (dernier.vinPoints && dernier.vinPoints.get(n)) || 0;
+    const b = Math.min(plafond(n), (dernier.couvert[n] || 0) + vd);
+    if (!a && !b) return '';
+    const d = b - a;
+    const signe = d === 0 ? 'nul' : (d > 0 ? 'plus' : 'moins');
+    return `<tr><td><span class="avecPastille">${
+      pastille((D.affixes[n] || {}).cat)}${n}</span></td>
+      <td class="n">${a || '—'}</td><td class="n">${b || '—'}</td>
+      <td class="n ec ${signe}">${d === 0 ? '=' : (d > 0 ? '+' : '−') + Math.abs(d)}</td></tr>`;
+  }).join('');
+
+  const rarG = sommeRaretes(gauche.slotItems);
+  const rarD = sommeRaretes(dernier.slotItems);
+  carte.hidden = false;
+  $('comparaison').innerHTML = `
+    <div class="cmpTete">
+      <div><span class="cmpQui">A</span> ${echapper(_comparer.nom)}
+        <small>${D.classes[String(classeG)] || ''} · ${nb(rarG)} ${t('cmp.crans')}</small></div>
+      <div><span class="cmpQui b">B</span> ${t('cmp.courant')}
+        <small>${D.classes[String(classeD)] || ''} · ${nb(rarD)} ${t('cmp.crans')}</small></div>
+      <button id="cmpVider">${t('cmp.vider')}</button>
+    </div>
+    <table class="cmp"><tr><th>${t('fiche.stat')}</th><th class="n">A</th>
+      <th class="n">B</th><th class="n">${t('cmp.ecart')}</th></tr>${lignes}</table>
+    <table class="cmp" style="margin-top:10px"><tr><th>${t('table.affixe')}</th>
+      <th class="n">A</th><th class="n">B</th><th class="n">${t('cmp.ecart')}</th></tr>
+      ${aff}</table>`;
+  $('cmpVider').onclick = () => { _comparer = null; dessinerComparaison(); };
+}
+
+/* Mettre le build courant « de côté » : c'est le A de la comparaison. */
+function mettreDeCote() {
+  const code = $('code').value;
+  if (!code || !dernier) return;
+  _comparer = { code, nom: ($('nomBuild').value || '').trim() || t('cmp.miseDeCote'),
+                classe: Number($('classe').value), arme: $('arme').value || null };
+  dessinerComparaison();
+  $('etat').innerHTML += ` <span class="pas">${t('cmp.pose')}</span>`;
+}
+
+/* ======================================================================
+   COMMUNAUTÉ
+
+   Une page, trois vues. Les identifiants des anciennes pages sont
+   conservés : tout le code qui pilotait la galerie et les guides continue
+   de fonctionner tel quel, il ne change que de contenant.
+   ====================================================================== */
+const CLASSE_IMAGE = {
+  10: 'mercenary', 11: 'sorcerer', 12: 'blackarrow',
+  13: 'shadowstrix', 14: 'seer', 15: 'withered-knight',
+};
+
+function montrerVue(id) {
+  for (const v of document.querySelectorAll('#pageCommunaute .vue')) {
+    v.hidden = v.id !== id;
+  }
+  for (const b of document.querySelectorAll('#sousOnglets button')) {
+    b.classList.toggle('actif', b.dataset.vue === id);
+  }
+  if (id === 'vuePublics' && !_galerieChargee) {
+    _galerieChargee = true;
+    chargerGalerie(0);
+  }
+  if (id === 'vueGuides' && !_guidesCharges) {
+    _guidesCharges = true;
+    chargerGuides(0);
+    chargerMesGuides();
+  }
+}
+
+/* Les builds de référence, groupés par classe avec l'illustration du jeu.
+   Ils vivent dans le fichier, pas en base : ils doivent s'afficher même
+   sans compte et même si Supabase est injoignable. */
+function dessinerReference() {
+  const boite = $('listeReference');
+  if (!boite || !window.D_REFERENCE) return;
+  const langue = (window.I18N && I18N.courante()) || 'fr';
+  const parClasse = new Map();
+  for (const b of window.D_REFERENCE) {
+    if (!parClasse.has(b.c)) parClasse.set(b.c, []);
+    parClasse.get(b.c).push(b);
+  }
+  boite.innerHTML = '';
+  for (const [classe, liste] of [...parClasse.entries()].sort((a, b) => a[0] - b[0])) {
+    const bloc = document.createElement('div');
+    bloc.className = 'classeBloc';
+    const img = CLASSE_IMAGE[classe];
+    bloc.innerHTML = `<div class="classeTete">
+        ${img ? `<img src="icones_classes/${img}.webp" alt="" decoding="async">` : ''}
+        <div><h3>${D.classes[String(classe)] || classe}</h3>
+          <small>${[...new Set(liste.map((b) => b.a))].join(' · ')}</small></div>
+      </div>
+      <div class="refGrille"></div>`;
+    const grille = bloc.querySelector('.refGrille');
+    for (const b of liste) {
+      const carte = document.createElement('div');
+      carte.className = 'refCarte';
+      const nom = (b.nom && (b.nom[langue] || b.nom.fr)) || b.k;
+      const desc = (b.d && (b.d[langue] || b.d.fr)) || '';
+      carte.innerHTML = `<h4>${echapper(nom)}</h4>
+        <div class="meta">
+          <span class="puce">${echapper(b.a)}</span>
+          <span class="puce">${echapper(b.r)}</span>
+          ${b.t.map(([n, l]) => `<span class="puce">${n} ${l}</span>`).join('')}
+        </div>
+        <div class="quoi">${echapper(desc)}</div>
+        <div class="actions">
+          <button class="refCharger">${t('gal.charger')}</button>
+          <button class="refCode">${t('gal.code')}</button>
+          <button class="refCopier">${t('gal.copier')}</button>
+        </div>`;
+      const etat = { k: b.code, c: b.c, a: b.a, g: null, v: true, m: false,
+                     pa: false, pg: 6, ps: [], t: b.t, w: [] };
+      carte.querySelector('.refCharger').onclick = () => {
+        appliquerEtat(etat);
+        restituer({ nom, etat, code: b.code });
+        montrerPage('main');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+      carte.querySelector('.refCode').onclick = (ev) => {
+        copierTexte(b.code, ev.target, t('gal.codeCopie'), t('gal.code'));
+      };
+      carte.querySelector('.refCopier').onclick = () => {
+        const l = biblio();
+        const n2 = l.some((x) => x.nom === nom) ? `${nom} (copie)` : nom;
+        l.push({ nom: n2, etat, code: b.code, pub: false, ami: false });
+        if (!ecrireBiblio(l)) return;
+        dessinerBuilds();
+        $('noteGalerie').innerHTML =
+          `<span class="pas">${t('partage.copieOk', { nom: n2 })}</span>`;
+      };
+      grille.appendChild(carte);
+    }
+    boite.appendChild(bloc);
   }
 }
 
@@ -2677,14 +3000,12 @@ function montrerPage(id) {
   for (const b of document.querySelectorAll('#nav button')) {
     b.classList.toggle('actif', b.dataset.page === id);
   }
-  if (id === 'pageGalerie' && !_galerieChargee) {
-    _galerieChargee = true;
-    chargerGalerie(0);
-  }
-  if (id === 'pageGuides' && !_guidesCharges) {
-    _guidesCharges = true;
-    chargerGuides(0);
-    chargerMesGuides();
+  if (id === 'pageCommunaute') {
+    dessinerReference();
+    // La vue active garde sa place d'une visite à l'autre ; au premier
+    // passage c'est la référence, qui a toujours du contenu.
+    const active = document.querySelector('#pageCommunaute .vue:not([hidden])');
+    montrerVue(active ? active.id : 'vueReference');
   }
   window.scrollTo({ top: 0 });
 }
@@ -2727,6 +3048,10 @@ window.surChangementDeLangue = function () {
   majBudgetVin();
   if (window._poserFiltresBuilds) window._poserFiltresBuilds();
   dessinerBuilds();
+  // Les builds de référence portent leurs textes dans les trois langues :
+  // sans redessin ils restaient dans la langue du premier affichage.
+  dessinerReference();
+  dessinerComparaison();
   // Les listes déroulantes portent des libellés traduits : sans ce
   // remplissage, tri et filtres resteraient dans la langue précédente.
   remplirSelect($('sortsCible'), [
@@ -2738,7 +3063,8 @@ window.surChangementDeLangue = function () {
   if (comptesDispo()) {
     dessinerAmis();
     remplirSelect($('galTri'), [
-      ['recent', t('gal.tri.recent')], ['ancien', t('gal.tri.ancien')],
+      ['recent', t('gal.tri.recent')], ['populaire', t('gal.tri.populaire')],
+      ['ancien', t('gal.tri.ancien')],
       ['nom', t('gal.tri.nom')], ['auteur', t('gal.tri.auteur')]], galEtat.tri);
     for (const [el, val] of [[$('galClasse'), galEtat.classe],
                              [$('guClasse'), guEtat.classe],
@@ -2850,6 +3176,11 @@ function demarrer(donnees) {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
   };
   $('calculer').onclick = calculer;
+  // Les sous-onglets de la page Communauté, et le bouton de comparaison.
+  for (const b of document.querySelectorAll('#sousOnglets button')) {
+    b.onclick = () => montrerVue(b.dataset.vue);
+  }
+  if ($('comparer')) $('comparer').onclick = mettreDeCote;
   // Ouvrir le bandeau suffit à dire « j'ai vu » : le battement s'arrête.
   const bs = $('blocSuggestions');
   if (bs) bs.addEventListener('toggle', () => {
@@ -2939,7 +3270,8 @@ function demarrer(donnees) {
     // vide qu'on prendrait pour une panne.
     $('galRafraichir').onclick = () => chargerGalerie(0);
     remplirSelect($('galTri'), [
-      ['recent', t('gal.tri.recent')], ['ancien', t('gal.tri.ancien')],
+      ['recent', t('gal.tri.recent')], ['populaire', t('gal.tri.populaire')],
+      ['ancien', t('gal.tri.ancien')],
       ['nom', t('gal.tri.nom')], ['auteur', t('gal.tri.auteur')]], galEtat.tri);
     remplirSelect($('galClasse'),
       [['', t('gal.toutesClasses')]].concat(
