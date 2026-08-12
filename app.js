@@ -940,9 +940,10 @@ function buildPartageChoisi() {
  * 2 Légendaire ressortait tout doré — « du jaune partout ». On ne recalcule
  * que si aucun code n'a été gardé. */
 function restituer(b) {
-  if (b && b.code) {
+  const code = b && (b.code || (b.etat && b.etat.k));
+  if (code) {
     try {
-      afficherCode(b.code);
+      afficherCode(code);
       return;
     } catch (e) {
       // Code devenu illisible (données du jeu changées) : on retombe sur le
@@ -951,6 +952,15 @@ function restituer(b) {
         `<span class="avert">Code du build illisible (${e.message}), `
         + 'le stuff est recomposé à partir des affixes.</span>';
     }
+  } else if (b && b.nom) {
+    // BUILD D'AVANT LA CORRECTION. Il ne contient que des objectifs, pas de
+    // stuff. Le recomposer donnera autre chose que ce qui avait été vu, et
+    // c'est exactement ce qui donnait « du jaune partout » sans explication.
+    $('noteBuilds').innerHTML =
+      `<span class="avert">« ${b.nom} » a été enregistré avant que les builds `
+      + 'gardent leur stuff : il n\'y a que les affixes, le stuff est donc '
+      + 'recomposé et peut différer. Réimporte son code puis réenregistre-le '
+      + 'sous le même nom pour le figer.</span>';
   }
   calculer();
 }
@@ -972,8 +982,14 @@ function dessinerBuilds() {
     // nulle part où publier. On la montre grisée plutôt que de la cacher,
     // pour que la possibilité soit visible.
     const avecCompte = comptesDispo() && window.Comptes.connecte();
-    ligne.innerHTML = `<button class="ouvrir" title="Charger ce build">
-        <b>${b.nom}</b><small>${cl} · ${ra} · ${(b.etat.t || []).length} affixe(s)</small>
+    const fige = !!(b.code || (b.etat && b.etat.k));
+    const titre = fige
+      ? 'Charger ce build tel qu\'il a été enregistré'
+      : 'Ce build n\'a pas gardé son stuff : il sera recomposé, '
+        + 'et peut donc différer de ce que tu avais.';
+    ligne.innerHTML = `<button class="ouvrir" title="${titre}">
+        <b>${b.nom}${fige ? '' : ' <i>⚠</i>'}</b>
+        <small>${cl} · ${ra} · ${(b.etat.t || []).length} affixe(s)</small>
       </button>
       <label class="pub" title="${avecCompte
         ? 'Rendre ce build visible par les autres'
