@@ -64,7 +64,17 @@ CONTROLES = [
     ("fonction builds_de",
      lambda: fonction_repond("builds_de", {"p": "___inexistant___"})),
     ("fonction galerie_publique",
-     lambda: fonction_repond("galerie_publique", {"limite": 5})),
+     lambda: fonction_repond("galerie_publique",
+                             {"p_limite": 5, "p_decalage": 0, "p_tri": "recent"})),
+    ("fonction combien_de_builds_publics",
+     lambda: fonction_repond("combien_de_builds_publics", {})),
+    ("fonction guides_publics",
+     lambda: fonction_repond("guides_publics", {"p_limite": 5})),
+    ("fonction guide_complet",
+     lambda: fonction_repond(
+         "guide_complet", {"gid": "00000000-0000-0000-0000-000000000000"})),
+    ("lecture directe de guides : aucune ligne",
+     lambda: appeler("/rest/v1/guides?select=titre")[1] == []),
     # La colonne du code ami doit avoir disparu.
     ("colonne morte profiles.code retiree",
      lambda: not existe_colonne("profiles", "code")),

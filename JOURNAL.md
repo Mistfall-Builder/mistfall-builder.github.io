@@ -247,6 +247,61 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Fiche de personnage, compétences, galerie et guides
+
+**La fiche.** `site/fiche.js` calcule Attaque, Défense, Vie, résistances,
+pénétration et vie effective. Rien n'est estimé : stats de départ des pages
+de classe du wiki (Attack 100 / Defense 50 / Health 618 partout), stats des
+pièces depuis le jeu, effets d'affixes lus au niveau réellement atteint.
+La courbe Défense → réduction reproduit l'exemple publié par le wiki
+(Défense 400 → 33,1 %) et le monstre standard (705 → 50 %).
+
+**Les compétences.** Les 100 fiches du wiki, dont 70 avec coefficient. Le
+panneau calcule coup par coup avec l'Attaque du build, contre un monstre,
+en brut, ou contre un personnage identique. Les 30 compétences sans
+coefficient publié le disent au lieu d'afficher un chiffre inventé.
+
+**La galerie.** Tri, filtre de classe, recherche, pagination, tout côté
+base. Le vide « personne n'a publié » est distingué du vide « ton filtre ne
+ramène rien » via `combien_de_builds_publics()`.
+
+**Les guides.** Table + RLS + deux fonctions. Balisage minuscule (titres,
+puces, paragraphes) et échappement systématique : accepter du HTML écrit
+par un inconnu et affiché à tous serait une faille.
+
+### Trois bugs trouvés par les garde-fous, pas par hasard
+
+1. **La synchronisation dépubliait en silence.** La fusion reconstruisait
+   chaque build à partir du serveur seul : la case « ami » n'était même pas
+   demandée dans la requête et disparaissait à chaque passage, et une case
+   « public » cochée ici mais pas encore arrivée là-bas était décochée puis
+   RENVOYÉE décochée. C'est ce qui a dépublié « Jaune tanky ». Les deux
+   visibilités s'additionnent maintenant (OU) au lieu de se remplacer.
+
+2. **`+10.5%` valait 10 %.** Le lecteur d'effets découpait sur les points,
+   donc « Attack +10.5% » devenait « Attack +10 » et « 5% ». Valor 7
+   rendait ×1.100 au lieu de ×1.105. Le point n'est une fin de phrase que
+   s'il n'est pas suivi d'un chiffre.
+
+3. **Le libellé cherché en fin de morceau.** « Movement Speed +4.5%,
+   stacking up to 2 times » perdait sa vitesse parce que la phrase finit
+   par « 2 times ». On balaie maintenant chaque libellé connu partout dans
+   le texte.
+
+`site/test_fiche.js` passe les 44 affixes à leurs 7 niveaux : **246 phrases,
+0 mal comprise**, plus 10 valeurs contrôlées une par une et la courbe
+vérifiée contre l'exemple du wiki.
+
+`tools/completer_affixes.py` a comblé 15 libellés manquants sur 12 affixes
+depuis le wiki, sans jamais écraser un texte venu du jeu. Cinq noms
+diffèrent entre wiki et jeu et ont été reliés sur la DESCRIPTION, pas sur la
+ressemblance. « Critical Damage » n'a **volontairement pas** été relié à
+« Headshot Damage » : les descriptions diffèrent, ce sont deux choses.
+
+### Le panaché ne se garde plus
+Décoché à chaque lancement de l'outil, jamais restauré. Le retrouver coché
+sans l'avoir demandé rend le résultat incompréhensible.
+
 ### Un seul mot, et une case qui dit ce qu'elle fait
 Le même identifiant s'appelait « pseudo public » quand on le choisissait,
 « pseudo exact de ton ami » quand on le tapait, et « code » dans les messages

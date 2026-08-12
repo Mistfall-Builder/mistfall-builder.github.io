@@ -123,6 +123,97 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 @media(max-width:1040px){main{grid-template-columns:1fr}}
 .colonne{position:sticky;top:84px}
 @media(max-width:1040px){.colonne{position:static}}
+/* La fiche s'étale sous les deux colonnes : ses tableaux de stats et sa
+   grille de compétences ne tiennent pas dans 330 px. */
+.pleine{grid-column:1/-1;display:grid;gap:18px}
+.pleine[hidden]{display:none}
+
+/* ------------------------------------------------- filtres et pagination -- */
+.filtres{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filtres input[type=search]{flex:1 1 200px;min-width:0}
+.filtres select{flex:0 0 auto;width:auto;min-width:130px}
+.filtres button{flex:0 0 auto}
+.pages{display:flex;gap:6px;justify-content:center;align-items:center;
+       margin-top:12px;flex-wrap:wrap}
+.pages button{width:auto;padding:5px 11px;font-size:12px}
+.pages button[disabled]{opacity:.35;cursor:default}
+.pages .ou{font-size:12px;color:var(--doux);padding:0 6px}
+
+/* --------------------------------------------------------- grille builds -- */
+.grilleBuilds{display:grid;gap:10px;margin-top:10px;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.cb{border:1px solid var(--bord);border-radius:3px;padding:10px 11px;
+    background:rgba(255,255,255,.02);display:flex;flex-direction:column;gap:7px}
+.cb h4{margin:0;font-size:14px;letter-spacing:.2px}
+.cb .meta{font-size:11px;color:var(--doux);display:flex;gap:7px;flex-wrap:wrap;
+          align-items:center}
+.cb .auteur{color:var(--accent)}
+.cb .puces{display:flex;gap:4px;flex-wrap:wrap}
+.cb .puce{font-size:10.5px;border:1px solid var(--bord);border-radius:2px;
+          padding:1px 5px;color:var(--doux)}
+.cb .actions{display:flex;gap:6px;margin-top:auto}
+.cb .actions button{width:auto;flex:1;padding:5px 8px;font-size:12px}
+
+/* ----------------------------------------------------------------- fiche -- */
+.statsGrille{display:grid;gap:9px;
+  grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}
+.stat{border:1px solid var(--bord);border-radius:3px;padding:8px 10px;
+      background:rgba(255,255,255,.02)}
+.stat .lib{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;
+           color:var(--doux)}
+.stat .val{font-size:19px;font-weight:600;margin-top:2px}
+.stat .sous{font-size:11px;color:var(--doux);margin-top:1px}
+.stat.fort .val{color:var(--accent)}
+#ficheProvenance table{width:100%;border-collapse:collapse;font-size:12px}
+#ficheProvenance td,#ficheProvenance th{border-bottom:1px solid var(--bord);
+  padding:4px 7px;text-align:left;vertical-align:top}
+#ficheProvenance th{color:var(--doux);font-weight:500;font-size:11px;
+  text-transform:uppercase;letter-spacing:.7px}
+#ficheProvenance .n{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ------------------------------------------------------------ competences -- */
+.grilleSorts{display:grid;gap:8px;margin-top:4px;
+  grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.sort{border:1px solid var(--bord);border-radius:3px;padding:8px 10px;
+      background:rgba(255,255,255,.02);cursor:pointer;text-align:left;
+      width:100%;color:inherit;font:inherit}
+.sort:hover{border-color:var(--accent);background:rgba(240,123,48,.06)}
+.sort.actif{border-color:var(--accent);background:rgba(240,123,48,.10)}
+.sort .n{font-size:13px;font-weight:600}
+.sort .d{font-size:16px;color:var(--accent);font-variant-numeric:tabular-nums;
+         margin-top:3px}
+.sort .m{font-size:10.5px;color:var(--doux);margin-top:2px}
+.sort.muet .d{color:var(--doux);font-size:12px}
+.sort.autreArme{opacity:.55}
+#detailSort{margin-top:12px}
+#detailSort table{width:100%;border-collapse:collapse;font-size:12px}
+#detailSort td,#detailSort th{border-bottom:1px solid var(--bord);
+  padding:4px 7px;text-align:left}
+#detailSort th{color:var(--doux);font-weight:500;font-size:11px;
+  text-transform:uppercase;letter-spacing:.7px}
+#detailSort .n{text-align:right;font-variant-numeric:tabular-nums}
+#detailSort .tot{font-weight:600;color:var(--accent)}
+.branches{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.branches button{width:auto;padding:4px 10px;font-size:12px}
+.branches button.actif{border-color:var(--accent);color:var(--accent)}
+
+/* ---------------------------------------------------------------- guides -- */
+.guide{border:1px solid var(--bord);border-radius:3px;margin-bottom:8px;
+       background:rgba(255,255,255,.02)}
+.guide>summary{padding:9px 11px;cursor:pointer;list-style:none;
+               display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.guide>summary::-webkit-details-marker{display:none}
+.guide>summary b{font-size:14px}
+.guide>summary small{color:var(--doux);font-size:11px}
+.guide .corpsGuide{padding:0 13px 12px;font-size:13.5px;line-height:1.62}
+.guide .corpsGuide h4{margin:12px 0 4px;font-size:13px;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--accent)}
+.guide .corpsGuide p{margin:0 0 8px}
+.guide .corpsGuide ul{margin:0 0 8px;padding-left:20px}
+textarea{width:100%;background:var(--creux);color:var(--texte);
+  border:1px solid var(--bord);border-radius:3px;padding:9px 10px;
+  font:inherit;font-size:13px;line-height:1.55;resize:vertical}
+textarea:focus{outline:none;border-color:var(--accent)}
 
 /* Légèrement translucides : l'illustration reste devinable derrière les
    panneaux, ce qui donne la profondeur, sans jamais passer sous le texte. */
@@ -383,6 +474,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     <nav class="nav" id="nav">
       <button data-page="main" class="actif" data-i18n="nav.builder">Builder</button>
       <button data-page="pageGalerie" data-i18n="nav.publics">Builds publics</button>
+      <button data-page="pageGuides" data-i18n="nav.guides">Guides publics</button>
     </nav>
     <div class="droite">
       <div class="langues" id="langues" title="Change language"></div>
@@ -545,6 +637,37 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </div>
   </div>
+
+  <!-- LA FICHE, PLEINE LARGEUR ET EN BAS. Elle ne sert qu'une fois le build
+       calculé, et sa place sous les deux colonnes évite de repousser les
+       réglages hors de l'écran tant qu'il n'y a rien à montrer. -->
+  <div class="pleine" id="blocFiche" hidden>
+    <div class="carte">
+      <h2 data-i18n="fiche.titre">Fiche de personnage</h2>
+      <div class="corps">
+        <div id="fiche"></div>
+        <details class="pliable" id="ficheDetail">
+          <summary data-i18n="fiche.detail">D'où vient chaque nombre</summary>
+          <div id="ficheProvenance"></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2 data-i18n="sorts.titre">Compétences</h2>
+      <div class="corps">
+        <div class="filtres">
+          <select id="sortsCible"></select>
+          <label class="coche" style="flex:0 0 auto">
+            <input type="checkbox" id="sortsArme" checked>
+            <span data-i18n="sorts.filtreArme">Seulement mon arme</span></label>
+        </div>
+        <div id="sortsAide" class="pas" style="font-size:12px;margin:8px 0"></div>
+        <div id="listeSorts" class="grilleSorts"></div>
+        <div id="detailSort"></div>
+      </div>
+    </div>
+  </div>
 </main>
 
 <section id="pageGalerie" class="page" hidden>
@@ -554,9 +677,60 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
   <div class="carte">
     <h2 data-i18n="gal.titre">Builds publics</h2>
     <div class="corps">
-      <button id="galRafraichir" data-i18n="gal.rafraichir">Rafraîchir</button>
+      <!-- Les filtres partent en base, pas dans le navigateur : à mille
+           builds, tout télécharger pour en cacher 990 n'a pas de sens. -->
+      <div class="filtres">
+        <input type="search" id="galRecherche" data-i18n-ph="gal.chercher"
+               placeholder="nom du build ou pseudonyme…">
+        <select id="galClasse"></select>
+        <select id="galTri"></select>
+        <button id="galRafraichir" data-i18n="gal.rafraichir">Rafraîchir</button>
+      </div>
       <div id="noteGalerie" style="margin-top:9px;font-size:12px"></div>
-      <div id="listeGalerie" style="margin-top:10px"></div>
+      <div id="listeGalerie" class="grilleBuilds"></div>
+      <div id="galPages" class="pages"></div>
+    </div>
+  </div>
+</section>
+
+<section id="pageGuides" class="page" hidden>
+  <div class="banniere">
+    <img src="marque/logo_petit.png" alt="Mistfall Hunter Builder" width="320">
+  </div>
+
+  <div class="carte" id="blocEcrireGuide" hidden>
+    <h2 data-i18n="guide.ecrire">Écrire un guide</h2>
+    <div class="corps">
+      <div class="rangee">
+        <input type="text" id="guideTitre" maxlength="120"
+               data-i18n-ph="guide.titrePlace" placeholder="titre du guide…">
+        <select id="guideClasse" style="flex:0 0 auto"></select>
+      </div>
+      <textarea id="guideCorps" rows="10" data-i18n-ph="guide.corpsPlace"
+                placeholder="Ton guide. Une ligne vide sépare deux paragraphes ; une ligne qui commence par # devient un titre, par - une puce."></textarea>
+      <div class="rangee">
+        <label class="coche" style="flex:1"><input type="checkbox" id="guidePublic">
+          <span data-i18n="guide.publier">Le rendre visible par tout le monde</span></label>
+        <button id="guideEnregistrer" style="flex:0 0 auto"
+                data-i18n="builds.enregistrer">Enregistrer</button>
+      </div>
+      <div id="noteGuide" style="font-size:12px"></div>
+      <div id="mesGuides" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="carte">
+    <h2 data-i18n="guide.titre">Guides publics</h2>
+    <div class="corps">
+      <div class="filtres">
+        <input type="search" id="guRecherche" data-i18n-ph="guide.chercher"
+               placeholder="titre ou pseudonyme…">
+        <select id="guClasse"></select>
+        <button id="guRafraichir" data-i18n="gal.rafraichir">Rafraîchir</button>
+      </div>
+      <div id="noteGuides" style="margin-top:9px;font-size:12px"></div>
+      <div id="listeGuides" style="margin-top:10px"></div>
+      <div id="guPages" class="pages"></div>
     </div>
   </div>
 </section>
@@ -579,10 +753,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=20"></script>
-<script src="config.js?v=20"></script>
-<script src="comptes.js?v=20"></script>
-<script src="donnees.js?v=20"></script>
-<script src="app.js?v=20"></script>
+<script src="i18n.js?v=25"></script>
+<script src="config.js?v=25"></script>
+<script src="comptes.js?v=25"></script>
+<script src="donnees.js?v=25"></script>
+<script src="skills.js?v=25"></script>
+<script src="fiche.js?v=25"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

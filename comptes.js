@@ -156,9 +156,13 @@
   }
 
   // ------------------------------------------------------------ builds ----
+  /* `partage` fait partie de la sélection : sans lui, la case « ami » ne
+     survivait à aucune synchronisation. Elle n'existait que dans le
+     navigateur, et la fusion la remplaçait par rien. */
   async function listerBuilds() {
     return avecReprise(() => appeler(
-      '/rest/v1/builds?select=nom,etat,code,public,maj&order=maj.desc', {}, true));
+      '/rest/v1/builds?select=nom,etat,code,public,partage,maj&order=maj.desc',
+      {}, true));
   }
 
   // ------------------------------------------------------- partage --------
@@ -390,6 +394,8 @@
   window.Comptes = {
     actif, connecte, courriel, inscrire, connecter, deconnecter,
     listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
-    monProfil, monProfilComplet, definirPseudo, parPseudo, galerie,
+    monProfil, monProfilComplet, definirPseudo, parPseudo,
+    galerie, combienDeBuildsPublics,
+    mesGuides, enregistrerGuide, supprimerGuide, guidesPublics, guideComplet,
   };
 }());

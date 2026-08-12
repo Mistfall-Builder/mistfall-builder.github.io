@@ -993,7 +993,8 @@ function afficher(res, classe) {
   // En différé : chercher les suggestions coûte presque autant qu'un build,
   // et le faire ici retarderait l'affichage de tout le reste pour rien.
   setTimeout(() => { dessinerSuggestions(res, classe);
-                     dessinerAlternatives(res, classe); }, 0);
+                     dessinerAlternatives(res, classe);
+                     dessinerFiche(res, classe); }, 0);
 
   const libres = res.sockets.filter((s) => !s.gem).length;
   const compte = {};
@@ -1128,9 +1129,25 @@ async function synchroniser(silencieux) {
     const par = new Map(locaux.map((b) => [b.nom, b]));
     let recus = 0;
     for (const d of distants || []) {
-      if (!par.has(d.nom)) recus += 1;
-      par.set(d.nom, { nom: d.nom, etat: d.etat, code: d.code || '',
-                       pub: !!d.public });
+      const local = par.get(d.nom);
+      if (!local) recus += 1;
+      // LES CASES DE VISIBILITÉ S'ADDITIONNENT, ELLES NE SE REMPLACENT PAS.
+      //
+      // L'ancienne version reconstruisait l'entrée à partir du serveur seul.
+      // Deux dégâts : la case « ami », qui n'était même pas demandée dans la
+      // requête, disparaissait à chaque synchronisation ; et une case cochée
+      // ici mais pas encore arrivée là-bas était décochée puis RENVOYÉE
+      // décochée — cocher « public » puis recharger dépubliait en silence.
+      //
+      // Un OU règle les deux : dépublier reste possible, mais demande un
+      // décochage explicite, ce qui est exactement ce à quoi on s'attend.
+      par.set(d.nom, {
+        nom: d.nom,
+        etat: d.etat,
+        code: d.code || '',
+        pub: !!d.public || !!(local && local.pub),
+        ami: !!d.partage || !!(local && local.ami),
+      });
     }
     const fusion = [...par.values()];
     ecrireBiblio(fusion);
@@ -1253,21 +1270,131 @@ function carteBuildDistant(b, auteur) {
   return el;
 }
 
-/* ------------------------------------------------------ galerie publique -- */
-async function chargerGalerie() {
+/* ------------------------------------------------------ galerie publique --
+ *
+ * FILTRER EN BASE, PAS DANS LE NAVIGATEUR. À mille builds, tout télécharger
+ * pour en cacher 990 serait absurde : le tri, la recherche, le filtre de
+ * classe et la page partent dans l'appel, et la base renvoie le total avec
+ * chaque ligne pour que la pagination sache où elle en est sans deuxième
+ * requête. */
+const PAR_PAGE = 24;
+const galEtat = { page: 0, total: 0, tri: 'recent', classe: '', recherche: '' };
+
+/* Une carte de build : ce qu'on veut savoir avant de cliquer. */
+function carteBuildGalerie(b) {
+  const el = document.createElement('div');
+  el.className = 'cb';
+  const e = b.etat || {};
+  const cl = D.classes[String(e.c)] || '?';
+  const ra = e.g ? (D.raretes[String(e.g)] || '') : t('perso.auto');
+  const cibles = (e.t || []).slice().sort((x, y) => y[1] - x[1]);
+  const puces = cibles.slice(0, 6)
+    .map(([n, l]) => `<span class="puce">${n} ${l}</span>`).join('');
+  const reste = cibles.length > 6 ? `<span class="puce">+${cibles.length - 6}</span>` : '';
+  const quand = b.maj ? new Date(b.maj).toLocaleDateString() : '';
+  el.innerHTML = `<h4>${echapper(b.nom)}</h4>
+    <div class="meta">
+      <span class="auteur">${b.auteur ? echapper(b.auteur) : t('gal.anonyme')}</span>
+      <span>${cl}</span><span>${e.a || ''}</span><span>${ra}</span>
+      ${quand ? `<span>${quand}</span>` : ''}
+    </div>
+    <div class="puces">${puces}${reste}</div>
+    <div class="actions">
+      <button class="bdCharger">${t('gal.charger')}</button>
+      <button class="bdCode" ${b.code ? '' : 'disabled'}>${t('gal.code')}</button>
+      <button class="bdCopier">${t('gal.copier')}</button>
+    </div>`;
+  el.querySelector('.bdCharger').onclick = () => {
+    appliquerEtat(b.etat);
+    restituer(b);
+    montrerPage('main');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  el.querySelector('.bdCode').onclick = (ev) => {
+    if (!b.code) return;
+    copierTexte(b.code, ev.target, t('gal.codeCopie'), t('gal.code'));
+  };
+  el.querySelector('.bdCopier').onclick = () => {
+    const liste = biblio();
+    const nom = liste.some((x) => x.nom === b.nom) ? `${b.nom} (copie)` : b.nom;
+    liste.push({ nom, etat: b.etat, code: b.code || '', pub: false, ami: false });
+    if (!ecrireBiblio(liste)) return;
+    dessinerBuilds();
+    $('noteGalerie').innerHTML =
+      `<span class="pas">${t('partage.copieOk', { nom })}</span>`;
+  };
+  return el;
+}
+
+/* Copier sans quitter la page : le bouton confirme lui-même puis revient.
+   Un message ailleurs dans la page passerait inaperçu. */
+function copierTexte(texte, bouton, ok, avant) {
+  const rendre = () => { if (bouton) bouton.textContent = avant; };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(texte).then(() => {
+      if (bouton) { bouton.textContent = ok; setTimeout(rendre, 1600); }
+    }, () => {});
+    return;
+  }
+  const z = document.createElement('textarea');
+  z.value = texte; document.body.appendChild(z); z.select();
+  try { document.execCommand('copy'); } catch (e) { /* rien à faire */ }
+  z.remove();
+  if (bouton) { bouton.textContent = ok; setTimeout(rendre, 1600); }
+}
+
+function echapper(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/* La pagination : deux flèches et un compteur. Numéroter les pages n'aide
+   personne quand on ne sait pas ce qu'il y a dedans. */
+function dessinerPages(boite, etat, parPage, aller) {
+  const pages = Math.max(1, Math.ceil(etat.total / parPage));
+  if (etat.total <= parPage) { boite.innerHTML = ''; return; }
+  boite.innerHTML = '';
+  const bouton = (txt, versPage, actif) => {
+    const b = document.createElement('button');
+    b.textContent = txt;
+    b.disabled = !actif;
+    if (actif) b.onclick = () => aller(versPage);
+    boite.appendChild(b);
+  };
+  bouton('‹', etat.page - 1, etat.page > 0);
+  const ou = document.createElement('span');
+  ou.className = 'ou';
+  ou.textContent = t('gal.page', { n: etat.page + 1, sur: pages, total: etat.total });
+  boite.appendChild(ou);
+  bouton('›', etat.page + 1, etat.page + 1 < pages);
+}
+
+async function chargerGalerie(page) {
   const boite = $('listeGalerie');
   const note = $('noteGalerie');
-  if (!comptesDispo()) return;
+  if (!comptesDispo() || !boite) return;
+  if (typeof page === 'number') galEtat.page = Math.max(0, page);
   note.innerHTML = `<span class="pas">${t('partage.chargement')}</span>`;
   try {
-    const liste = await window.Comptes.galerie(60);
+    const r = await window.Comptes.galerie({
+      limite: PAR_PAGE,
+      decalage: galEtat.page * PAR_PAGE,
+      tri: galEtat.tri,
+      classe: galEtat.classe === '' ? null : Number(galEtat.classe),
+      recherche: galEtat.recherche,
+    });
+    galEtat.total = r.total;
     boite.innerHTML = '';
-    if (!liste.length) {
-      note.innerHTML = `<span class="pas">${t('gal.vide')}</span>`;
-      return;
-    }
-    for (const b of liste) boite.appendChild(carteBuildDistant(b, b.auteur));
-    note.innerHTML = '';
+    for (const b of r.lignes) boite.appendChild(carteBuildGalerie(b));
+    dessinerPages($('galPages'), galEtat, PAR_PAGE, chargerGalerie);
+    if (r.lignes.length) { note.innerHTML = ''; return; }
+    // DEUX VIDES À NE PAS CONFONDRE : « personne n'a rien publié » et
+    // « ton filtre ne ramène rien » demandent des gestes opposés.
+    const filtre = galEtat.recherche || galEtat.classe !== '';
+    if (!filtre) { note.innerHTML = `<span class="pas">${t('gal.vide')}</span>`; return; }
+    const combien = await window.Comptes.combienDeBuildsPublics();
+    note.innerHTML = `<span class="pas">${combien
+      ? t('gal.videFiltre', { n: combien }) : t('gal.vide')}</span>`;
   } catch (e) {
     note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
   }
@@ -1755,6 +1882,400 @@ function afficherCode(code) {
    base pour quelqu'un qui ne la regardera jamais. */
 let _galerieChargee = false;
 
+/* ======================================================================
+   FICHE DE PERSONNAGE
+
+   Tous les nombres viennent de fiche.js, qui les calcule avec la formule
+   publiée par le wiki. Ici on ne fait que les mettre en page — et surtout
+   on montre D'OÙ ils viennent, parce qu'une fiche qu'on ne peut pas
+   vérifier ne vaut rien.
+   ====================================================================== */
+let _sortChoisi = null;
+let _brancheChoisie = 0;
+
+function nb(x, dec) {
+  const d = dec == null ? 0 : dec;
+  return Number(x || 0).toLocaleString(undefined,
+    { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function pc(x, dec) {
+  return `${(Number(x || 0) * 100).toFixed(dec == null ? 1 : dec)} %`;
+}
+
+function carteStat(lib, val, sous, fort) {
+  return `<div class="stat${fort ? ' fort' : ''}">
+    <div class="lib">${lib}</div><div class="val">${val}</div>
+    ${sous ? `<div class="sous">${sous}</div>` : ''}</div>`;
+}
+
+function dessinerFiche(res, classeId) {
+  const bloc = $('blocFiche');
+  if (!bloc || !window.Fiche) return;
+  const f = window.Fiche.ficheDe(res, classeId, D);
+  bloc.hidden = false;
+
+  $('fiche').innerHTML = `<div class="statsGrille">
+    ${carteStat(t('fiche.attaque'), nb(f.attaque),
+                t('fiche.attaqueSous', { base: nb(f.base.Attack),
+                  stuff: nb(f.stuff.attack || 0) }), true)}
+    ${carteStat(t('fiche.defense'), nb(f.defense),
+                t('fiche.defenseSous', { red: pc(f.reduction) }), true)}
+    ${carteStat(t('fiche.vie'), nb(f.vie))}
+    ${carteStat(t('fiche.ehpPhys'), nb(f.ehpPhysique),
+                t('fiche.ehpSous'))}
+    ${carteStat(t('fiche.ehpMag'), nb(f.ehpMagique), t('fiche.ehpSous'))}
+    ${carteStat(t('fiche.degPhys'), '+' + pc(f.bonusPhysique))}
+    ${carteStat(t('fiche.degMag'), '+' + pc(f.bonusMagique))}
+    ${carteStat(t('fiche.resPhys'), pc(f.resistPhysique))}
+    ${carteStat(t('fiche.resMag'), pc(f.resistMagique))}
+    ${carteStat(t('fiche.penetration'), pc(f.penetration))}
+    ${carteStat(t('fiche.resCrit'), pc(f.resistCritique))}
+    ${carteStat(t('fiche.critique'), pc(f.critique, 0),
+                t('fiche.critiqueSous'))}
+  </div>`;
+
+  // La provenance : chaque ligne dit ce qui vient de la classe, du stuff et
+  // des affixes. C'est ce tableau qui permet de contredire l'outil.
+  const l = [];
+  const ligne = (quoi, base, stuff, aff, total) =>
+    `<tr><td>${quoi}</td><td class="n">${base}</td><td class="n">${stuff}</td>
+     <td class="n">${aff}</td><td class="n"><b>${total}</b></td></tr>`;
+  l.push(ligne(t('fiche.attaque'), nb(f.base.Attack), nb(f.stuff.attack || 0),
+    f.aff.attaquePourcent ? '×' + (1 + f.aff.attaquePourcent).toFixed(3) : '—',
+    nb(f.attaque)));
+  l.push(ligne(t('fiche.defense'), nb(f.base.Defense), nb(f.stuff.defence || 0),
+    nb(f.aff.defensePlate || 0), nb(f.defense)));
+  l.push(ligne(t('fiche.vie'), nb(f.base.Health), nb(f.stuff.maxHealth || 0),
+    f.aff.viePourcent ? '×' + (1 + f.aff.viePourcent).toFixed(3) : '—',
+    nb(f.vie)));
+  l.push(ligne(t('fiche.degPhys'), '—', pc(f.stuff.physicalIncrease || 0),
+    pc(f.aff.degatsPhysiques || 0), pc(f.bonusPhysique)));
+  l.push(ligne(t('fiche.degMag'), '—', pc(f.stuff.magicalIncrease || 0),
+    pc(f.aff.degatsMagiques || 0), pc(f.bonusMagique)));
+  l.push(ligne(t('fiche.resPhys'), '—', pc(f.stuff.physicalReduction || 0),
+    pc(f.aff.resistPhysique || 0), pc(f.resistPhysique)));
+  l.push(ligne(t('fiche.resMag'), '—', pc(f.stuff.magicalReduction || 0),
+    pc(f.aff.resistMagique || 0), pc(f.resistMagique)));
+
+  const apports = f.detailAffixes
+    .filter((a) => Object.keys(a.apports).length)
+    .sort((a, b) => a.nom.localeCompare(b.nom))
+    .map((a) => `<tr><td>${a.nom} <b>${a.niveau}</b></td>
+      <td colspan="4">${echapper(a.phrase)}</td></tr>`).join('');
+  const muets = f.detailAffixes.filter((a) => !Object.keys(a.apports).length);
+
+  $('ficheProvenance').innerHTML = `
+    <p class="pas" style="font-size:12px">${t('fiche.explique')}</p>
+    <table>
+      <tr><th>${t('fiche.stat')}</th><th class="n">${t('fiche.deClasse')}</th>
+          <th class="n">${t('fiche.deStuff')}</th>
+          <th class="n">${t('fiche.deAffixes')}</th>
+          <th class="n">${t('fiche.total')}</th></tr>
+      ${l.join('')}
+    </table>
+    ${apports ? `<p class="pas" style="font-size:12px;margin-top:10px">
+        ${t('fiche.affixesLus')}</p><table>${apports}</table>` : ''}
+    ${muets.length ? `<p class="pas" style="font-size:12px;margin-top:8px">
+        ${t('fiche.affixesHorsFiche', {
+          liste: muets.map((a) => `${a.nom} ${a.niveau}`).join(', ') })}</p>` : ''}
+    ${f.restes.length ? `<p class="ko" style="font-size:12px;margin-top:8px">
+        ${t('fiche.nonCompris', {
+          liste: f.restes.map((r) => `${r[0]} ${r[1]} : ${r[2].join(' / ')}`)
+            .join(' — ') })}</p>` : ''}`;
+
+  dessinerSorts(res, classeId, f);
+}
+
+/* ======================================================================
+   COMPÉTENCES
+
+   Les coefficients viennent du wiki, l'Attack vient du build : le produit
+   des deux est un vrai chiffre, pas une estimation. Ce que le jeu ne
+   publie pas — résistance des monstres, taux de critique — vaut zéro et
+   l'écran le dit, plutôt que d'être deviné.
+   ====================================================================== */
+function cibleCourante(f) {
+  const v = ($('sortsCible') || {}).value || 'monstre';
+  if (v === 'brut') return { defense: 0, resistPhysique: 0, resistMagique: 0 };
+  if (v === 'moi') {
+    return { defense: f.defense, resistPhysique: f.resistPhysique,
+             resistMagique: f.resistMagique };
+  }
+  return { defense: window.D_DEFENSE_MONSTRE || 705,
+           resistPhysique: 0, resistMagique: 0 };
+}
+
+function dessinerSorts(res, classeId, f) {
+  const boite = $('listeSorts');
+  if (!boite || !window.Fiche) return;
+  const nomClasse = D.classes[String(classeId)];
+  const tous = window.Fiche.competencesDe(nomClasse);
+  const arme = ($('arme') || {}).value || '';
+  const filtrer = ($('sortsArme') || {}).checked;
+  const memeArme = (s) => !arme || !s.arme
+    || s.arme.split(' / ').some((a) => a === arme);
+  const liste = filtrer ? tous.filter(memeArme) : tous;
+  const cible = cibleCourante(f);
+
+  $('sortsAide').textContent = t('sorts.aide', {
+    n: tous.length, classe: nomClasse,
+    chiffrees: tous.filter((s) => s.coups.length).length,
+  });
+
+  boite.innerHTML = '';
+  for (const s of liste) {
+    const b = document.createElement('button');
+    b.className = 'sort' + (s.coups.length ? '' : ' muet')
+      + (memeArme(s) ? '' : ' autreArme')
+      + (_sortChoisi === s.nom ? ' actif' : '');
+    const tot = window.Fiche.totalCompetence(s, f, cible, _brancheChoisie);
+    b.innerHTML = `<div class="n">${echapper(s.nom)}</div>
+      <div class="d">${s.coups.length ? nb(tot.degats) : t('sorts.sansDegats')}</div>
+      <div class="m">${[s.arme,
+        s.energie != null ? `${nb(s.energie, 1)} ${t('sorts.energie')}` : '',
+        s.cd != null ? `${nb(s.cd, 0)} s` : ''].filter(Boolean).join(' · ')}</div>`;
+    b.onclick = () => {
+      _sortChoisi = (_sortChoisi === s.nom) ? null : s.nom;
+      _brancheChoisie = 0;
+      dessinerSorts(res, classeId, f);
+    };
+    boite.appendChild(b);
+  }
+  dessinerDetailSort(liste.find((s) => s.nom === _sortChoisi), f, cible,
+                     res, classeId);
+}
+
+function dessinerDetailSort(s, f, cible, res, classeId) {
+  const boite = $('detailSort');
+  if (!boite) return;
+  if (!s) { boite.innerHTML = ''; return; }
+  if (!s.coups.length) {
+    boite.innerHTML = `<p class="pas">${t('sorts.riendePublie')}
+      <a href="${s.url}" target="_blank" rel="noopener noreferrer">${t('sorts.voirWiki')}</a></p>`;
+    return;
+  }
+
+  // Une frappe suit UNE branche : on la choisit, on ne les additionne pas.
+  let branches = '';
+  if (s.branches.length) {
+    branches = `<div class="branches">${s.branches.map((b, i) =>
+      `<button class="${i === _brancheChoisie ? 'actif' : ''}" data-b="${i}">
+        ${t('sorts.branche', { n: i + 1, coups: b.coups.length })}</button>`)
+      .join('')}</div>
+      <p class="pas" style="font-size:12px">${t('sorts.brancheAide')}</p>`;
+  }
+
+  const dansBranche = s.branches.length
+    ? new Set(s.branches[_brancheChoisie].coups) : null;
+  const lignes = s.coups.map((c) => {
+    const d = window.Fiche.degatsDuCoup(c.coef, c.type || 'physical', f, cible);
+    const dedans = !dansBranche || dansBranche.has(c.nom);
+    return `<tr style="${dedans ? '' : 'opacity:.35'}">
+      <td>${c.nom}${dedans ? '' : ' <span class="pas">' + t('sorts.horsBranche') + '</span>'}</td>
+      <td class="n">${c.coef.toFixed(6)}</td>
+      <td>${t('sorts.type.' + (c.type || 'physical'))}</td>
+      <td class="n">${nb(d.brut)}</td>
+      <td class="n">${nb(d.final)}</td>
+      <td class="n">${c.tough != null ? nb(c.tough, 1) : '—'}</td>
+      <td class="n">${c.fen || '—'}</td></tr>`;
+  }).join('');
+
+  const tot = window.Fiche.totalCompetence(s, f, cible, _brancheChoisie);
+  const dps = (s.cd || s.anim)
+    ? tot.degats / Math.max(s.cd || 0, s.anim || 0) : null;
+
+  boite.innerHTML = `<h3 style="margin:14px 0 6px">${echapper(s.nom)}</h3>
+    ${branches}
+    <table>
+      <tr><th>${t('sorts.coup')}</th><th class="n">${t('sorts.coef')}</th>
+          <th>${t('sorts.typeCol')}</th><th class="n">${t('sorts.brut')}</th>
+          <th class="n">${t('sorts.subis')}</th>
+          <th class="n">${t('sorts.tough')}</th>
+          <th class="n">${t('sorts.fenetre')}</th></tr>
+      ${lignes}
+      <tr class="tot"><td>${t('sorts.total')}</td>
+        <td class="n">${tot.coef.toFixed(6)}</td><td></td>
+        <td class="n">${nb(tot.brut)}</td><td class="n">${nb(tot.degats)}</td>
+        <td class="n">${nb(tot.tough, 1)}</td><td></td></tr>
+    </table>
+    <p class="pas" style="font-size:12px;margin-top:8px">
+      ${t('sorts.calcul', { att: nb(f.attaque),
+        red: pc(Math.max(window.Fiche.reductionDefense(cible.defense) - f.penetration, 0)),
+        // Le bonus qui s'applique dépend du TYPE de la compétence : afficher
+        // le bonus physique sous un sort magique ferait mentir la ligne.
+        bonus: pc(((s.coups[0] || {}).type === 'magical')
+                  ? f.bonusMagique : f.bonusPhysique) })}
+      ${dps ? ' · ' + t('sorts.dps', { n: nb(dps, 1) }) : ''}
+    </p>
+    <p class="pas" style="font-size:11.5px">${t('sorts.reserve')}
+      <a href="${s.url}" target="_blank" rel="noopener noreferrer">${t('sorts.voirWiki')}</a></p>
+    ${(s.effets || []).length ? `<table style="margin-top:8px">${
+      s.effets.map(([k, v]) => `<tr><td>${echapper(k)}</td>
+        <td class="n">${echapper(v)}</td></tr>`).join('')}</table>` : ''}`;
+
+  for (const b of boite.querySelectorAll('.branches button')) {
+    b.onclick = () => {
+      _brancheChoisie = Number(b.dataset.b);
+      dessinerSorts(res, classeId, f);
+    };
+  }
+}
+
+/* ======================================================================
+   GUIDES
+
+   Mêmes règles que les builds : rien n'est visible tant que l'auteur ne
+   coche pas, et la liste ne transporte jamais le corps des guides.
+   ====================================================================== */
+let _guidesCharges = false;
+const GU_PAR_PAGE = 20;
+const guEtat = { page: 0, total: 0, classe: '', recherche: '' };
+
+/* Un balisage minuscule et volontairement pauvre : titres, puces,
+   paragraphes. Accepter du HTML dans un texte écrit par un inconnu et
+   affiché à tout le monde serait une faille, pas une fonctionnalité. */
+function rendreGuide(texte) {
+  const lignes = String(texte || '').split(/\r?\n/);
+  const sortie = [];
+  let liste = false;
+  const fermer = () => { if (liste) { sortie.push('</ul>'); liste = false; } };
+  for (const brute of lignes) {
+    const l = brute.trim();
+    if (!l) { fermer(); continue; }
+    if (l.startsWith('#')) {
+      fermer();
+      sortie.push(`<h4>${echapper(l.replace(/^#+\s*/, ''))}</h4>`);
+    } else if (l.startsWith('-') || l.startsWith('*')) {
+      if (!liste) { sortie.push('<ul>'); liste = true; }
+      sortie.push(`<li>${echapper(l.slice(1).trim())}</li>`);
+    } else {
+      fermer();
+      sortie.push(`<p>${echapper(l)}</p>`);
+    }
+  }
+  fermer();
+  return sortie.join('');
+}
+
+async function chargerGuides(page) {
+  const boite = $('listeGuides');
+  const note = $('noteGuides');
+  if (!comptesDispo() || !boite) return;
+  if (typeof page === 'number') guEtat.page = Math.max(0, page);
+  note.innerHTML = `<span class="pas">${t('partage.chargement')}</span>`;
+  try {
+    const r = await window.Comptes.guidesPublics({
+      limite: GU_PAR_PAGE,
+      decalage: guEtat.page * GU_PAR_PAGE,
+      classe: guEtat.classe === '' ? null : Number(guEtat.classe),
+      recherche: guEtat.recherche,
+    });
+    guEtat.total = r.total;
+    boite.innerHTML = '';
+    for (const g of r.lignes) boite.appendChild(carteGuide(g));
+    dessinerPages($('guPages'), guEtat, GU_PAR_PAGE, chargerGuides);
+    note.innerHTML = r.lignes.length ? ''
+      : `<span class="pas">${t('guide.vide')}</span>`;
+  } catch (e) {
+    note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
+  }
+}
+
+function carteGuide(g) {
+  const el = document.createElement('details');
+  el.className = 'guide';
+  const cl = g.classe != null ? (D.classes[String(g.classe)] || '') : '';
+  el.innerHTML = `<summary>
+      <b>${echapper(g.titre)}</b>
+      <small>${[cl, g.auteur ? t('gal.par') + ' ' + echapper(g.auteur)
+        : t('gal.anonyme'),
+        g.maj ? new Date(g.maj).toLocaleDateString() : ''
+      ].filter(Boolean).join(' · ')}</small>
+    </summary>
+    <div class="corpsGuide"><span class="pas">${t('partage.chargement')}</span></div>`;
+  let charge = false;
+  el.addEventListener('toggle', async () => {
+    // Le corps ne descend qu'à l'ouverture : une liste de vingt guides
+    // ferait sinon voyager des dizaines de milliers de caractères.
+    if (!el.open || charge) return;
+    charge = true;
+    const corps = el.querySelector('.corpsGuide');
+    try {
+      const plein = await window.Comptes.guideComplet(g.id);
+      corps.innerHTML = plein ? rendreGuide(plein.corps)
+        : `<span class="pas">${t('guide.introuvable')}</span>`;
+    } catch (e) {
+      charge = false;
+      corps.innerHTML = `<span class="ko">${e.message}</span>`;
+    }
+  });
+  return el;
+}
+
+async function chargerMesGuides() {
+  const bloc = $('blocEcrireGuide');
+  if (!bloc) return;
+  const ouvert = comptesDispo() && window.Comptes.connecte();
+  bloc.hidden = !ouvert;
+  if (!ouvert) return;
+  try {
+    const liste = await window.Comptes.mesGuides();
+    const boite = $('mesGuides');
+    boite.innerHTML = liste.length
+      ? `<div class="pas" style="font-size:12px;margin-bottom:6px">${t('guide.mes')}</div>`
+      : '';
+    for (const g of liste) {
+      const el = document.createElement('div');
+      el.className = 'buildDistant';
+      el.innerHTML = `<div class="bd"><b>${echapper(g.titre)}</b>
+          <small>${g.public ? t('guide.estPublic') : t('guide.brouillon')}
+            · ${g.corps.length} ${t('guide.signes')}</small></div>
+        <button class="gEdit">${t('guide.modifier')}</button>
+        <button class="gSuppr">×</button>`;
+      el.querySelector('.gEdit').onclick = () => {
+        $('guideTitre').value = g.titre;
+        $('guideClasse').value = g.classe == null ? '' : String(g.classe);
+        $('guideCorps').value = g.corps;
+        $('guidePublic').checked = !!g.public;
+        $('guideTitre').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+      el.querySelector('.gSuppr').onclick = async () => {
+        await window.Comptes.supprimerGuide(g.id).catch(() => {});
+        chargerMesGuides();
+        chargerGuides(0);
+      };
+      boite.appendChild(el);
+    }
+  } catch (e) {
+    $('noteGuide').innerHTML = `<span class="ko">${e.message}</span>`;
+  }
+}
+
+async function enregistrerGuide() {
+  const note = $('noteGuide');
+  const titre = ($('guideTitre').value || '').trim();
+  const corps = ($('guideCorps').value || '').trim();
+  if (titre.length < 3) {
+    note.innerHTML = `<span class="ko">${t('guide.titreCourt')}</span>`; return;
+  }
+  if (corps.length < 20) {
+    note.innerHTML = `<span class="ko">${t('guide.corpsCourt')}</span>`; return;
+  }
+  note.innerHTML = `<span class="pas">…</span>`;
+  try {
+    const cl = $('guideClasse').value;
+    await window.Comptes.enregistrerGuide({
+      titre, corps, classe: cl === '' ? null : Number(cl),
+      public: $('guidePublic').checked,
+    });
+    note.innerHTML = `<span class="ok">${t('guide.enregistre')}</span>`;
+    chargerMesGuides();
+    chargerGuides(0);
+  } catch (e) {
+    note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
+  }
+}
+
 function montrerPage(id) {
   for (const el of document.querySelectorAll('main, .page')) {
     el.hidden = (id === 'main') ? (el.tagName !== 'MAIN') : (el.id !== id);
@@ -1764,7 +2285,12 @@ function montrerPage(id) {
   }
   if (id === 'pageGalerie' && !_galerieChargee) {
     _galerieChargee = true;
-    chargerGalerie();
+    chargerGalerie(0);
+  }
+  if (id === 'pageGuides' && !_guidesCharges) {
+    _guidesCharges = true;
+    chargerGuides(0);
+    chargerMesGuides();
   }
   window.scrollTo({ top: 0 });
 }
@@ -1772,6 +2298,9 @@ function montrerPage(id) {
 function poserNavigation() {
   for (const b of document.querySelectorAll('#nav button')) {
     b.onclick = () => montrerPage(b.dataset.page);
+    // Sans compte branché, ces deux onglets n'ont rien à montrer : un
+    // onglet qui ouvre sur du vide est pire que pas d'onglet.
+    if (b.dataset.page !== 'main' && !comptesDispo()) b.hidden = true;
   }
 }
 
@@ -1803,11 +2332,29 @@ window.surChangementDeLangue = function () {
   dessinerAffixes();
   majBudgetVin();
   dessinerBuilds();
+  // Les listes déroulantes portent des libellés traduits : sans ce
+  // remplissage, tri et filtres resteraient dans la langue précédente.
+  remplirSelect($('sortsCible'), [
+    ['monstre', t('sorts.cible.monstre')],
+    ['brut', t('sorts.cible.brut')],
+    ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'monstre');
   // Les listes distantes aussi : elles contiennent des libellés traduits
   // (« Charger », « Copier chez moi ») que seul un redessin met à jour.
   if (comptesDispo()) {
     dessinerAmis();
+    remplirSelect($('galTri'), [
+      ['recent', t('gal.tri.recent')], ['ancien', t('gal.tri.ancien')],
+      ['nom', t('gal.tri.nom')], ['auteur', t('gal.tri.auteur')]], galEtat.tri);
+    for (const [el, val] of [[$('galClasse'), galEtat.classe],
+                             [$('guClasse'), guEtat.classe],
+                             [$('guideClasse'), ($('guideClasse') || {}).value]]) {
+      if (!el) continue;
+      const vide = el.id === 'guideClasse' ? t('guide.sansClasse') : t('gal.toutesClasses');
+      remplirSelect(el, [['', vide]].concat(
+        Object.entries(D.classes).map(([k, v]) => [k, v])), val || '');
+    }
     if (_galerieChargee) chargerGalerie();
+    if (_guidesCharges) { chargerGuides(); chargerMesGuides(); }
   }
   if (dernier) afficher(dernier, Number($('classe').value));
 };
@@ -1857,6 +2404,19 @@ function demarrer(donnees) {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
   };
   $('calculer').onclick = calculer;
+
+  // LA FICHE. Changer de cible ou de filtre d'arme ne touche que
+  // l'affichage : on redessine sans relancer le moteur de build.
+  remplirSelect($('sortsCible'), [
+    ['monstre', t('sorts.cible.monstre')],
+    ['brut', t('sorts.cible.brut')],
+    ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'monstre');
+  const redessinerFiche = () => {
+    if (dernier) dessinerFiche(dernier, Number($('classe').value));
+  };
+  $('sortsCible').onchange = redessinerFiche;
+  $('sortsArme').onchange = redessinerFiche;
+
   poserAideVin();
   $('vin').onchange = () => {
     document.querySelectorAll('#listeAffixes .affixe').forEach(majEtatVin);
@@ -1896,7 +2456,47 @@ function demarrer(donnees) {
     dessinerAmis();
     $('amiAjouter').onclick = ajouterAmi;
     $('amiPseudo').onkeydown = (ev) => { if (ev.key === 'Enter') ajouterAmi(); };
-    $('galRafraichir').onclick = chargerGalerie;
+    // LA GALERIE. Chaque filtre relance la requête en repartant page 1 :
+    // rester page 4 d'un filtre qui n'a plus que deux pages afficherait un
+    // vide qu'on prendrait pour une panne.
+    $('galRafraichir').onclick = () => chargerGalerie(0);
+    remplirSelect($('galTri'), [
+      ['recent', t('gal.tri.recent')], ['ancien', t('gal.tri.ancien')],
+      ['nom', t('gal.tri.nom')], ['auteur', t('gal.tri.auteur')]], galEtat.tri);
+    remplirSelect($('galClasse'),
+      [['', t('gal.toutesClasses')]].concat(
+        Object.entries(D.classes).map(([k, v]) => [k, v])), galEtat.classe);
+    $('galTri').onchange = () => { galEtat.tri = $('galTri').value; chargerGalerie(0); };
+    $('galClasse').onchange = () => { galEtat.classe = $('galClasse').value; chargerGalerie(0); };
+    let minuteur = null;
+    $('galRecherche').oninput = () => {
+      // On attend que la frappe se calme : une requête par lettre saturerait
+      // la base pour des résultats que personne n'a le temps de lire.
+      clearTimeout(minuteur);
+      minuteur = setTimeout(() => {
+        galEtat.recherche = $('galRecherche').value.trim();
+        chargerGalerie(0);
+      }, 320);
+    };
+
+    // LES GUIDES.
+    remplirSelect($('guClasse'),
+      [['', t('gal.toutesClasses')]].concat(
+        Object.entries(D.classes).map(([k, v]) => [k, v])), guEtat.classe);
+    remplirSelect($('guideClasse'),
+      [['', t('guide.sansClasse')]].concat(
+        Object.entries(D.classes).map(([k, v]) => [k, v])), '');
+    $('guRafraichir').onclick = () => chargerGuides(0);
+    $('guClasse').onchange = () => { guEtat.classe = $('guClasse').value; chargerGuides(0); };
+    let minuteurG = null;
+    $('guRecherche').oninput = () => {
+      clearTimeout(minuteurG);
+      minuteurG = setTimeout(() => {
+        guEtat.recherche = $('guRecherche').value.trim();
+        chargerGuides(0);
+      }, 320);
+    };
+    $('guideEnregistrer').onclick = enregistrerGuide;
 
     // Le pseudo engendre le code ami à sa première écriture, puis ne le
     // change plus : sinon les amis à qui on l'a donné le perdraient.
