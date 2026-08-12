@@ -507,12 +507,23 @@ table.cmp .ec.nul{color:var(--terne)}
   border-color:var(--accent-sombre);color:var(--accent-clair)}
 .lm.toutBaisser:hover{background:var(--accent-sombre);color:var(--texte)}
 
-/* La liste d'affixes de la colonne large : meme grille que le plein ecran.
-   285 px ne fixe pas la largeur des tuiles, seulement le NOMBRE de
-   colonnes ; `1fr` les etire ensuite sur toute la place disponible. */
-#listeAffixes{display:grid;gap:7px;
-  grid-template-columns:repeat(auto-fill,minmax(255px,1fr));
-  align-content:start}
+/* LA LISTE DE GAUCHE : la meme tuile, en version resserree.
+   La colonne est etroite, donc une seule tuile par ligne et un defilement
+   interne. Ce qui la rend plus lisible qu'avant tient a la tuile elle-meme
+   -- le nom sur sa propre ligne, des boutons de niveau larges au lieu
+   d'une liste deroulante, et le point du palier -- pas a la place prise :
+   on en voit toujours autant a l'ecran. Le bouton ⛶ reste la pour tout
+   voir d'un coup. */
+#listeAffixes{display:grid;gap:5px;grid-template-columns:1fr;
+  align-content:start;max-height:52vh;overflow-y:auto;padding-right:3px}
+#listeAffixes .gAff{padding:5px 8px 6px;gap:4px}
+#listeAffixes .gTete .txt{font-size:12.5px}
+#listeAffixes .gNiv button{padding:4px 0;font-size:11px}
+#listeAffixes .gPref{width:20px;min-width:20px;font-size:12px}
+#listeAffixes .vin{width:52px}
+/* Le defilement interne ne doit pas coller les tuiles au bord. */
+#listeAffixes::-webkit-scrollbar{width:8px}
+#listeAffixes::-webkit-scrollbar-thumb{background:var(--releve);border-radius:4px}
 
 /* ---------------------------------------------------------------- guides -- */
 .guide{border:1px solid var(--bord);border-radius:3px;margin-bottom:8px;
@@ -666,17 +677,6 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 /* Plus de hauteur bridee ni de defilement interne : la liste est passee
    dans la colonne large, ou elle tient en entier. */
 #budgetVin{margin-top:9px;font-size:12px}
-.affixe{display:flex;align-items:center;gap:9px;padding:5px 8px;
-  border-bottom:1px solid #10151800;transition:background .1s}
-.affixe:hover{background:#12181b}
-.affixe.actif{background:#15100c;box-shadow:inset 2px 0 0 var(--accent)}
-.affixe .nom{flex:1;min-width:0;font-size:13.5px;color:var(--texte2)}
-.affixe.actif .nom{color:var(--texte)}
-.affixe .nom small{display:block;color:var(--terne);font-size:11px;line-height:1.3}
-.affixe select{flex:0 0 auto;padding:2px 3px;font-size:12.5px}
-.affixe select.niveau{width:56px}
-.affixe select.vin{width:64px;color:var(--doux)}
-.affixe select.vin:not([value=""]){color:var(--accent-clair)}
 .pastille{flex:0 0 auto;width:18px;height:18px;display:grid;place-items:center}
 .pastille svg{width:15px;height:15px;display:block}
 .c-offense{color:var(--off)}.c-defense{color:var(--def)}
@@ -756,11 +756,6 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .altItem.actuel:hover{background:#1d1208}
 
 /* ----------------------------------------------------------- préférences -- */
-.affixe .pref{flex:0 0 auto;width:26px;padding:2px 0;font-size:13px;
-  line-height:1;background:none;border:1px solid transparent;color:var(--terne)}
-.affixe .pref:hover{border-color:var(--bord-fort);background:var(--releve)}
-.affixe .pref[data-etat="bonus"]{color:var(--accent);border-color:var(--accent-sombre)}
-.affixe .pref[data-etat="non"]{color:var(--ko);border-color:#4a2c2c}
 .entetes span:nth-child(4){width:26px;text-align:center}
 .separateur{margin:14px 0 9px;color:var(--terne);
   font:800 10px/1 var(--condense);letter-spacing:1.7px;text-transform:uppercase;
@@ -937,6 +932,28 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
+    <details class="carte pliable" id="carteAffixes" open>
+      <summary><span data-i18n="affixes.titre">Affixes visés</span>
+        <span class="compte" id="compteCibles"></span></summary>
+      <div class="corps">
+        <div class="rangee">
+          <input type="text" id="recherche" data-i18n-ph="affixes.filtrer"
+                 placeholder="filtrer la liste…" style="flex:1">
+          <div class="chipsPref" id="triPref"></div>
+          <button id="ouvrirGrille" class="loupe" style="flex:0 0 auto"
+                  data-i18n-title="grille.ouvrir"
+                  title="Tout voir d'un coup">⛶</button>
+        </div>
+        <!-- Plus d'en-tetes de colonnes : les tuiles ne sont plus un tableau,
+             chaque reglage porte son sens sur place. -->
+        <div id="listeAffixes"></div>
+        <div id="budgetVin" class="pas"></div>
+        <div class="rangee" style="margin-top:9px">
+          <button id="vider" data-i18n="affixes.vider">Tout vider</button>
+        </div>
+      </div>
+    </details>
+
 
     <button class="primaire" id="calculer" data-i18n="calculer">Calculer le build</button>
     <div id="etat"></div>
@@ -1037,17 +1054,6 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
          propositions occupent la moitié d'un écran alors qu'on ne les
          consulte qu'à l'occasion. Le bandeau bat doucement tant qu'on ne
          l'a pas ouvert, pour qu'on sache qu'il y a quelque chose dedans. -->
-    <details class="carte pliable" id="blocSuggestions" hidden>
-      <summary><span data-i18n="sugg.titre">Suggestions</span>
-        <span class="compte" id="compteSugg"></span></summary>
-      <div class="corps">
-        <div id="listeSuggestions"></div>
-        <div class="pas" style="margin-top:9px;font-size:12px">
-          <span data-i18n="sugg.aide">Des échanges d'une seule pièce qui font gagner quelque chose sans faire perdre de cible. Rien n'est appliqué tant que tu ne cliques pas.</span>
-        </div>
-      </div>
-    </details>
-
     <!-- Repliée par défaut : huit emplacements × plusieurs pièces occupent
          un écran entier, alors qu'on ne les consulte qu'à l'occasion. -->
     <details class="carte pliable" id="blocAlternatives" hidden>
@@ -1082,34 +1088,22 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <summary><span data-i18n="marge.titre">Encore disponible</span>
         <span class="compte" id="compteMarge"></span></summary>
       <div class="corps">
-        <div class="pas" style="font-size:12px;margin-bottom:8px"
-             data-i18n="marge.aide">Ce que les emplacements de gemme libres
-          permettent encore, chaque ligne prise seule.</div>
+        <!-- UNE SEULE CARTE POUR « QU'EST-CE QUE JE PEUX ENCORE BOUGER ? ».
+             Monter, descendre, echanger : trois sens de la meme question.
+             Les separer faisait dire a l'une le contraire de l'autre. -->
+        <div id="margeMot" class="pas" style="font-size:12px;margin-bottom:8px"></div>
         <div id="listeMarge"></div>
+        <div id="blocEchanges" hidden>
+          <div class="separateur" data-i18n="marge.echanges">Échanger une pièce</div>
+          <div class="pas" style="font-size:12px;margin-bottom:8px"
+               data-i18n="marge.echangesAide">Des échanges d'une seule pièce, au
+            même cran de rareté, qui font gagner un affixe que tu vises sans en
+            faire perdre. Rien n'est appliqué tant que tu ne cliques pas.</div>
+          <div id="listeSuggestions"></div>
+        </div>
       </div>
     </details>
 
-    <details class="carte pliable" id="carteAffixes" open>
-      <summary><span data-i18n="affixes.titre">Affixes visés</span>
-        <span class="compte" id="compteCibles"></span></summary>
-      <div class="corps">
-        <div class="rangee">
-          <input type="text" id="recherche" data-i18n-ph="affixes.filtrer"
-                 placeholder="filtrer la liste…" style="flex:1">
-          <div class="chipsPref" id="triPref"></div>
-          <button id="ouvrirGrille" class="loupe" style="flex:0 0 auto"
-                  data-i18n-title="grille.ouvrir"
-                  title="Tout voir d'un coup">⛶</button>
-        </div>
-        <!-- Plus d'en-tetes de colonnes : les tuiles ne sont plus un tableau,
-             chaque reglage porte son sens sur place. -->
-        <div id="listeAffixes"></div>
-        <div id="budgetVin" class="pas"></div>
-        <div class="rangee" style="margin-top:9px">
-          <button id="vider" data-i18n="affixes.vider">Tout vider</button>
-        </div>
-      </div>
-    </details>
   </div>
 
 </main>
@@ -1296,15 +1290,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=65"></script>
-<script src="config.js?v=65"></script>
-<script src="comptes.js?v=65"></script>
-<script src="donnees.js?v=65"></script>
-<script src="skills.js?v=65"></script>
-<script src="talents.js?v=65"></script>
-<script src="builds_reference.js?v=65"></script>
-<script src="guides_classes.js?v=65"></script>
-<script src="fiche.js?v=65"></script>
-<script src="app.js?v=65"></script>
+<script src="i18n.js?v=68"></script>
+<script src="config.js?v=68"></script>
+<script src="comptes.js?v=68"></script>
+<script src="donnees.js?v=68"></script>
+<script src="skills.js?v=68"></script>
+<script src="talents.js?v=68"></script>
+<script src="builds_reference.js?v=68"></script>
+<script src="guides_classes.js?v=68"></script>
+<script src="fiche.js?v=68"></script>
+<script src="app.js?v=68"></script>
 </body>
 </html>

@@ -853,6 +853,18 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
       // Un affixe marqué « ne me le propose pas » disqualifie l'échange :
       // c'est une consigne, pas une pondération.
       if (gains.some(([n]) => prefs.get(n) === 'non')) continue;
+      /* UN ÉCHANGE DOIT SERVIR CE QU'ON A DEMANDÉ.
+       *
+       * Un affixe non demandé pesait quand même 1, si bien qu'un échange
+       * dont le SEUL gain était un affixe dont on n'a jamais parlé
+       * remontait comme proposition — « change tes bottes pour gagner
+       * Sky Piercer », alors que rien ne demandait Sky Piercer. La carte
+       * l'annonçait elle-même (« non demandé ») et le proposait pourtant.
+       *
+       * Changer une pièce n'est pas gratuit : ça se mérite par un affixe
+       * VISÉ, ou marqué ★ comme bonus souhaité. Le reste passe en simple
+       * mention à côté du gain, sans jamais déclencher la proposition. */
+      if (!gains.some(([n]) => want[n] || prefs.get(n) === 'bonus')) continue;
       // Un affixe visé pèse le plus, un bonus explicitement souhaité vient
       // juste après, le reste ne compte que pour mémoire.
       const poids = (n) => (want[n] ? 3 : (prefs.get(n) === 'bonus' ? 2 : 1));
@@ -1139,10 +1151,28 @@ function dessinerAffixes() {
     dessinerAffixes();
     if ($('grilleAffixes') && !$('grilleAffixes').hidden) dessinerGrilleAffixes();
   });
-  // Un filtre qui ne laisse rien passer doit se dire, sinon la grille vide
-  // ressemble à une panne.
+  /* UNE GRILLE VIDE DOIT S'EXPLIQUER ET SE DÉFAIRE.
+   *
+   * Elle ressemble sinon a une panne — et ça n'a rien de theorique : au
+   * rechargement, un navigateur peut restaurer tout seul le contenu d'un
+   * champ, y compris un texte colle la par erreur. Les 44 affixes
+   * disparaissaient alors sans que rien ne dise pourquoi, sur un message
+   * qui parlait en plus de builds et pas d'affixes.
+   *
+   * On nomme donc le filtre en cause et on donne le bouton qui le leve. */
   if (!conteneur.children.length) {
-    conteneur.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
+    const quoi = filtre ? t('affixes.aucunTexte', { filtre })
+                        : t('affixes.aucunTri');
+    conteneur.className = '';
+    conteneur.innerHTML = `<div class="vide-filtre">${echapper(quoi)}
+      <button id="leverFiltres">${t('affixes.leverFiltres')}</button></div>`;
+    $('leverFiltres').onclick = () => {
+      $('recherche').value = '';
+      filtrePref = '';
+      dessinerAffixes();
+    };
+  } else {
+    conteneur.className = '';
   }
   const c = $('compteCibles');
   if (c) c.textContent = cibles.size ? t('grille.compte', { n: cibles.size }) : '';
@@ -1544,74 +1574,95 @@ function activerCopie(oui) {
 
 /* La marge à l'écran. Cliquer une ligne pose l'affixe comme cible au niveau
    annoncé : c'est le geste qu'on allait faire à la main juste après. */
+/* ======================================================================
+   MARGE DE MANŒUVRE — une seule carte, trois sens
+
+   « Qu'est-ce que je peux encore bouger ? » se pose de trois façons, et
+   les répartir sur deux cartes les faisait se contredire à l'écran : les
+   Suggestions proposaient d'échanger des bottes pour un Sky Piercer que
+   personne n'avait demandé, pendant que « Encore disponible », qui ne
+   regarde que les emplacements libres, n'en parlait pas.
+
+   DESCENDRE — les cibles ne passent pas : jusqu'où redescendre. Aucun
+   recalcul, aucune estimation : le moteur a déjà produit le meilleur stuff
+   pour la consigne, donc ramener chaque cible manquée au niveau qu'il
+   atteint déjà rend l'ensemble réalisable avec ces pièces exactement.
+
+   MONTER — ce que les emplacements de gemme encore libres permettent, sans
+   toucher à une seule pièce. C'est toujours le geste le moins cher.
+
+   ÉCHANGER — remplacer une pièce par une autre du même cran. Ça ne se
+   propose que si le gain sert un affixe visé ou marqué ★ : changer une
+   pièce se mérite.
+   ====================================================================== */
+let _nbEchanges = 0;
+let _nbMarge = 0;
+let _nbBaisse = 0;
+
+function majCompteMarge() {
+  const c = $('compteMarge');
+  if (!c) return;
+  if (_nbBaisse) { c.textContent = t('marge.compteBas', { n: _nbBaisse }); return; }
+  const n = _nbMarge + _nbEchanges;
+  c.textContent = n ? t('marge.compteHaut', { n }) : '';
+}
+
 function dessinerMarge(res) {
   const carte = $('carteMarge');
   const boite = $('listeMarge');
+  const mot = $('margeMot');
   if (!carte || !boite) return;
   carte.hidden = false;
-  const cpt = $('compteMarge');
 
-  /* DEUX SENS, UNE SEULE CARTE.
-   *
-   * Quand les cibles passent, elle repond a « jusqu'ou puis-je encore
-   * monter ? ». Quand elles ne passent pas, la question devient l'inverse :
-   * « de combien dois-je descendre pour que ca rentre ? » -- et c'est la
-   * qu'on en a le plus besoin.
-   *
-   * La reponse a ce second cas ne demande AUCUN recalcul et n'est pas une
-   * estimation : le moteur a deja produit le meilleur stuff possible pour
-   * la consigne. Ramener chaque cible manquee au niveau que ce stuff
-   * atteint DEJA rend l'ensemble realisable, avec ces pieces exactement.
-   * C'est une garantie, pas une suggestion optimiste. */
+  const atteint = (nom) => Math.min(plafond(nom), (res.couvert[nom] || 0)
+    + ((res.vinPoints && res.vinPoints.get(nom)) || 0));
   const bas = [...cibles.entries()]
-    .map(([nom, vise]) => {
-      const atteint = Math.min(plafond(nom), (res.couvert[nom] || 0)
-        + ((res.vinPoints && res.vinPoints.get(nom)) || 0));
-      return { nom, vise, atteint };
-    })
-    .filter((x) => x.atteint < x.vise)
-    .sort((a, b) => (b.vise - b.atteint) - (a.vise - a.atteint));
+    .map(([nom, vise]) => ({ nom, vise, a: atteint(nom) }))
+    .filter((x) => x.a < x.vise)
+    .sort((x, y) => (y.vise - y.a) - (x.vise - x.a));
+
+  _nbBaisse = bas.length;
+  boite.className = 'grilleMarge';
+  boite.innerHTML = '';
 
   if (bas.length) {
-    boite.className = 'grilleMarge';
-    boite.innerHTML = `<div class="margeMot ko">${t('marge.trop', { n: bas.length })}</div>`;
-    if (cpt) cpt.textContent = t('marge.compteBas', { n: bas.length });
+    // Tant que ça ne passe pas, monter ou échanger n'a aucun sens : la
+    // seule question est de combien redescendre.
+    if (mot) { mot.className = 'ko'; mot.style.fontSize = '12.5px';
+               mot.textContent = t('marge.trop', { n: bas.length }); }
     for (const x of bas) {
-      const b2 = document.createElement('button');
-      b2.className = 'lm baisse';
-      b2.title = t('marge.poser', { nom: x.nom, n: x.atteint });
-      b2.innerHTML = `${pastille((D.affixes[x.nom] || {}).cat)}
+      const b = document.createElement('button');
+      b.className = 'lm baisse';
+      b.title = t('marge.poser', { nom: x.nom, n: x.a });
+      b.innerHTML = `${pastille((D.affixes[x.nom] || {}).cat)}
         <span class="nomA">${x.nom}</span>
-        <span class="fleche">${x.vise} → <span class="cible">${x.atteint}</span></span>`;
-      b2.onclick = () => {
-        if (x.atteint > 0) cibles.set(x.nom, x.atteint); else cibles.delete(x.nom);
+        <span class="fleche">${x.vise} → <span class="cible">${x.a}</span></span>`;
+      b.onclick = () => {
+        if (x.a > 0) cibles.set(x.nom, x.a); else cibles.delete(x.nom);
         dessinerAffixes(); majBudgetVin(); calculer();
       };
-      boite.appendChild(b2);
+      boite.appendChild(b);
     }
-    // Tout descendre d'un coup : c'est le geste qu'on allait faire ligne
-    // par ligne, et le resultat est garanti realisable.
     const tout = document.createElement('button');
     tout.className = 'lm toutBaisser';
     tout.textContent = t('marge.toutBaisser');
     tout.onclick = () => {
       for (const x of bas) {
-        if (x.atteint > 0) cibles.set(x.nom, x.atteint); else cibles.delete(x.nom);
+        if (x.a > 0) cibles.set(x.nom, x.a); else cibles.delete(x.nom);
       }
       dessinerAffixes(); majBudgetVin(); calculer();
     };
     boite.appendChild(tout);
+    _nbMarge = 0;
+    majCompteMarge();
     return;
   }
 
   const liste = marge(res, res.vinPoints || new Map());
-  if (cpt) cpt.textContent = liste.length ? t('marge.compteHaut', { n: liste.length }) : '';
-  boite.className = 'grilleMarge';
-  boite.innerHTML = '';
-  if (!liste.length) {
-    boite.className = '';
-    boite.innerHTML = `<span class="pas">${t('marge.rien')}</span>`;
-    return;
+  _nbMarge = liste.length;
+  if (mot) {
+    mot.className = 'pas'; mot.style.fontSize = '12px';
+    mot.textContent = liste.length ? t('marge.aideCourt') : t('marge.rien');
   }
   // Une dizaine suffit : au-delà, la liste devient un annuaire et personne
   // ne la lit. Les plus gros gains sont en tête.
@@ -1633,6 +1684,7 @@ function dessinerMarge(res) {
     };
     boite.appendChild(b);
   }
+  majCompteMarge();
 }
 
 /* ------------------------------------------------------------ mes builds --
@@ -2357,9 +2409,13 @@ function lirePermalien() {
    n'est appliqué tant qu'on ne clique pas. Une carte vide disparaît plutôt
    que d'afficher « aucune suggestion » à longueur de build. */
 function dessinerSuggestions(res, classe) {
-  const carte = $('blocSuggestions');
+  // Les echanges vivent maintenant DANS la carte « Marge de manoeuvre » :
+  // c'est la meme question que « jusqu'ou puis-je monter ? », posee sur les
+  // pieces au lieu des emplacements libres. Deux cartes separees en
+  // arrivaient a se contredire a l'ecran.
+  const carte = $('blocEchanges');
   const boite = $('listeSuggestions');
-  if (!carte || !res || !res.slotItems) return;
+  if (!carte || !boite || !res || !res.slotItems) return;
   let liste = [];
   try {
     const pl = {};
@@ -2376,15 +2432,11 @@ function dessinerSuggestions(res, classe) {
     liste = [];
   }
   carte.hidden = !liste.length;
-  // LE BANDEAU RESTE REPLIÉ, ET IL BAT. Six propositions prennent la moitié
-  // d'un écran alors qu'on ne les consulte qu'à l'occasion ; mais repliées
-  // en silence, personne ne saurait qu'elles existent. Le compte les
-  // annonce, le battement attire l'œil une fois, et l'ouverture l'éteint —
-  // signaler deux fois la même chose devient du harcèlement.
-  const compte = $('compteSugg');
-  if (compte) compte.textContent = liste.length ? `${liste.length}` : '';
-  if (liste.length && !carte.open) carte.dataset.neuf = '1';
-  if (!liste.length) { delete carte.dataset.neuf; return; }
+  // Le nombre d'echanges remonte au sommaire de la carte, qui totalise les
+  // trois sens : replie, on sait deja s'il y a quelque chose a regarder.
+  _nbEchanges = liste.length;
+  majCompteMarge();
+  if (!liste.length) return;
   boite.innerHTML = '';
   liste.forEach((e) => {
     const couleurA = D.couleurs[String(e.avant.g)] || '#9fb0c4';
@@ -3780,6 +3832,10 @@ function demarrer(donnees) {
   majBudgetVin();
 
   brancherPlis();
+  // Le navigateur restaure parfois seul la valeur d'un champ au
+  // rechargement. Sur le filtre des affixes, ça vide la grille sans
+  // explication : on repart toujours d'un filtre neutre.
+  if ($('recherche')) $('recherche').value = '';
   $('classe').onchange = () => { libererVerrous(); majArmes(); };
   if ($('arme')) $('arme').addEventListener('change', () => libererVerrous());
   $('recherche').oninput = dessinerAffixes;
