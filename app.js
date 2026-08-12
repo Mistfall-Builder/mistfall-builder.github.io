@@ -547,12 +547,13 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
  * On essaie donc, pour chaque emplacement, les autres pièces disponibles, et
  * on garde celles qui font gagner quelque chose sans faire perdre de cible.
  *
- * À rareté figée on ne propose JAMAIS plus rare : « Épique » est une
- * consigne, pas une suggestion. En panaché, un cran est autorisé — les
- * raretés y sont déjà mêlées — et son coût est affiché.
+ * ON NE TOUCHE JAMAIS À LA RARETÉ, dans aucun mode. Le bouton « panacher »
+ * et les planchers par emplacement sont faits pour ça : c'est l'utilisateur
+ * qui décide quelle pièce monte. Une suggestion ne compare que des pièces du
+ * MÊME cran, qui diffèrent par leur inné ou leurs emplacements.
  *
  * Rien n'est appliqué automatiquement : chaque suggestion est un bouton. */
-function suggestions(res, classe, arme, cibleListe, planchers, vinPoints, mixte) {
+function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
   const want = Object.fromEntries(cibleListe);
   const items = { ...res.slotItems };
   // La référence est mesurée COMME les essais (pose gloutonne). Comparer une
@@ -567,10 +568,13 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints, mixte)
     const actuel = items[slot];
     if (!actuel) continue;
     const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
-    const plafondAlt = actuel.g + (mixte ? 1 : 0);
+    // LA RARETÉ NE SE TOUCHE JAMAIS. Le bouton « panacher » et les planchers
+    // par emplacement existent pour ça : c'est l'utilisateur qui décide
+    // quelle pièce monte. Une suggestion ne propose qu'une AUTRE pièce du
+    // MÊME cran, pour son inné ou ses emplacements.
     let meilleur = null;
     for (const alt of opts) {
-      if (alt === actuel || alt.g > plafondAlt) continue;
+      if (alt === actuel || alt.g !== actuel.g) continue;
       const essai = { ...items, [slot]: alt };
       const cov = assembler(essai, want, false).couvert;
       if (!tient(cov)) continue;
@@ -587,9 +591,16 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints, mixte)
       for (const [n, a, b] of gains) valeur += (b - a) * (want[n] ? 3 : 1);
       for (const [n, a, b] of pertes) valeur -= (a - b) * (want[n] ? 3 : 1);
       valeur += paliers.length * 5;
-      valeur -= (alt.g - actuel.g) * 2;
+      // D'OÙ VIENT LE GAIN. « Sky Piercer +1 » ne dit rien : est-ce l'inné de
+      // la pièce, ou une gemme qu'un emplacement libéré a permis de poser ?
+      // La réponse change la décision, donc elle s'affiche.
+      const origine = {};
+      for (const [n] of gains) {
+        origine[n] = (alt.i === n && actuel.i !== n) ? 'inne' : 'gemme';
+      }
       const e = { slot, avant: actuel, apres: alt, gains, pertes, paliers,
-                  valeur, cran: alt.g - actuel.g };
+                  valeur, origine,
+                  demande: Object.fromEntries(gains.map(([n]) => [n, !!want[n]])) };
       if (!meilleur || e.valeur > meilleur.valeur) meilleur = e;
     }
     if (meilleur) sortie.push(meilleur);
@@ -601,32 +612,6 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints, mixte)
    plus cher. Un même objectif s'atteint de plusieurs façons : beaucoup de
    pièces moyennes, ou peu de pièces très rares — et ce n'est pas forcément
    celle que l'outil choisit qu'on a sous la main. */
-function variantes(classe, arme, cibleListe, vin, planchers, vinChoisi) {
-  const vues = new Map();
-  for (let plancher = 1; plancher <= 6; plancher += 1) {
-    for (const mx of [true, false]) {
-      let r;
-      try {
-        r = construire(classe, arme, cibleListe, plancher, vin, mx,
-                       planchers, vinChoisi);
-      } catch (e) { continue; }
-      if (!r.suffisant) continue;
-      const sig = Object.values(r.slotItems)
-        .filter(Boolean).map((it) => it.g).sort().join(',');
-      if (vues.has(sig)) continue;
-      const par = {};
-      for (const it of Object.values(r.slotItems)) {
-        if (it) par[it.g] = (par[it.g] || 0) + 1;
-      }
-      r.libelle = Object.entries(par).sort((a, b) => b[0] - a[0])
-        .map(([g, n]) => `${n} ${D.raretes[g]}`).join(' + ');
-      r.cout = sommeRaretes(r.slotItems);
-      vues.set(sig, r);
-    }
-  }
-  return [...vues.values()].sort((a, b) => a.cout - b.cout);
-}
-
 /* Combien de points de vin chaque affixe reçoit. Mêmes règles que l'outil de
    bureau : au plus D.vin.max affixes, D.vin.bonus points chacun, et
    D.vin.max × D.vin.bonus au total. Une consigne qui déborde est rognée —
@@ -754,9 +739,8 @@ function majEtatVin(ligne) {
   // l'affixe n'est plus visé donnerait un réglage qui ne compte pas.
   if (!vise) vin.value = '';
   vin.title = vise
-    ? `Points de Victory Wine sur cet affixe (au plus ${D.vin.max} affixes, `
-      + `${D.vin.bonus} points chacun).`
-    : "Choisis d'abord un niveau visé pour cet affixe.";
+    ? t('affixes.vinTitre', { max: D.vin.max, bonus: D.vin.bonus })
+    : t('affixes.vinSansCible');
 }
 
 /* Dit en clair où en est le budget de vin, faute de quoi une consigne rognée
@@ -772,9 +756,9 @@ function majBudgetVin() {
   const trop = !auto && (demande > budget || vinManuel.size > D.vin.max);
   el.className = trop ? 'ko' : 'pas';
   el.textContent = auto
-    ? `Vin réparti automatiquement (${total}/${budget} points).`
-    : `Vin : ${total}/${budget} points sur ${retenu.size}/${D.vin.max} affixes`
-      + (trop ? ' — la consigne dépasse les règles du jeu, elle a été rognée.' : '.');
+    ? t('vin.auto', { total, budget })
+    : t(trop ? 'vin.trop' : 'vin.manuel',
+        { total, budget, n: retenu.size, max: D.vin.max });
 }
 
 function dessinerAffixes() {
@@ -789,13 +773,13 @@ function dessinerAffixes() {
     ligne.className = 'affixe' + (cibles.has(nom) ? ' actif' : '');
     const sansGemme = !info.mat.length;
     ligne.innerHTML = pastille(info.cat) + `<span class="nom">${nom}
-      <small>max ${info.cap}${sansGemme ? ' · vin seulement' : ''}</small></span>`;
+      <small>${t('affixes.max')} ${info.cap}${sansGemme ? ' · ' + t('affixes.vinSeul') : ''}</small></span>`;
     ligne.title = (info.desc || '') + (info.eff ? '\n\n' + info.eff
       .map((e, i) => `${i + 1}. ${e}`).join('\n') : '');
 
     const sel = document.createElement('select');
     sel.className = 'niveau';
-    sel.title = 'Niveau visé';
+    sel.title = t('affixes.niveauVise');
     sel.innerHTML = '<option value="">—</option>' +
       Array.from({ length: info.cap }, (_, i) => `<option>${i + 1}</option>`).join('');
     sel.value = cibles.has(nom) ? String(cibles.get(nom)) : '';
@@ -821,7 +805,7 @@ function dessinerAffixes() {
     vin.className = 'vin';
     vin.title = `Points de Victory Wine sur cet affixe (au plus ${D.vin.max} `
       + `affixes, ${D.vin.bonus} points chacun).`;
-    vin.innerHTML = '<option value="">auto</option>'
+    vin.innerHTML = `<option value="">${t('affixes.auto')}</option>`
       + Array.from({ length: D.vin.bonus + 1 },
                    (_, i) => `<option value="${i}">${i ? '+' + i : '—'}</option>`).join('');
     vin.value = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
@@ -857,7 +841,7 @@ function afficher(res, classe) {
       .map((s) => `<div class="socket">
         ${s.gem && s.gem.ic ? `<img src="icones/${s.gem.ic}" alt="" loading="lazy">`
                             : '<span class="creux"></span>'}
-        <span>${s.gem ? `<b>${s.gem.n}</b>` : '<span class="pas">vide</span>'}
+        <span>${s.gem ? `<b>${s.gem.n}</b>` : `<span class="pas">${t('equip.vide')}</span>`}
           <span class="mat">${materiau(s.type, s.level)} ${s.level === 2 ? 'II' : 'I'}</span></span>
       </div>`).join('');
     carte.style.setProperty('--tinte', couleur);
@@ -866,7 +850,7 @@ function afficher(res, classe) {
     carte.innerHTML = `<div class="slot">${D.nomsSlots[slot] || slot}</div>
       ${vignette(it.ic, couleur)}
       <div class="nom" style="color:${couleur}">${it.n}</div>
-      <div class="inne${it.i ? '' : ' sans'}">${it.i ? 'inné : ' + it.i : 'aucun inné'}</div>
+      <div class="inne${it.i ? '' : ' sans'}">${it.i ? t('equip.inne') + ' ' + it.i : t('equip.aucunInne')}</div>
       ${gems}`;
     pd.appendChild(carte);
   }
@@ -887,11 +871,15 @@ function afficher(res, classe) {
     .sort((a, b) => b[1] - a[1])
     .map(([n, v]) => `${n} ${v}`).join(' · ');
   $('tableauAffixes').innerHTML = lignes
-    ? `<table><tr><th>Affixe</th><th>Visé</th><th>Équip.</th><th>Vin</th><th>Total</th></tr>${lignes}</table>`
-      + (bonus ? `<div style="margin-top:6px" class="pas">En prime, non demandés : ${bonus}</div>` : '')
-    : '<span class="pas">Aucun affixe visé.</span>';
+    ? `<table><tr><th>${t('table.affixe')}</th><th>${t('table.vise')}</th>`
+      + `<th>${t('table.equip')}</th><th>${t('table.vin')}</th>`
+      + `<th>${t('table.total')}</th></tr>${lignes}</table>`
+      + (bonus ? `<div style="margin-top:6px" class="pas">${t('table.prime')} ${bonus}</div>` : '')
+    : `<span class="pas">${t('table.aucun')}</span>`;
 
-  dessinerSuggestions(res, classe);
+  // En différé : chercher les suggestions coûte presque autant qu'un build,
+  // et le faire ici retarderait l'affichage de tout le reste pour rien.
+  setTimeout(() => dessinerSuggestions(res, classe), 0);
 
   const libres = res.sockets.filter((s) => !s.gem).length;
   const compte = {};
@@ -900,9 +888,9 @@ function afficher(res, classe) {
     compte[k] = (compte[k] || 0) + 1;
   }
   $('bilan').textContent = libres
-    ? `${libres} emplacement(s) encore libre(s) : ` +
+    ? `${t('equip.libres', { n: libres })} ` +
       Object.entries(compte).map(([k, n]) => `${n} ${k}`).join(' · ')
-    : 'Tous les emplacements de gemme sont remplis.';
+    : t('equip.pleins');
 
   try {
     const objets = {};
@@ -922,7 +910,7 @@ function afficher(res, classe) {
   } catch (err) {
     $('code').value = '';
     $('copier').disabled = true;
-    $('noteCode').textContent = `Code impossible : ${err.message}`;
+    $('noteCode').textContent = t('code.impossible', { message: err.message });
   }
 }
 
@@ -1122,7 +1110,7 @@ function dessinerBuilds() {
   const liste = biblio();
   const boite = $('listeBuilds');
   if (!liste.length) {
-    boite.innerHTML = '<div class="vide-liste">Aucun build enregistré.</div>';
+    boite.innerHTML = `<div class="vide-liste">${t('builds.vide')}</div>`;
     return;
   }
   boite.innerHTML = '';
@@ -1137,19 +1125,18 @@ function dessinerBuilds() {
     const avecCompte = comptesDispo() && window.Comptes.connecte();
     const fige = !!(b.code || (b.etat && b.etat.k));
     const titre = fige
-      ? 'Charger ce build tel qu\'il a été enregistré'
-      : 'Ce build n\'a pas gardé son stuff : il sera recomposé, '
-        + 'et peut donc différer de ce que tu avais.';
+      ? t('builds.charger')
+      : t('builds.chargerVieux');
     ligne.innerHTML = `<button class="ouvrir" title="${titre}">
         <b>${b.nom}${fige ? '' : ' <i>⚠</i>'}</b>
-        <small>${cl} · ${ra} · ${(b.etat.t || []).length} affixe(s)</small>
+        <small>${cl} · ${ra} · ${t('builds.affixes', { n: (b.etat.t || []).length })}</small>
       </button>
       <label class="pub" title="${avecCompte
-        ? 'Rendre ce build visible par les autres'
-        : 'Connecte-toi pour publier un build'}">
+        ? t('builds.public')
+        : t('builds.publicNon')}">
         <input type="checkbox" ${b.pub ? 'checked' : ''}
                ${avecCompte ? '' : 'disabled'}><span>pub</span></label>
-      <button class="suppr" title="Supprimer">×</button>`;
+      <button class="suppr" title="${t('builds.supprimer')}">×</button>`;
     const casePub = ligne.querySelector('.pub input');
     casePub.onchange = () => {
       const l = biblio();
@@ -1165,7 +1152,7 @@ function dessinerBuilds() {
     };
     ligne.querySelector('.ouvrir').onclick = () => {
       appliquerEtat(b.etat);
-      $('noteBuilds').innerHTML = `<span class="pas">« ${b.nom} » chargé.</span>`;
+      $('noteBuilds').innerHTML = `<span class="pas">${t('builds.chargeOk', { nom: b.nom })}</span>`;
       restituer(b);
     };
     ligne.querySelector('.suppr').onclick = () => {
@@ -1186,12 +1173,12 @@ function enregistrerBuild() {
   const champ = $('nomBuild');
   const nom = (champ.value || '').trim();
   if (!nom) {
-    $('noteBuilds').innerHTML = '<span class="ko">Donne un nom au build.</span>';
+    $('noteBuilds').innerHTML = `<span class="ko">${t('builds.nomRequis')}</span>`;
     champ.focus();
     return;
   }
   if (!cibles.size) {
-    $('noteBuilds').innerHTML = '<span class="ko">Choisis au moins un affixe.</span>';
+    $('noteBuilds').innerHTML = `<span class="ko">${t('builds.affixeRequis')}</span>`;
     return;
   }
   const liste = biblio();
@@ -1206,7 +1193,7 @@ function enregistrerBuild() {
   champ.value = '';
   dessinerBuilds();
   $('noteBuilds').innerHTML =
-    `<span class="pas">« ${nom} » ${deja >= 0 ? 'remplacé' : 'enregistré'}.</span>`;
+    `<span class="pas">${t(deja >= 0 ? 'builds.remplace' : 'builds.enregistre', { nom })}</span>`;
   if (comptesDispo() && window.Comptes.connecte()) {
     window.Comptes.envoyerBuilds([entree]).catch((e) => {
       $('noteBuilds').innerHTML =
@@ -1260,7 +1247,7 @@ function dessinerSuggestions(res, classe) {
     }
     liste = suggestions(res, classe, $('arme').value || null,
                         [...cibles.entries()], pl,
-                        res.vinPoints || new Map(), $('mixte').checked);
+                        res.vinPoints || new Map());
   } catch (e) {
     liste = [];
   }
@@ -1270,17 +1257,23 @@ function dessinerSuggestions(res, classe) {
   liste.forEach((e) => {
     const couleurA = D.couleurs[String(e.avant.g)] || '#9fb0c4';
     const couleurB = D.couleurs[String(e.apres.g)] || '#9fb0c4';
-    const puces = e.gains.map(([n, a, b]) =>
-      `<span class="puceG${e.paliers.includes(n) ? ' palier' : ''}">`
-      + `${n} ${a}→${b}${e.paliers.includes(n) ? ' · palier' : ''}</span>`).join('')
+    const puces = e.gains.map(([n, a, b]) => {
+      const pal = e.paliers.includes(n);
+      const vise = e.demande && e.demande[n];
+      const src = e.origine && e.origine[n] === 'inne'
+        ? t('sugg.inne') : t('sugg.gemme');
+      return `<span class="puceG${pal ? ' palier' : ''}${vise ? '' : ' bonus'}" `
+        + `title="${src}">${n} ${a}→${b}`
+        + `${pal ? ' · ' + t('sugg.palier') : ''}`
+        + `${vise ? '' : ' · ' + t('sugg.nonDemande')}</span>`;
+    }).join('')
       + e.pertes.map(([n, a, b]) =>
         `<span class="puceP">${n} ${a}→${b}</span>`).join('');
     const div = document.createElement('div');
     div.className = 'sugg';
     div.innerHTML = `
       <div class="txt">
-        <div class="ou">${D.nomsSlots[e.slot] || e.slot}${
-          e.cran > 0 ? ' <em>+1 rareté</em>' : ''}</div>
+        <div class="ou">${D.nomsSlots[e.slot] || e.slot}</div>
         <div class="qui"><span style="color:${couleurA}">${e.avant.n}</span>
           → <span style="color:${couleurB}">${e.apres.n}</span></div>
         <div class="pu">${puces}</div>
@@ -1303,7 +1296,7 @@ function dessinerSuggestions(res, classe) {
 }
 
 function calculer() {
-  if (!cibles.size) { $('etat').textContent = 'Choisis au moins un affixe.'; return; }
+  if (!cibles.size) { $('etat').textContent = t('etat.choisir'); return; }
   const classe = Number($('classe').value);
   const arme = $('arme').value || null;
   const grade = $('rarete').value ? Number($('rarete').value) : null;
@@ -1315,7 +1308,7 @@ function calculer() {
       planchers[c.value] = g;
     }
   }
-  $('etat').textContent = 'Calcul…';
+  $('etat').textContent = t('etat.calcul');
   const t0 = performance.now();
   setTimeout(() => {
     try {
@@ -1327,10 +1320,11 @@ function calculer() {
       for (const it of Object.values(res.slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
       const detail = Object.entries(raretes).sort()
         .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
-      const chrono = `${detail} — calculé en ${Math.round(performance.now() - t0)} ms.`;
+      const chrono = t('etat.chrono',
+                       { detail, ms: Math.round(performance.now() - t0) });
       if (res.suffisant) {
         $('etat').innerHTML =
-          `<span class="ok">Toutes les cibles sont atteintes.</span><br>${chrono}`;
+          `<span class="ok">${t('etat.ok')}</span><br>${chrono}`;
         return;
       }
       // ÉCHEC : ne pas s'arrêter à « pas atteignable ». Une rareté figée
@@ -1338,16 +1332,14 @@ function calculer() {
       // d'un build tout-violet à un build qui a besoin de deux pièces
       // dorées. On cherche donc ce qui marcherait, et on le propose.
       $('etat').innerHTML =
-        `<span class="ko">Certaines cibles ne sont pas atteintes.</span><br>${chrono}`
-        + '<br><span class="pas">Recherche d\'un réglage qui passe…</span>';
+        `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
+        + `<br><span class="pas">${t('etat.recherche')}</span>`;
       const issue = chercherUneIssue(classe, arme, grade, mixte, planchers);
       $('etat').innerHTML =
-        `<span class="ko">Certaines cibles ne sont pas atteintes.</span><br>${chrono}`
-        + (issue ? `<br>${issue}` : '<br><span class="pas">Aucun réglage ne les '
-           + 'atteint toutes, même en Légendaire panaché : les cibles sont hors '
-           + 'de portée du jeu, pas du réglage.</span>');
+        `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
+        + (issue ? `<br>${issue}` : `<br><span class="pas">${t('etat.rien')}</span>`);
     } catch (err) {
-      $('etat').innerHTML = `<span class="ko">Erreur : ${err.message}</span>`;
+      $('etat').innerHTML = `<span class="ko">${t('etat.erreur', { message: err.message })}</span>`;
     }
   }, 10);
 }
@@ -1360,14 +1352,14 @@ function chercherUneIssue(classe, arme, grade, mixte, planchers) {
   const vin = $('vin').checked;
   const essais = [];
   if (!mixte) {
-    essais.push({ cle: 'panache', texte: 'en panachant les raretés',
+    essais.push({ cle: 'panache', texte: t('issue.panache'),
                   grade, mixte: true });
   }
   if (grade !== null) {
-    essais.push({ cle: 'auto', texte: 'en rareté « Auto »',
+    essais.push({ cle: 'auto', texte: t('issue.auto'),
                   grade: null, mixte });
     if (!mixte) {
-      essais.push({ cle: 'auto-panache', texte: 'en « Auto » + panaché',
+      essais.push({ cle: 'auto-panache', texte: t('issue.autoPanache'),
                     grade: null, mixte: true });
     }
   }
@@ -1393,20 +1385,20 @@ function chercherUneIssue(classe, arme, grade, mixte, planchers) {
         calculer();
       };
     }, 0);
-    return `<span class="ok">Ça passe ${e.texte}</span> (${detail}). `
+    return `<span class="ok">${t('etat.issue', { comment: e.texte })}</span> (${detail}). `
       + '<button id="appliquerIssue" style="padding:3px 9px;font-size:12px">'
-      + 'Appliquer</button>';
+      + `${t('etat.appliquer')}</button>`;
   }
   return null;
 }
 
 function importer() {
-  const code = prompt("Colle un code « Import Stuff » du jeu :");
+  const code = prompt(t('code.demande'));
   if (!code) return;
   try {
     afficherCode(code.trim());
   } catch (err) {
-    $('etat').innerHTML = `<span class="ko">Code illisible : ${err.message}</span>`;
+    $('etat').innerHTML = `<span class="ko">${t('etat.codeIllisible', { message: err.message })}</span>`;
   }
 }
 
@@ -1473,8 +1465,42 @@ function afficherCode(code) {
    Les données arrivent par une balise <script> et NON par fetch() : ouvert
    depuis le disque (file://), un fetch est refusé par le navigateur et la
    page restait vide — listes d'affixes comprises. */
+/* Le sélecteur de langue. Il est posé avant tout le reste : si le chargement
+   des données échouait, on veut quand même pouvoir changer de langue pour
+   lire le message d'erreur. */
+function poserLangues() {
+  const boite = $('langues');
+  if (!boite || !window.I18N) return;
+  boite.innerHTML = '';
+  for (const l of I18N.langues) {
+    const b = document.createElement('button');
+    b.textContent = I18N.drapeau(l);
+    b.title = I18N.nom(l);
+    b.className = l === I18N.courante() ? 'actif' : '';
+    b.onclick = () => I18N.choisir(l);
+    boite.appendChild(b);
+  }
+}
+
+/* Rejoué à chaque changement de langue : les textes statiques sont repris
+   par I18N.appliquer(), mais tout ce que le script a écrit lui-même (liste
+   d'affixes, tableau, paperdoll, messages) doit être redessiné. */
+window.surChangementDeLangue = function () {
+  poserLangues();
+  if (!D) return;
+  remplirSelect($('rarete'),
+    [['', t('perso.auto')]].concat(
+      [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])),
+    $('rarete').value);
+  dessinerAffixes();
+  majBudgetVin();
+  dessinerBuilds();
+  if (dernier) afficher(dernier, Number($('classe').value));
+};
+
 function demarrer(donnees) {
   D = donnees;
+  if (window.I18N) { I18N.appliquer(); poserLangues(); }
   for (const g of D.gemmes) {
     gemParId.set(g.id, g);
     for (const a of g.a) {
@@ -1517,58 +1543,6 @@ function demarrer(donnees) {
   };
   $('calculer').onclick = calculer;
   $('vin').onchange = majBudgetVin;
-
-  // ------------------------------------------------ mélanges possibles
-  let _variantes = [];
-  $('chercherVariantes').onclick = () => {
-    if (!cibles.size) {
-      $('noteVariantes').innerHTML =
-        '<span class="ko">Choisis d\'abord des affixes.</span>';
-      return;
-    }
-    $('noteVariantes').innerHTML =
-      '<span class="pas">Recherche des mélanges… (quelques secondes)</span>';
-    $('chercherVariantes').disabled = true;
-    // En différé : la recherche bloque le fil d'exécution, et sans ce délai
-    // le message ci-dessus ne s'afficherait jamais.
-    setTimeout(() => {
-      try {
-        const pl = {};
-        if ($('mixte').checked && $('plancherActif').checked) {
-          const gr = Number($('plancherGrade').value);
-          for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
-            pl[c.value] = gr;
-          }
-        }
-        _variantes = variantes(Number($('classe').value), $('arme').value || null,
-                               [...cibles.entries()], $('vin').checked, pl, vinManuel);
-        const sel = $('listeVariantes');
-        sel.disabled = !_variantes.length;
-        sel.innerHTML = _variantes.length
-          ? _variantes.map((v, i) =>
-              `<option value="${i}">${v.libelle} — coût ${v.cout}</option>`).join('')
-          : '<option value="">aucun mélange n\'atteint ces cibles</option>';
-        $('noteVariantes').innerHTML = _variantes.length
-          ? `<span class="ok">${_variantes.length} mélange(s) trouvé(s)</span>`
-            + '<span class="pas"> — le premier est le moins coûteux en crans '
-            + 'de rareté. Choisis-en un pour l\'afficher.</span>'
-          : '<span class="ko">Aucun mélange n\'atteint ces cibles.</span>';
-      } catch (e) {
-        $('noteVariantes').innerHTML = `<span class="ko">Erreur : ${e.message}</span>`;
-      } finally {
-        $('chercherVariantes').disabled = false;
-      }
-    }, 30);
-  };
-  $('listeVariantes').onchange = () => {
-    const v = _variantes[Number($('listeVariantes').value)];
-    if (!v) return;
-    dernier = v;
-    afficher(v, Number($('classe').value));
-    $('noteVariantes').innerHTML =
-      `<span class="ok">${v.libelle}</span><span class="pas"> affiché — `
-      + 'le code d\'import au-dessus correspond à ce mélange.</span>';
-  };
 
   // ------------------------------------------------------- mes builds
   dessinerBuilds();
@@ -1757,9 +1731,7 @@ function demarrer(donnees) {
     // tout et rien ne le disait.
     const champ = $('code');
     const dire = (ok) => {
-      $('noteCode').textContent = ok
-        ? 'Copié. Colle-le dans Prepare → Manage/Import.'
-        : 'Copie impossible ici — le code est sélectionné, fais Ctrl+C.';
+      $('noteCode').textContent = ok ? t('code.copie') : t('code.copieKo');
     };
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(champ.value).then(() => dire(true), () => dire(false));
@@ -1779,7 +1751,7 @@ function demarrer(donnees) {
     restituer({ code: (_etatPartage && _etatPartage.k) || '' });
     return;
   }
-  $('etat').textContent = 'Prêt.';
+  $('etat').textContent = t('etat.pret');
 }
 
 if (window.D_MISTFALL) {
