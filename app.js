@@ -572,7 +572,19 @@ function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
   const want = Object.fromEntries(cibleListe);
   const items = { ...res.slotItems };
   const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vinPoints.get(n) || 0));
-  const tient = (cov) => cibleListe.every(([n, l]) => tot(cov, n) >= l);
+
+  // LES PALIERS DÉJÀ FRANCHIS COMPTENT AUTANT QUE LES CIBLES. Un affixe visé
+  // à 3 mais obtenu à 5 franchit son palier ; le laisser redescendre à 3
+  // respecterait la cible tout en perdant le bonus, sans que rien ne le
+  // dise. On relève donc ce qui est franchi, et on l'exige aussi.
+  const base = assembler(items, want, false).couvert;
+  const paliersTenus = [];
+  for (const n of Object.keys(base)) {
+    const p = palier(n);
+    if (p && tot(base, n) >= p) paliersTenus.push([n, p]);
+  }
+  const tient = (cov) => cibleListe.every(([n, l]) => tot(cov, n) >= l)
+    && paliersTenus.every(([n, p]) => tot(cov, n) >= p);
 
   const sortie = [];
   for (const slot of D.ordreSlots) {
@@ -1140,22 +1152,26 @@ function ecrireAmis(liste) {
 }
 
 async function ajouterAmi() {
-  const champ = $('amiCode');
+  const champ = $('amiPseudo');
   const note = $('noteAmis');
-  const brut = champ.value || '';
+  const brut = (champ.value || '').trim();
+  if (brut.length < 2) {
+    note.innerHTML = `<span class="ko">${t('ami.tropCourt')}</span>`;
+    return;
+  }
   note.innerHTML = '<span class="pas">…</span>';
   try {
-    const trouve = await window.Comptes.parCode(brut);
+    const trouve = await window.Comptes.parPseudo(brut);
     if (!trouve) {
       note.innerHTML = `<span class="ko">${t('ami.introuvable')}</span>`;
       return;
     }
     const liste = amis();
-    if (liste.some((a) => a.code === trouve.code)) {
+    if (liste.some((a) => a.pseudo.toLowerCase() === trouve.pseudo.toLowerCase())) {
       note.innerHTML = `<span class="pas">${t('ami.deja', { nom: trouve.pseudo })}</span>`;
       return;
     }
-    liste.push({ code: trouve.code, pseudo: trouve.pseudo });
+    liste.push({ pseudo: trouve.pseudo });
     ecrireAmis(liste);
     champ.value = '';
     note.innerHTML = `<span class="ok">${t('ami.ajoute', { nom: trouve.pseudo })}</span>`;
@@ -1177,16 +1193,15 @@ async function dessinerAmis() {
     const bloc = document.createElement('div');
     bloc.className = 'amiBloc';
     bloc.innerHTML = `<div class="amiTete"><b>${a.pseudo}</b>
-      <span class="amiCode">${window.Comptes.formater(a.code)}</span>
       <button class="amiSuppr" title="${t('ami.retirer')}">×</button></div>
       <div class="amiListe"></div>`;
     bloc.querySelector('.amiSuppr').onclick = () => {
-      ecrireAmis(amis().filter((x) => x.code !== a.code));
+      ecrireAmis(amis().filter((x) => x.pseudo !== a.pseudo));
       dessinerAmis();
     };
     boite.appendChild(bloc);
     try {
-      const d = await window.Comptes.parCode(a.code);
+      const d = await window.Comptes.parPseudo(a.pseudo);
       const dedans = bloc.querySelector('.amiListe');
       if (!d || !d.builds.length) {
         dedans.innerHTML = `<span class="pas">${t('ami.rien', { nom: a.pseudo })}</span>`;
@@ -1845,9 +1860,7 @@ function demarrer(donnees) {
   if (comptesDispo() && window.Comptes.connecte()) {
     synchroniser(!(retourAuth && retourAuth.connecte));
     window.Comptes.monProfilComplet().then((p) => {
-      if (!p) return;
-      if (p.pseudo) $('pseudo').value = p.pseudo;
-      if (p.code) $('monCode').textContent = window.Comptes.formater(p.code);
+      if (p && p.pseudo) $('pseudo').value = p.pseudo;
     }).catch(() => {});
   }
 
@@ -1856,16 +1869,7 @@ function demarrer(donnees) {
     $('blocPartage').hidden = false;
     dessinerAmis();
     $('amiAjouter').onclick = ajouterAmi;
-    $('amiCode').onkeydown = (ev) => { if (ev.key === 'Enter') ajouterAmi(); };
-    $('monCodeCopier').onclick = () => {
-      const c = $('monCode').textContent;
-      if (!c || c === '—') return;
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(c).then(() => {
-          $('notePseudo').innerHTML = `<span class="pas">${t('ami.copie')}</span>`;
-        }, () => {});
-      }
-    };
+    $('amiPseudo').onkeydown = (ev) => { if (ev.key === 'Enter') ajouterAmi(); };
     $('galRafraichir').onclick = chargerGalerie;
 
     // Le pseudo engendre le code ami à sa première écriture, puis ne le
@@ -1878,8 +1882,7 @@ function demarrer(donnees) {
         return;
       }
       try {
-        const code = await window.Comptes.definirPseudo(p);
-        if (code) $('monCode').textContent = window.Comptes.formater(code);
+        await window.Comptes.definirPseudo(p);
         note.innerHTML = `<span class="ok">${t('compte.pseudoOk')}</span>`;
       } catch (e) {
         note.innerHTML = /duplicate|unique/i.test(e.message)

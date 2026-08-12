@@ -172,99 +172,59 @@
     return (r && r[0]) ? r[0].pseudo : null;
   }
 
-  /* Le code ami est engendré une seule fois, à la création du profil, et ne
-     change plus : sinon les amis à qui on l'a donné le perdraient. */
   async function definirPseudo(pseudo) {
     const s = connecte();
-    const actuel = await monProfilComplet();
-    const ligne = { user_id: s.user.id, pseudo };
-    if (!actuel || !actuel.code) ligne.code = engendrerCode();
     await avecReprise(() => appeler('/rest/v1/profiles?on_conflict=user_id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(ligne),
+      body: JSON.stringify({ user_id: s.user.id, pseudo }),
     }, true));
-    return ligne.code || (actuel && actuel.code) || null;
+    return pseudo;
   }
 
-  /* Le code ami : court, lisible à voix haute, sans caractères ambigus.
-     Il sert à TROUVER quelqu'un, pas à garder un secret. */
-  const ALPHABET_CODE = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-
-  function engendrerCode() {
-    let s = '';
-    const tirage = new Uint32Array(8);
-    (window.crypto || window.msCrypto).getRandomValues(tirage);
-    for (let i = 0; i < 8; i += 1) {
-      s += ALPHABET_CODE[tirage[i] % ALPHABET_CODE.length];
-    }
-    return s;
-  }
-
-  function formater(code) {
-    return code ? `${code.slice(0, 4)}-${code.slice(4)}` : '';
-  }
-
-  function nettoyer(code) {
-    return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  }
-
-  /* LA COLONNE `code` PEUT NE PAS ENCORE EXISTER. La migration est appliquée
-     par l'intégration GitHub de Supabase, qui n'est pas instantanée : entre
-     la mise en ligne du site et celle de la base, demander une colonne
-     absente ferait échouer tout le bloc compte. On retombe donc sur le seul
-     pseudo, et le code ami apparaîtra tout seul une fois la base à jour. */
-  let _sansColonneCode = false;
   let _sansColonnePartage = false;
 
   async function monProfilComplet() {
     const s = connecte();
     if (!s) return null;
-    if (!_sansColonneCode) {
-      try {
-        const r = await avecReprise(() => appeler(
-          `/rest/v1/profiles?select=pseudo,code&user_id=eq.${s.user.id}`, {}, true));
-        return (r && r[0]) || null;
-      } catch (e) {
-        if (!/column|42703|does not exist/i.test(e.message)) throw e;
-        _sansColonneCode = true;
-      }
-    }
     const r = await avecReprise(() => appeler(
       `/rest/v1/profiles?select=pseudo&user_id=eq.${s.user.id}`, {}, true));
     return (r && r[0]) || null;
   }
 
-  /* Les builds d'UN joueur, retrouvé par son code. Rien n'est listé sans
-     code : il n'y a plus d'annuaire de tous les joueurs. */
-  async function parCode(code) {
-    const propre = nettoyer(code);
-    if (propre.length !== 8) throw new Error(lisible('code invalide'));
-    const profs = await appeler(
-      `/rest/v1/profiles?select=user_id,pseudo,code&code=eq.${propre}`);
-    if (!profs || !profs.length) return null;
-    const p = profs[0];
-    const builds = await appeler(
-      `/rest/v1/builds?select=nom,etat,code&user_id=eq.${p.user_id}`
-      + '&or=(partage.is.true,public.is.true)&order=maj.desc');
-    return { pseudo: p.pseudo, code: p.code,
-             builds: (builds || []).map((b) => ({
-               nom: b.nom, etat: b.etat, code: b.code || '' })) };
+  /* ON PASSE PAR DES FONCTIONS, PAS PAR LA TABLE.
+   *
+   * Lire `profiles` directement permettrait `?select=pseudo` sans filtre,
+   * c'est-à-dire la liste de tous les joueurs. La table est donc fermée, et
+   * ces trois fonctions sont les seules portes : elles répondent à une
+   * question précise et ne rendent jamais d'inventaire. Sans le pseudo
+   * exact, on n'obtient rien. */
+  function rpc(nom, corps) {
+    return appeler(`/rest/v1/rpc/${nom}`, {
+      method: 'POST', body: JSON.stringify(corps || {}),
+    });
+  }
+
+  /* Les builds d'UN joueur, retrouvé par son pseudo exact. */
+  async function parPseudo(pseudo) {
+    const propre = String(pseudo || '').trim();
+    if (propre.length < 2) return null;
+    const qui = await rpc('joueur_existe', { p: propre });
+    if (!qui || !qui.length) return null;
+    const builds = await rpc('builds_de', { p: propre });
+    return {
+      pseudo: qui[0].pseudo,
+      builds: (builds || []).map((b) => ({
+        nom: b.nom, etat: b.etat, code: b.code || '' })),
+    };
   }
 
   /* La galerie : uniquement ce qui est explicitement publié. */
   async function galerie(limite) {
-    const builds = await appeler(
-      '/rest/v1/builds?select=nom,etat,code,user_id,maj&public=is.true'
-      + `&order=maj.desc&limit=${Number(limite) || 60}`);
-    if (!builds || !builds.length) return [];
-    const ids = [...new Set(builds.map((b) => b.user_id))];
-    const profs = await appeler(
-      `/rest/v1/profiles?select=user_id,pseudo&user_id=in.(${ids.join(',')})`);
-    const nomDe = new Map((profs || []).map((p) => [p.user_id, p.pseudo]));
-    return builds.map((b) => ({
+    const r = await rpc('galerie_publique', { limite: Number(limite) || 60 });
+    return (r || []).map((b) => ({
       nom: b.nom, etat: b.etat, code: b.code || '',
-      auteur: nomDe.get(b.user_id) || '?', maj: b.maj,
+      auteur: b.auteur || '?', maj: b.maj,
     }));
   }
 
@@ -355,7 +315,6 @@
   window.Comptes = {
     actif, connecte, courriel, inscrire, connecter, deconnecter,
     listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
-    monProfil, monProfilComplet, definirPseudo,
-    parCode, galerie, formater, nettoyer,
+    monProfil, monProfilComplet, definirPseudo, parPseudo, galerie,
   };
 }());

@@ -131,6 +131,21 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
   border-left:2px solid var(--accent);border-radius:3px 3px 0 0}
 .corps{padding:12px 13px}
 
+/* Une carte qu'on ouvre et referme. Le chevron tourne, le titre garde
+   exactement l'allure des autres en-têtes : on ne devine pas qu'il y a
+   deux composants différents. */
+.pliable>summary{margin:0;padding:9px 13px;font:800 12px/1 var(--condense);
+  letter-spacing:1.9px;text-transform:uppercase;color:var(--doux);
+  background:var(--panneau2);border-left:2px solid var(--accent);
+  border-radius:3px 3px 0 0;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:9px;user-select:none}
+.pliable>summary::-webkit-details-marker{display:none}
+.pliable>summary::before{content:'▸';font-size:11px;color:var(--accent);
+  transition:transform .15s;display:inline-block}
+.pliable[open]>summary::before{transform:rotate(90deg)}
+.pliable[open]>summary{border-bottom:1px solid var(--bord)}
+.pliable>summary:hover{color:var(--texte)}
+
 label{display:block;color:var(--terne);font:600 11px/1 var(--condense);
       letter-spacing:1.3px;text-transform:uppercase;margin:12px 0 5px}
 .corps>label:first-child{margin-top:0}
@@ -456,15 +471,9 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
                      maxlength="24">
               <button id="enregistrerPseudo" style="flex:0 0 auto" data-i18n="compte.ok">OK</button>
             </div>
-            <label data-i18n="ami.mon">Mon code ami</label>
-            <div class="rangee">
-              <div id="monCode" class="codeAmi">—</div>
-              <button id="monCodeCopier" style="flex:0 0 auto"
-                      data-i18n="code.copier">Copier</button>
-            </div>
             <div class="pas" style="font-size:11px;margin-top:4px"
-                 data-i18n="ami.monAide">Donne-le à tes amis pour qu'ils voient
-              tes builds marqués « ami ».</div>
+                 data-i18n="ami.monAide">Donne ton pseudo à tes amis pour
+              qu'ils voient tes builds marqués « ami ».</div>
             <div id="notePseudo"></div>
           </div>
           <div id="noteCompte"></div>
@@ -496,13 +505,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </div>
 
-    <div class="carte" id="blocAlternatives" hidden>
-      <h2 data-i18n="alt.titre">Pièces interchangeables</h2>
+    <!-- Repliée par défaut : huit emplacements × plusieurs pièces occupent
+         un écran entier, alors qu'on ne les consulte qu'à l'occasion. -->
+    <details class="carte pliable" id="blocAlternatives" hidden>
+      <summary data-i18n="alt.titre">Pièces interchangeables</summary>
       <div class="corps">
         <div id="listeAlternatives"></div>
         <div id="noteAlternatives" style="margin-top:9px;font-size:12px"></div>
       </div>
-    </div>
+    </details>
 
     <div class="carte">
       <h2 data-i18n="table.titre">Affixes obtenus</h2>
@@ -515,8 +526,8 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <h2 data-i18n="ami.titre">Builds de mes amis</h2>
       <div class="corps">
         <div class="rangee">
-          <input type="text" id="amiCode" maxlength="12"
-                 data-i18n-ph="ami.place" placeholder="code ami (ex. ABCD-2345)">
+          <input type="text" id="amiPseudo" maxlength="24"
+                 data-i18n-ph="ami.place" placeholder="pseudo exact de ton ami">
           <button id="amiAjouter" style="flex:0 0 auto"
                   data-i18n="ami.ajouter">Ajouter</button>
         </div>
@@ -564,10 +575,10 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=16"></script>
-<script src="config.js?v=16"></script>
-<script src="comptes.js?v=16"></script>
-<script src="donnees.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="i18n.js?v=17"></script>
+<script src="config.js?v=17"></script>
+<script src="comptes.js?v=17"></script>
+<script src="donnees.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>
