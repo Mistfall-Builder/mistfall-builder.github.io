@@ -247,6 +247,22 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Icône dragon, message vide retiré
+L'icône de l'outil et l'en-tête du site prennent le dragon fourni par
+l'utilisateur : la planche est découpée en trois pièces (icône encadrée,
+dragon seul, logo), le fond noir est rendu transparent, et un `.ico`
+multi-tailles est produit pour l'exécutable. Vérifié : les octets de la
+deuxième image du `.ico` se retrouvent bien dans `Mistfall Helper.exe`.
+
+Le message « Aucun ami pour l'instant. Demande son code à quelqu'un. »
+disparaît : il n'apprenait rien de plus que le champ juste au-dessus.
+
+Sa non-traduction a révélé une vraie cause, elle : `surChangementDeLangue`
+ne redessinait ni la liste d'amis ni la galerie, dont les libellés
+(« Charger », « Copier chez moi ») restaient donc en français sur la page
+anglaise. Les deux sont maintenant redessinées, et la clé `ami.aucun` a été
+retirée des trois dictionnaires.
+
 ### Pièces interchangeables + préférences
 Lister les combinaisons était inutilisable (23 328 sur un cas réel) : on
 liste donc les pièces interchangeables **par emplacement**, chacune posée et
