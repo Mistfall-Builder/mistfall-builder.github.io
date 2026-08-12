@@ -247,6 +247,31 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Cartes repliables, et le palier expliqué
+
+**Suggestions** devient un dépliant, **replié par défaut** : six propositions
+prenaient la moitié d'un écran alors qu'on ne les consulte qu'à l'occasion.
+Même flèche que « Pièces interchangeables », pour ne pas inventer un second
+vocabulaire.
+
+Repliées en silence, personne ne saurait qu'elles existent : le nombre
+s'affiche dans le bandeau, et celui-ci **bat doucement** tant qu'on ne l'a
+pas ouvert. Un battement de 2,1 s, pas un clignotement — un clignotement
+franc attire l'œil puis l'épuise. Il s'arrête à la première ouverture :
+signaler deux fois la même chose devient du harcèlement. Neutralisé sous
+`prefers-reduced-motion`.
+
+**Affixes visés** et **Affixes obtenus** deviennent repliables aussi, mais
+**ouverts par défaut** : ce sont les tableaux qu'on vient consulter, on veut
+seulement pouvoir les ranger en travaillant plus bas dans la page.
+
+**Le palier**, enfin, dit ce qu'il est. L'étiquette n'apprenait rien à qui ne
+connaît pas la mécanique. Une infobulle explique maintenant : au niveau
+indiqué, l'affixe gagne un SECOND effet en plus de sa progression normale.
+Aegis 4 donne Defense +60 ; Aegis 5 donne Defense +75 **et** Physical
+Resistance +2.5 %. 24 affixes sur 44 en ont un — 18 au niveau 5, 6 au
+niveau 4.
+
 ### « Quand est-ce que je peux m'arrêter ? »
 
 Demandé sur Discord : après un build, savoir ce qu'on peut ENCORE prendre

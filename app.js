@@ -1201,7 +1201,8 @@ function dessinerMarge(res) {
     b.title = t('marge.poser', { nom: m.nom, n: m.atteignable });
     b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
       <span class="nomA">${m.nom}</span>
-      ${franchit ? `<span class="marquePal">${t('sugg.palier')}</span>` : ''}
+      ${franchit ? `<span class="marquePal"
+        title="${t('palier.quoi', { n: m.palier })}">${t('sugg.palier')}</span>` : ''}
       <span class="fleche">${m.actuel} → <span class="cible">${m.atteignable}</span></span>`;
     b.onclick = () => {
       cibles.set(m.nom, m.atteignable);
@@ -1860,7 +1861,15 @@ function dessinerSuggestions(res, classe) {
     liste = [];
   }
   carte.hidden = !liste.length;
-  if (!liste.length) return;
+  // LE BANDEAU RESTE REPLIÉ, ET IL BAT. Six propositions prennent la moitié
+  // d'un écran alors qu'on ne les consulte qu'à l'occasion ; mais repliées
+  // en silence, personne ne saurait qu'elles existent. Le compte les
+  // annonce, le battement attire l'œil une fois, et l'ouverture l'éteint —
+  // signaler deux fois la même chose devient du harcèlement.
+  const compte = $('compteSugg');
+  if (compte) compte.textContent = liste.length ? `${liste.length}` : '';
+  if (liste.length && !carte.open) carte.dataset.neuf = '1';
+  if (!liste.length) { delete carte.dataset.neuf; return; }
   boite.innerHTML = '';
   liste.forEach((e) => {
     const couleurA = D.couleurs[String(e.avant.g)] || '#9fb0c4';
@@ -1870,7 +1879,8 @@ function dessinerSuggestions(res, classe) {
       const quoi = (e.demande && e.demande[n]) || '';
       const src = e.origine && e.origine[n] === 'inne'
         ? t('sugg.inne') : t('sugg.gemme');
-      const etiq = pal ? ' · ' + t('sugg.palier')
+      const etiq = pal ? ` · <b title="${t('palier.quoi', { n: palier(n) })}">`
+        + t('sugg.palier') + '</b>'
         : (quoi === 'bonus' ? ' · ★' : (quoi ? '' : ' · ' + t('sugg.nonDemande')));
       return `<span class="puceG${pal ? ' palier' : ''}${quoi ? '' : ' bonus'}" `
         + `title="${src}">${n} ${a}→${b}${etiq}</span>`;
@@ -2803,6 +2813,11 @@ function demarrer(donnees) {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
   };
   $('calculer').onclick = calculer;
+  // Ouvrir le bandeau suffit à dire « j'ai vu » : le battement s'arrête.
+  const bs = $('blocSuggestions');
+  if (bs) bs.addEventListener('toggle', () => {
+    if (bs.open) delete bs.dataset.neuf;
+  });
 
   // LA FICHE. Changer de cible ou de filtre d'arme ne touche que
   // l'affichage : on redessine sans relancer le moteur de build.

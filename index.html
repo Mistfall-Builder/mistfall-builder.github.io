@@ -339,6 +339,27 @@ textarea:focus{outline:none;border-color:var(--accent)}
 .pliable[open]>summary::before{transform:rotate(90deg)}
 .pliable[open]>summary{border-bottom:1px solid var(--bord)}
 .pliable>summary:hover{color:var(--texte)}
+/* Le compte, poussé à droite : il dit qu'il y a quelque chose à voir sans
+   qu'on ait besoin d'ouvrir. */
+.pliable>summary .compte{margin-left:auto;font:600 11px/1 var(--corps);
+  letter-spacing:0;text-transform:none;color:var(--accent)}
+
+/* IL BAT, IL NE CLIGNOTE PAS. Un clignotement franc attire l'œil puis
+   l'épuise ; une respiration lente se remarque en vision périphérique et
+   s'oublie dès qu'on lit autre chose. Elle s'arrête à la première
+   ouverture : signaler deux fois la même chose devient du harcèlement. */
+@keyframes battement{
+  0%,100%{border-left-color:var(--accent);
+          box-shadow:inset 3px 0 0 -1px rgba(240,123,48,0)}
+  50%    {border-left-color:var(--accent-clair);
+          box-shadow:inset 3px 0 12px -4px rgba(240,123,48,.85)}
+}
+.pliable[data-neuf="1"]:not([open])>summary{animation:battement 2.1s ease-in-out infinite}
+.pliable[data-neuf="1"]:not([open])>summary::before{color:var(--accent-clair)}
+@media(prefers-reduced-motion:reduce){
+  .pliable[data-neuf="1"]:not([open])>summary{animation:none;
+    border-left-color:var(--accent-clair)}
+}
 
 label{display:block;color:var(--terne);font:600 11px/1 var(--condense);
       letter-spacing:1.3px;text-transform:uppercase;margin:12px 0 5px}
@@ -611,8 +632,9 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </div>
 
-    <div class="carte">
-      <h2 data-i18n="affixes.titre">Affixes visés</h2>
+    <details class="carte pliable" open>
+      <summary><span data-i18n="affixes.titre">Affixes visés</span>
+        <span class="compte" id="compteCibles"></span></summary>
       <div class="corps">
         <input type="text" id="recherche" data-i18n-ph="affixes.filtrer" placeholder="filtrer la liste…">
         <div class="entetes"><span data-i18n="affixes.col.nom">Affixe</span><span data-i18n="affixes.col.niveau">Niveau</span><span data-i18n="affixes.col.vin">Vin</span>
@@ -623,7 +645,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
           <button id="vider" data-i18n="affixes.vider">Tout vider</button>
         </div>
       </div>
-    </div>
+    </details>
 
     <button class="primaire" id="calculer" data-i18n="calculer">Calculer le build</button>
     <div id="etat"></div>
@@ -702,15 +724,20 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </div>
 
-    <div class="carte" id="blocSuggestions" hidden>
-      <h2 data-i18n="sugg.titre">Suggestions</h2>
+    <!-- Repliée par défaut, comme les pièces interchangeables : six
+         propositions occupent la moitié d'un écran alors qu'on ne les
+         consulte qu'à l'occasion. Le bandeau bat doucement tant qu'on ne
+         l'a pas ouvert, pour qu'on sache qu'il y a quelque chose dedans. -->
+    <details class="carte pliable" id="blocSuggestions" hidden>
+      <summary><span data-i18n="sugg.titre">Suggestions</span>
+        <span class="compte" id="compteSugg"></span></summary>
       <div class="corps">
         <div id="listeSuggestions"></div>
         <div class="pas" style="margin-top:9px;font-size:12px">
           <span data-i18n="sugg.aide">Des échanges d'une seule pièce qui font gagner quelque chose sans faire perdre de cible. Rien n'est appliqué tant que tu ne cliques pas.</span>
         </div>
       </div>
-    </div>
+    </details>
 
     <!-- Repliée par défaut : huit emplacements × plusieurs pièces occupent
          un écran entier, alors qu'on ne les consulte qu'à l'occasion. -->
@@ -722,12 +749,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
-    <div class="carte">
-      <h2 data-i18n="table.titre">Affixes obtenus</h2>
+    <details class="carte pliable" open>
+      <summary><span data-i18n="table.titre">Affixes obtenus</span></summary>
       <div class="corps defil" id="tableauAffixes">
         <span class="pas" data-i18n="table.vide">Choisis des affixes, puis « Calculer le build ».</span>
       </div>
-    </div>
+    </details>
 
     <div class="carte" id="blocPartage" hidden>
       <h2 data-i18n="ami.titre">Builds de mes amis</h2>
@@ -878,12 +905,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=36"></script>
-<script src="config.js?v=36"></script>
-<script src="comptes.js?v=36"></script>
-<script src="donnees.js?v=36"></script>
-<script src="skills.js?v=36"></script>
-<script src="fiche.js?v=36"></script>
-<script src="app.js?v=36"></script>
+<script src="i18n.js?v=37"></script>
+<script src="config.js?v=37"></script>
+<script src="comptes.js?v=37"></script>
+<script src="donnees.js?v=37"></script>
+<script src="skills.js?v=37"></script>
+<script src="fiche.js?v=37"></script>
+<script src="app.js?v=37"></script>
 </body>
 </html>
