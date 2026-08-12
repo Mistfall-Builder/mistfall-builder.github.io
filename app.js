@@ -1414,6 +1414,32 @@ function afficher(res, classe) {
       Object.entries(compte).map(([k, n]) => `${n} ${k}`).join(' · ')
     : t('equip.pleins');
 
+  /* LE VERDICT, SOUS L'ÉQUIPEMENT. La même réponse qu'en haut à gauche,
+     mais posée là où l'on regarde ses pièces et ses gemmes : savoir si le
+     compte y est ne doit pas obliger à remonter la page.
+     Il est recalculé ici, et non recopié de la ligne d'état, pour rester
+     juste après un build chargé ou une suggestion appliquée — deux cas où
+     la ligne d'état parle d'autre chose. */
+  const verdict = $('verdictEquip');
+  if (verdict) {
+    const atteint = (nom) => Math.min(plafond(nom),
+      (res.couvert[nom] || 0)
+      + ((res.vinPoints && res.vinPoints.get(nom)) || 0));
+    const manques = rangs
+      .filter(([nom, vise]) => vise != null && atteint(nom) < vise)
+      .map(([nom, vise]) => `${nom} ${vise}`);
+    if (!rangs.some(([, vise]) => vise != null)) {
+      verdict.textContent = '';
+      verdict.className = '';
+    } else if (!manques.length) {
+      verdict.className = 'ok';
+      verdict.textContent = t('etat.ok');
+    } else {
+      verdict.className = 'ko';
+      verdict.textContent = t('equip.manquent', { liste: manques.join(', ') });
+    }
+  }
+
   dessinerMarge(res);
 
   try {
@@ -2304,7 +2330,13 @@ function dessinerAlternatives(res, classe) {
 }
 
 function calculer() {
-  if (!cibles.size) { $('etat').textContent = t('etat.choisir'); return; }
+  if (!cibles.size) {
+    $('etat').textContent = t('etat.choisir');
+    // Sans cible, le verdict d'en bas n'a plus d'objet : le laisser
+    // afficherait « toutes les cibles sont atteintes » pour zéro cible.
+    if ($('verdictEquip')) { $('verdictEquip').textContent = ''; $('verdictEquip').className = ''; }
+    return;
+  }
   const classe = Number($('classe').value);
   const arme = $('arme').value || null;
   const grade = $('rarete').value ? Number($('rarete').value) : null;
