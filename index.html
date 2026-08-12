@@ -453,22 +453,26 @@ table.cmp .ec.nul{color:var(--terne)}
 /* UNE SEULE LIGNE PAR AFFIXE. Sur deux lignes, les 44 tuiles depassaient
    la hauteur de l'ecran et il fallait encore faire defiler -- ce que cette
    grille est justement censee supprimer. */
-.gAff{border:1px solid var(--bord);border-radius:3px;padding:4px 7px;
-  background:var(--creux);display:flex;align-items:center;gap:8px;
+/* LA TUILE D'AFFIXE, en deux lignes. Sur une seule, le nom devait ceder
+   sa place aux huit boutons et les noms longs finissaient coupes. Ici le
+   nom occupe toute la premiere ligne et se lit en entier ; les niveaux
+   prennent la seconde sur toute la largeur, donc des boutons plus larges,
+   donc plus faciles a viser. Meme tuile dans la colonne et en plein ecran. */
+.gAff{border:1px solid var(--bord);border-radius:3px;padding:7px 9px 8px;
+  background:var(--creux);display:flex;flex-direction:column;gap:6px;
   transition:opacity .12s,border-color .12s,box-shadow .12s}
-.gAff .gNom{display:flex;align-items:center;gap:6px;font-size:12px;
-  color:var(--texte);flex:1;min-width:0}
-/* Les noms longs (« Energy Recovery Speed Increase ») sont coupes plutot
-   que de pousser les boutons hors de la tuile ; l'infobulle donne le nom
-   entier et l'effet de chaque niveau. */
-.gAff .gNom span.txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gTete{display:flex;align-items:center;gap:7px;min-width:0}
+.gTete .txt{flex:1;min-width:0;font-size:13px;color:var(--texte);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gAff.actif{border-color:var(--accent-sombre);background:var(--panneau2)}
-/* La recherche ne FILTRE pas, elle designe : la grille garde ses positions
-   d'une frappe a l'autre, donc l'oeil retrouve ou il en etait. */
+/* La recherche ne FILTRE pas dans la vue plein ecran, elle designe : la
+   grille garde ses positions d'une frappe a l'autre, donc l'oeil retrouve
+   ou il en etait. */
 .gAff.terne{opacity:.24}
 .gAff.brille{border-color:var(--accent);
   box-shadow:0 0 0 1px var(--accent),0 0 22px -6px var(--accent)}
-.gPref{width:20px;min-width:20px;padding:2px 0;font-size:12px;flex:0 0 auto;
+.gAff .vin{flex:0 0 auto;width:56px;padding:3px 4px;font-size:11px}
+.gPref{width:22px;min-width:22px;padding:2px 0;font-size:13px;flex:0 0 auto;
   background:none;border:none;color:var(--terne)}
 .gPref[data-etat="bonus"]{color:var(--accent)}
 .gPref[data-etat="non"]{color:var(--ko)}
@@ -480,8 +484,8 @@ table.cmp .ec.nul{color:var(--terne)}
 .chipsPref button:hover{color:var(--texte);border-color:var(--accent-sombre)}
 .chipsPref button.actif{background:var(--accent-sombre);border-color:var(--accent);
   color:var(--texte)}
-.gNiv{display:flex;gap:2px;flex:0 0 auto}
-.gNiv button{width:20px;min-width:20px;padding:3px 0;font-size:10.5px;
+.gNiv{display:flex;gap:3px}
+.gNiv button{flex:1 1 0;min-width:0;padding:5px 0;font-size:11.5px;
   background:var(--fond);border-color:var(--bord);color:var(--terne)}
 .gNiv button:hover{border-color:var(--accent-sombre);color:var(--texte)}
 .gNiv button.choisi{background:var(--accent-sombre);border-color:var(--accent);
@@ -491,6 +495,24 @@ table.cmp .ec.nul{color:var(--terne)}
 .gNiv button.palier::after{content:'';display:block;width:3px;height:3px;
   border-radius:50%;background:var(--accent);margin:2px auto 0}
 .gNiv button.choisi.palier::after{background:var(--texte)}
+
+/* Marge de manoeuvre : la carte parle dans les deux sens. Une proposition
+   de BAISSE se distingue d'une proposition de hausse -- ce n'est pas le
+   meme geste, et confondre les deux ferait cliquer a l'envers. */
+.margeMot{grid-column:1/-1;font-size:12.5px;line-height:1.5;margin-bottom:2px}
+.lm.baisse .cible{color:var(--avert)}
+.lm.baisse{border-color:rgba(224,100,79,.4)}
+.lm.baisse:hover{border-color:var(--ko)}
+.lm.toutBaisser{grid-column:1/-1;justify-content:center;font-weight:700;
+  border-color:var(--accent-sombre);color:var(--accent-clair)}
+.lm.toutBaisser:hover{background:var(--accent-sombre);color:var(--texte)}
+
+/* La liste d'affixes de la colonne large : meme grille que le plein ecran.
+   285 px ne fixe pas la largeur des tuiles, seulement le NOMBRE de
+   colonnes ; `1fr` les etire ensuite sur toute la place disponible. */
+#listeAffixes{display:grid;gap:7px;
+  grid-template-columns:repeat(auto-fill,minmax(255px,1fr));
+  align-content:start}
 
 /* ---------------------------------------------------------------- guides -- */
 .guide{border:1px solid var(--bord);border-radius:3px;margin-bottom:8px;
@@ -641,9 +663,9 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .entetes span:first-child{flex:1}
 .entetes span:nth-child(2){width:56px;text-align:center}
 .entetes span:nth-child(3){width:64px;text-align:center}
-#listeAffixes{max-height:46vh;overflow-y:auto;border:1px solid var(--bord);
-  border-radius:3px;background:var(--creux)}
-#budgetVin{margin-top:7px;font-size:12px}
+/* Plus de hauteur bridee ni de defilement interne : la liste est passee
+   dans la colonne large, ou elle tient en entier. */
+#budgetVin{margin-top:9px;font-size:12px}
 .affixe{display:flex;align-items:center;gap:9px;padding:5px 8px;
   border-bottom:1px solid #10151800;transition:background .1s}
 .affixe:hover{background:#12181b}
@@ -778,6 +800,23 @@ tr.ligneKo td:first-child{box-shadow:inset 3px 0 0 var(--ko)}
 tr.ligneKo td:first-child span{color:var(--texte)}
 tr:last-child td{border-bottom:none}
 td.n{text-align:center;font-variant-numeric:tabular-nums}
+
+/* ------------------------------------------- tableau des affixes obtenus --
+   Cinq colonnes de chiffres de meme poids : l'oeil ne savait pas laquelle
+   repond a « est-ce que j'y suis ». On hierarchise.
+   - la colonne TOTAL est la reponse : plus grosse, en gras, detachee par un
+     filet, avec un ✓ ou un ✗ qui se lit sans dechiffrer le nombre ;
+   - les colonnes d'appoint (visé, équip., vin) passent en retrait ;
+   - une ligne sur deux est ombree, pour suivre les cinq colonnes sans
+     sauter de ligne. */
+#tableauAffixes tbody tr:nth-child(even) td{background:rgba(255,255,255,.022)}
+#tableauAffixes tr.ligneKo:nth-child(even) td{background:rgba(224,100,79,.13)}
+#tableauAffixes td.appoint{color:var(--terne);font-size:12px}
+#tableauAffixes td.total{font-size:15px;font-weight:800;
+  border-left:1px solid var(--bord-fort);white-space:nowrap}
+#tableauAffixes th.total{border-left:1px solid var(--bord-fort)}
+#tableauAffixes td.total .marque{font-size:11px;margin-left:5px;opacity:.85}
+#tableauAffixes td:first-child{font-size:13px;color:var(--texte)}
 .ok{color:var(--ok);font-weight:700}.ko{color:var(--ko);font-weight:700}
 #noteCompte .ok,#noteCompte .ko{font-weight:600}
 .pas{color:var(--terne)}
@@ -795,6 +834,16 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 @media(max-width:640px){#paperdoll{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .piece{background:var(--creux);border:1px solid var(--bord);border-radius:3px;
   padding:0 0 8px;min-height:172px;position:relative;overflow:hidden}
+/* Le cadenas, dans le coin de la piece. Discret ouvert, franc ferme :
+   une piece figee doit se reconnaitre sans lire le petit symbole. */
+.cadenas{position:absolute;top:3px;right:3px;z-index:2;width:24px;height:24px;
+  padding:0;font-size:12px;line-height:1;background:transparent;border:none;
+  opacity:.32;filter:grayscale(1)}
+.piece:hover .cadenas{opacity:.8}
+.cadenas.ferme{opacity:1;filter:none}
+.piece.verrouille{border-color:var(--accent)}
+.piece.verrouille .slot{background:var(--accent-sombre);color:var(--texte)}
+#noteVerrous button{width:auto;padding:3px 9px;font-size:11px;margin-left:8px}
 .piece .slot{font:800 10px/1 var(--condense);letter-spacing:1.7px;
   text-transform:uppercase;color:var(--terne);text-align:center;
   padding:6px 4px;background:var(--panneau2);
@@ -888,27 +937,6 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
-    <details class="carte pliable" open>
-      <summary><span data-i18n="affixes.titre">Affixes visés</span>
-        <span class="compte" id="compteCibles"></span></summary>
-      <div class="corps">
-        <div class="rangee">
-          <input type="text" id="recherche" data-i18n-ph="affixes.filtrer"
-                 placeholder="filtrer la liste…" style="flex:1">
-          <div class="chipsPref" id="triPref"></div>
-          <button id="ouvrirGrille" class="loupe" style="flex:0 0 auto"
-                  data-i18n-title="grille.ouvrir"
-                  title="Tout voir d'un coup">⛶</button>
-        </div>
-        <div class="entetes"><span data-i18n="affixes.col.nom">Affixe</span><span data-i18n="affixes.col.niveau">Niveau</span><span data-i18n="affixes.col.vin">Vin</span>
-          <span data-i18n="affixes.col.pref" title="★">★</span></div>
-        <div id="listeAffixes"></div>
-        <div id="budgetVin" class="pas"></div>
-        <div class="rangee" style="margin-top:9px">
-          <button id="vider" data-i18n="affixes.vider">Tout vider</button>
-        </div>
-      </div>
-    </details>
 
     <button class="primaire" id="calculer" data-i18n="calculer">Calculer le build</button>
     <div id="etat"></div>
@@ -1030,30 +1058,55 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
-    <details class="carte pliable" open>
-      <summary><span data-i18n="table.titre">Affixes obtenus</span></summary>
-      <div class="corps defil" id="tableauAffixes">
-        <span class="pas" data-i18n="table.vide">Choisis des affixes, puis « Calculer le build ».</span>
-      </div>
-    </details>
 
     <details class="carte pliable" id="carteEquip" open>
       <summary><span data-i18n="equip.titre">Équipement</span></summary>
       <div class="corps">
         <div id="paperdoll"></div>
+        <!-- Un verrou oublie explique des resultats etranges : il doit se
+             voir, et se lever d'un clic. -->
+        <div id="noteVerrous" style="margin-top:8px;font-size:12px"></div>
         <div id="bilan" class="avert" style="margin-top:10px"></div>
         <!-- Le meme verdict que la ligne d'etat, mais ici : on regarde son
              stuff et ses gemmes a cet endroit, et savoir si ca suffit ne
              doit pas obliger a remonter en haut de la colonne de gauche. -->
         <div id="verdictEquip" style="margin-top:6px;font-size:12.5px"></div>
-        <!-- Repond a « quand est-ce que je peux m'arreter d'ajouter des
-             affixes ? » : ce que les emplacements libres permettent encore. -->
-        <div id="carteMarge" hidden>
-          <div class="separateur" data-i18n="marge.titre">Encore disponible</div>
-          <div class="pas" style="font-size:12px;margin-bottom:7px"
-               data-i18n="marge.aide">Ce que les emplacements de gemme libres
-            permettent encore, chaque ligne prise seule.</div>
-          <div id="listeMarge"></div>
+      </div>
+    </details>
+
+    <!-- Repond a « quand est-ce que je peux m'arreter d'ajouter des affixes ? ».
+         Toujours presente et repliee : une carte qui apparait et disparait
+         selon le build se cherche, une carte qui est toujours au meme endroit
+         se retrouve. -->
+    <details class="carte pliable" id="carteMarge">
+      <summary><span data-i18n="marge.titre">Encore disponible</span>
+        <span class="compte" id="compteMarge"></span></summary>
+      <div class="corps">
+        <div class="pas" style="font-size:12px;margin-bottom:8px"
+             data-i18n="marge.aide">Ce que les emplacements de gemme libres
+          permettent encore, chaque ligne prise seule.</div>
+        <div id="listeMarge"></div>
+      </div>
+    </details>
+
+    <details class="carte pliable" id="carteAffixes" open>
+      <summary><span data-i18n="affixes.titre">Affixes visés</span>
+        <span class="compte" id="compteCibles"></span></summary>
+      <div class="corps">
+        <div class="rangee">
+          <input type="text" id="recherche" data-i18n-ph="affixes.filtrer"
+                 placeholder="filtrer la liste…" style="flex:1">
+          <div class="chipsPref" id="triPref"></div>
+          <button id="ouvrirGrille" class="loupe" style="flex:0 0 auto"
+                  data-i18n-title="grille.ouvrir"
+                  title="Tout voir d'un coup">⛶</button>
+        </div>
+        <!-- Plus d'en-tetes de colonnes : les tuiles ne sont plus un tableau,
+             chaque reglage porte son sens sur place. -->
+        <div id="listeAffixes"></div>
+        <div id="budgetVin" class="pas"></div>
+        <div class="rangee" style="margin-top:9px">
+          <button id="vider" data-i18n="affixes.vider">Tout vider</button>
         </div>
       </div>
     </details>
@@ -1093,6 +1146,13 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <div id="sortsAide" class="pas" style="font-size:12px;margin:8px 0"></div>
         <div id="listeSorts" class="grilleSorts"></div>
         <div id="detailSort"></div>
+      </div>
+    </details>
+
+    <details class="carte pliable" open>
+      <summary><span data-i18n="table.titre">Affixes obtenus</span></summary>
+      <div class="corps defil" id="tableauAffixes">
+        <span class="pas" data-i18n="table.vide">Choisis des affixes, puis « Calculer le build ».</span>
       </div>
     </details>
 </section>
@@ -1236,15 +1296,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=62"></script>
-<script src="config.js?v=62"></script>
-<script src="comptes.js?v=62"></script>
-<script src="donnees.js?v=62"></script>
-<script src="skills.js?v=62"></script>
-<script src="talents.js?v=62"></script>
-<script src="builds_reference.js?v=62"></script>
-<script src="guides_classes.js?v=62"></script>
-<script src="fiche.js?v=62"></script>
-<script src="app.js?v=62"></script>
+<script src="i18n.js?v=65"></script>
+<script src="config.js?v=65"></script>
+<script src="comptes.js?v=65"></script>
+<script src="donnees.js?v=65"></script>
+<script src="skills.js?v=65"></script>
+<script src="talents.js?v=65"></script>
+<script src="builds_reference.js?v=65"></script>
+<script src="guides_classes.js?v=65"></script>
+<script src="fiche.js?v=65"></script>
+<script src="app.js?v=65"></script>
 </body>
 </html>

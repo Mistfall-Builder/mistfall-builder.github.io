@@ -25,6 +25,37 @@ const vinManuel = new Map();        // affixe -> points de vin imposés
  *   bonus   — « si c'est gratuit, j'en veux » : compte double en suggestion
  *   non     — « ne me le propose pas » : jamais suggéré
  */
+/* ======================================================================
+   LES PIÈCES VERROUILLÉES
+
+   « Celle-là je l'ai déjà, elle ne bouge pas. » On règle ses affixes petit
+   à petit, et sans cadenas chaque recalcul rebat tout le stuff : la pièce
+   qu'on venait de trouver en jeu disparaissait au clic suivant.
+
+   Un verrou fige l'objet, SES gemmes et SON inné. Le moteur construit
+   autour : il ne remplace pas la pièce, ne la dégrade pas à l'allègement,
+   et ne touche pas à ses sertissures.
+
+   Les verrous ne survivent pas à un changement de contexte — charger un
+   build, importer un code, changer de classe ou d'arme les libère tous.
+   Garder un plastron de Mercenary verrouillé en passant au Seer n'aurait
+   aucun sens, et le silence sur ce point serait pire que la perte.
+   ====================================================================== */
+const verrouilles = new Map();      // slot -> { item, gemmes: [gemme|null, …] }
+
+function verrousObjet() {
+  const o = {};
+  for (const [slot, v] of verrouilles.entries()) o[slot] = v;
+  return Object.keys(o).length ? o : undefined;
+}
+
+function libererVerrous(pourquoi) {
+  if (!verrouilles.size) return;
+  verrouilles.clear();
+  const n = $('noteVerrous');
+  if (n) n.textContent = pourquoi ? t(pourquoi) : '';
+}
+
 const prefs = new Map();            // affixe -> 'bonus' | 'non'
 const CYCLE_PREF = [undefined, 'bonus', 'non'];
 
@@ -339,14 +370,30 @@ function poserGemmesExact(sockets, want, couvert) {
   return true;
 }
 
-function assembler(slotItems, want, exact) {
+/* Des verrous vers la forme attendue par `assembler`. */
+function figeesDe(verrous) {
+  const f = {};
+  for (const [slot, v] of Object.entries(verrous || {})) f[slot] = v.gemmes || [];
+  return f;
+}
+
+/* `figees` fige les gemmes d'un emplacement : { slot: [gemme|null, …] }.
+   C'est ce qui rend un verrou honnête — verrouiller une pièce sans ses
+   gemmes la laisserait se faire re-sertir au tour suivant, et le joueur
+   qui a deja pose ses gemmes en jeu verrait le site lui en proposer
+   d'autres. Les deux poseurs ne remplissent que les emplacements VIDES :
+   pre-remplir suffit donc a les mettre hors de portee. */
+function assembler(slotItems, want, exact, figees) {
   const sockets = [];
   const couvert = {};
   const sources = [];
   for (const [slot, it] of Object.entries(slotItems)) {
     if (!it) continue;
+    const fig = figees && figees[slot];
     it.s.forEach((sk, idx) => {
-      sockets.push({ slot, index: idx, type: sk[0], level: sk[1], gem: null });
+      const g = fig ? (fig[idx] || null) : null;
+      sockets.push({ slot, index: idx, type: sk[0], level: sk[1], gem: g });
+      if (g) for (const a of g.a) couvert[a] = (couvert[a] || 0) + 1;
     });
     if (it.i) { couvert[it.i] = (couvert[it.i] || 0) + 1; sources.push({ slot, affixe: it.i }); }
   }
@@ -383,11 +430,22 @@ function poolDe(classe, slot, arme, grade, mixte) {
   return morceaux;
 }
 
-function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite, depart) {
+function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite,
+                           depart, verrous) {
   const want = Object.fromEntries(cibleListe);
+  // Les pièces verrouillees : leur objet est impose, leurs gemmes figees,
+  // et la recherche n'a plus le droit d'y toucher.
+  const bloque = verrous || {};
+  const figees = {};
+  for (const [slot, v] of Object.entries(bloque)) figees[slot] = v.gemmes || [];
   const options = {};
   const slotItems = {};
   for (const slot of D.ordreSlots) {
+    if (bloque[slot] && bloque[slot].item) {
+      slotItems[slot] = bloque[slot].item;
+      options[slot] = [bloque[slot].item];
+      continue;
+    }
     const sol = Math.max(grade, planchers[slot] || 0);
     const pool = poolDe(classe, slot, arme, sol, mixte);
     options[slot] = pool;
@@ -403,7 +461,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     slotItems[slot] = best || null;
   }
 
-  let etat = assembler(slotItems, want, false);
+  let etat = assembler(slotItems, want, false, figees);
   const note = (items, e) => {
     const base = couvertureEffective(e.couvert, want, null);
     const sur = surplus(e.couvert, want);
@@ -425,12 +483,15 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
   for (let tour = 0; tour < D.toursRecherche; tour += 1) {
     let ameliore = false;
     for (const slot of D.ordreSlots) {
+      // Un emplacement verrouille ne se remplace pas, meme si le moteur
+      // trouverait mieux : c'est tout l'objet du cadenas.
+      if (bloque[slot]) continue;
       const pool = options[slot];
       if (!pool || pool.length <= 1) continue;
       for (const alt of pool) {
         if (alt === items[slot]) continue;
         const essaiItems = { ...items, [slot]: alt };
-        const essai = assembler(essaiItems, want, false);
+        const essai = assembler(essaiItems, want, false, figees);
         const n = note(essaiItems, essai);
         if (mieux(n, meilleur)) { items = essaiItems; etat = essai; meilleur = n; ameliore = true; break; }
       }
@@ -439,7 +500,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     if (!ameliore) break;
   }
 
-  const final = assembler(items, want, true);
+  const final = assembler(items, want, true, figees);
   return { slotItems: items, ...final, options };
 }
 
@@ -451,10 +512,13 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
  * accepté que s'il garde TOUTES les cibles : la passe ne peut donc jamais
  * dégrader un build, seulement l'alléger. Mesuré : 8 Légendaires -> 2
  * Légendaires + 5 Épiques + 1 Excellent sur un build réel. */
-function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tours) {
+function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tours, verrous) {
   const want = Object.fromEntries(cibleListe);
+  const bloque = verrous || {};
+  const figees = {};
+  for (const [sl, v] of Object.entries(bloque)) figees[sl] = v.gemmes || [];
   const tient = (items) => {
-    const a = assembler(items, want, false);
+    const a = assembler(items, want, false, figees);
     return cibleListe.every(([n, l]) =>
       (a.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
   };
@@ -471,6 +535,8 @@ function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tour
     const ordre = [...D.ordreSlots].sort(
       (a, b) => ((courant[b] && courant[b].g) || 0) - ((courant[a] && courant[a].g) || 0));
     for (const slot of ordre) {
+      // Alleger une piece verrouillee reviendrait a la remplacer : interdit.
+      if (bloque[slot]) continue;
       const actuel = courant[slot];
       if (!actuel) continue;
       const sol = planchers[slot] || 0;
@@ -491,7 +557,8 @@ function sommeRaretes(slotItems) {
   return Object.values(slotItems).reduce((s, it) => s + (it ? it.g : 0), 0);
 }
 
-function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi) {
+function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi,
+                    verrous) {
   const affinite = D.affinites[String(classe)] || null;
   const vinPoints = vin ? repartitionVin(cibleListe, vinChoisi) : new Map();
   const vinNoms = new Set(vinPoints.keys());
@@ -517,9 +584,9 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
   const want = Object.fromEntries(cibleGear);
 
   const essai = (g, mx, dep) => {
-    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep);
+    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep, verrous);
     if (!affinite) return a;
-    const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep);
+    const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous);
     const na = [couvertureEffective(a.couvert, want, null), surplus(a.couvert, want)];
     const nb = [couvertureEffective(b.couvert, want, null), surplus(b.couvert, want)];
     return (nb[0] > na[0] || (nb[0] === na[0] && nb[1] >= na[1])) ? b : a;
@@ -573,9 +640,9 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
     // Le vin est DÉJÀ retiré de `cibleGear` : on passe une allocation vide,
     // sinon il serait compté deux fois et l'allègement descendrait trop bas.
     const legers = alleger(res.slotItems, classe, arme, cibleGear,
-                           planchers, new Map());
+                           planchers, new Map(), undefined, verrous);
     if (sommeRaretes(legers) < sommeRaretes(res.slotItems)) {
-      const a = assembler(legers, want, true);
+      const a = assembler(legers, want, true, figeesDe(verrous));
       const candidat = { slotItems: legers, sockets: a.sockets,
                          couvert: a.couvert, sources: a.sources };
       if (cibleListe.every(([n, l]) =>
@@ -1055,8 +1122,9 @@ function correspondAffixe(nom, filtre) {
 }
 
 function dessinerAffixes() {
-  const filtre = ($('recherche').value || '').toLowerCase();
   const conteneur = $('listeAffixes');
+  if (!conteneur) return;
+  const filtre = ($('recherche').value || '').toLowerCase();
   conteneur.innerHTML = '';
   for (const nom of Object.keys(D.affixes).sort()) {
     // LA RECHERCHE PORTE AUSSI SUR L'EFFET, PAS SEULEMENT SUR LE NOM.
@@ -1065,88 +1133,19 @@ function dessinerAffixes() {
     // la description et les libellés d'effet de chaque niveau.
     if (filtre && !correspondAffixe(nom, filtre)) continue;
     if (!passeFiltrePref(nom)) continue;
-    const info = D.affixes[nom];
-    const ligne = document.createElement('div');
-    ligne.dataset.affixe = nom;
-    ligne.className = 'affixe' + (cibles.has(nom) ? ' actif' : '');
-    const sansGemme = !info.mat.length;
-    ligne.innerHTML = pastille(info.cat) + `<span class="nom">${nom}
-      <small>${t('affixes.max')} ${info.cap}${sansGemme ? ' · ' + t('affixes.vinSeul') : ''}</small></span>`;
-    ligne.title = (info.desc || '') + (info.eff ? '\n\n' + info.eff
-      .map((e, i) => `${i + 1}. ${e}`).join('\n') : '');
-
-    const sel = document.createElement('select');
-    sel.className = 'niveau';
-    sel.title = t('affixes.niveauVise');
-    sel.innerHTML = '<option value="">—</option>' +
-      Array.from({ length: info.cap }, (_, i) => `<option>${i + 1}</option>`).join('');
-    sel.value = cibles.has(nom) ? String(cibles.get(nom)) : '';
-    sel.onchange = () => {
-      if (sel.value) {
-        cibles.set(nom, Number(sel.value));
-      } else {
-        // Le vin RESTE. Il ne dépend plus d'une cible : retirer le niveau
-        // visé veut dire « le stuff n'a plus à chercher cet affixe », pas
-        // « jette la fiole ». La case garde sa valeur, visible, et le
-        // bandeau de budget dit ce qui est occupé.
-        cibles.delete(nom);
-      }
-      ligne.classList.toggle('actif', cibles.has(nom));
-      majEtatVin(ligne);
-      majBudgetVin();
-    };
-    ligne.appendChild(sel);
-
-    // LE VIN, AFFIXE PAR AFFIXE — comme dans l'outil de bureau. Sigrid donne
-    // au plus 2 points à au plus 4 affixes, 8 en tout, et rien n'oblige à
-    // mettre 2 partout : « auto » laisse choisir, sinon c'est toi qui décides.
-    const vin = document.createElement('select');
-    vin.className = 'vin';
-    // L'infobulle est posée par majEtatVin, plus bas, dans la langue courante.
-    vin.innerHTML = `<option value="">${t('affixes.auto')}</option>`
-      + Array.from({ length: D.vin.bonus + 1 },
-                   (_, i) => `<option value="${i}">${i ? '+' + i : '—'}</option>`).join('');
-    vin.value = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
-    vin.onchange = () => {
-      if (vin.value === '') vinManuel.delete(nom);
-      else vinManuel.set(nom, Number(vin.value));
-      majBudgetVin();
-    };
-    ligne.appendChild(vin);
-
-    const pref = document.createElement('button');
-    pref.className = 'pref';
-    const majPref = () => {
-      const v = prefs.get(nom);
-      pref.dataset.etat = v || 'neutre';
-      pref.textContent = v === 'bonus' ? '★' : (v === 'non' ? '✕' : '☆');
-      pref.title = t(v === 'bonus' ? 'pref.bonus'
-                     : (v === 'non' ? 'pref.non' : 'pref.neutre'));
-    };
-    pref.onclick = () => {
-      const i = CYCLE_PREF.indexOf(prefs.get(nom));
-      const suivant = CYCLE_PREF[(i + 1) % CYCLE_PREF.length];
-      if (suivant) prefs.set(nom, suivant); else prefs.delete(nom);
-      majPref();
-      if (dernier) setTimeout(() => dessinerSuggestions(dernier,
-        Number($('classe').value)), 0);
-    };
-    majPref();
-    ligne.appendChild(pref);
-
-    majEtatVin(ligne);
-    conteneur.appendChild(ligne);
+    conteneur.appendChild(tuileAffixe(nom));
   }
   dessinerChipsPref($('triPref'), () => {
     dessinerAffixes();
-    // La grille suit le même filtre quand elle est ouverte.
     if ($('grilleAffixes') && !$('grilleAffixes').hidden) dessinerGrilleAffixes();
   });
-  // Un filtre qui ne laisse rien passer doit se dire, sinon la liste vide
+  // Un filtre qui ne laisse rien passer doit se dire, sinon la grille vide
   // ressemble à une panne.
-  if (filtrePref && !conteneur.children.length) {
+  if (!conteneur.children.length) {
     conteneur.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
   }
+  const c = $('compteCibles');
+  if (c) c.textContent = cibles.size ? t('grille.compte', { n: cibles.size }) : '';
 }
 
 /* ======================================================================
@@ -1171,17 +1170,38 @@ function dessinerAffixes() {
 function tuileAffixe(nom) {
   const info = D.affixes[nom];
   const el = document.createElement('div');
-  el.className = 'gAff';
+  el.className = 'gAff affixe';
   el.dataset.affixe = nom;
   el.title = (info.desc || '')
     + (info.eff ? '\n\n' + info.eff.map((e, i) => `${i + 1}. ${e}`).join('\n') : '');
+  // DEUX LIGNES, PAS UNE. Sur une seule, le nom devait céder sa place aux
+  // huit boutons et « Energy Recovery Speed Increase » finissait en
+  // « Energy Rec… ». Le nom prend la première ligne et se lit en entier,
+  // les niveaux prennent la seconde sur toute la largeur.
   // Le nombre de boutons DIT déjà le maximum de l'affixe : répéter
   // « max 7 » à côté prendrait la place du nom pour ne rien apprendre.
-  el.innerHTML = `<button class="gPref"></button>
-    <div class="gNom">${pastille(info.cat)}
-      <span class="txt">${echapper(nom)}</span></div>
+  el.innerHTML = `<div class="gTete">
+      <button class="gPref pref"></button>
+      ${pastille(info.cat)}<span class="txt">${echapper(nom)}</span>
+      <select class="vin"></select>
+    </div>
     <div class="gNiv"></div>`;
   const rangee = el.querySelector('.gNiv');
+
+  // Le Victory Wine se règle ici aussi : c'est la même consigne que le
+  // niveau visé, la séparer sur deux écrans obligeait à faire l'aller-retour.
+  const vin = el.querySelector('.vin');
+  vin.innerHTML = `<option value="">${t('affixes.auto')}</option>`
+    + Array.from({ length: D.vin.bonus + 1 },
+                 (_, i) => `<option value="${i}">${i ? '+' + i : '—'}</option>`).join('');
+  vin.value = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
+  vin.onchange = () => {
+    if (vin.value === '') vinManuel.delete(nom);
+    else vinManuel.set(nom, Number(vin.value));
+    majBudgetVin();
+    majCompteursGrille();
+  };
+  majEtatVin(el);
 
   // L'étoile est aussi ici : sans elle, on ne pourrait marquer ses favoris
   // que dans la colonne étroite, donc jamais depuis la vue qui sert à les
@@ -1333,6 +1353,21 @@ function materiau(type, niveau) {
   return D.materiaux[`${type},${niveau}`] || '?';
 }
 
+/* Combien de pièces sont figées, et de quoi les libérer d'un clic. Un
+   verrou oublié explique des résultats bizarres — il doit se voir. */
+function majNoteVerrous() {
+  const n = $('noteVerrous');
+  if (!n) return;
+  if (!verrouilles.size) { n.innerHTML = ''; return; }
+  n.innerHTML = `<span class="ok">${t('verrou.compte', { n: verrouilles.size })}</span>
+    <button id="toutDeverrouiller">${t('verrou.tout')}</button>`;
+  $('toutDeverrouiller').onclick = () => {
+    verrouilles.clear();
+    if (dernier) afficher(dernier, Number($('classe').value));
+    else majNoteVerrous();
+  };
+}
+
 function afficher(res, classe) {
   const pd = $('paperdoll');
   pd.innerHTML = '';
@@ -1360,9 +1395,31 @@ function afficher(res, classe) {
       ${vignette(it.ic, couleur)}
       <div class="nom" style="color:${couleur}">${it.n}</div>
       <div class="inne${it.i ? '' : ' sans'}">${it.i ? t('equip.inne') + ' ' + it.i : t('equip.aucunInne')}</div>
-      ${gems}`;
+      ${gems}
+      <button class="cadenas" type="button"></button>`;
+    // LE CADENAS. Il fige CETTE pièce avec les gemmes qu'elle porte à cet
+    // instant : c'est la photo du moment, pas une consigne abstraite.
+    const cad = carte.querySelector('.cadenas');
+    const gemmesIci = res.sockets.filter((s) => s.slot === slot)
+      .sort((a, b) => a.index - b.index).map((s) => s.gem || null);
+    const majCadenas = () => {
+      const ferme = verrouilles.has(slot);
+      cad.textContent = ferme ? '🔒' : '🔓';
+      cad.classList.toggle('ferme', ferme);
+      carte.classList.toggle('verrouille', ferme);
+      cad.title = t(ferme ? 'verrou.ouvrir' : 'verrou.fermer');
+    };
+    cad.onclick = (ev) => {
+      ev.stopPropagation();
+      if (verrouilles.has(slot)) verrouilles.delete(slot);
+      else verrouilles.set(slot, { item: it, gemmes: gemmesIci });
+      majCadenas();
+      majNoteVerrous();
+    };
+    majCadenas();
     pd.appendChild(carte);
   }
+  majNoteVerrous();
 
   // UN AFFIXE MONTÉ AU VIN SEUL DOIT FIGURER ICI. On ne parcourait que les
   // cibles ; verser deux points sur un affixe qu'on ne vise pas donnait donc
@@ -1385,11 +1442,16 @@ function afficher(res, classe) {
     // isolé dans la dernière colonne oblige à repartir vers la gauche pour
     // savoir DE QUEL affixe il s'agit ; sur dix lignes on se trompe. La
     // ligne entière porte la couleur, le nom est trouvé sans chercher.
+    // Le ✓ / ✗ se lit avant le nombre : on sait si ça passe sans comparer
+    // deux chiffres de colonnes différentes.
+    const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
     return `<tr${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
               ${pastille(cat)}${nom}</span></td>
-            <td class="n">${vise == null ? '—' : vise}</td><td class="n">${eq}</td>
-            <td class="n">${v || ''}</td><td class="n ${cls}">${total}</td></tr>`;
+            <td class="n appoint">${vise == null ? '—' : vise}</td>
+            <td class="n appoint">${eq}</td>
+            <td class="n appoint">${v || ''}</td>
+            <td class="n total ${cls}">${total}<span class="marque">${marque}</span></td></tr>`;
   }).join('');
   const bonus = Object.entries(res.couvert)
     .filter(([n]) => !cibles.has(n) && !vinSeul.includes(n))
@@ -1486,11 +1548,71 @@ function dessinerMarge(res) {
   const carte = $('carteMarge');
   const boite = $('listeMarge');
   if (!carte || !boite) return;
+  carte.hidden = false;
+  const cpt = $('compteMarge');
+
+  /* DEUX SENS, UNE SEULE CARTE.
+   *
+   * Quand les cibles passent, elle repond a « jusqu'ou puis-je encore
+   * monter ? ». Quand elles ne passent pas, la question devient l'inverse :
+   * « de combien dois-je descendre pour que ca rentre ? » -- et c'est la
+   * qu'on en a le plus besoin.
+   *
+   * La reponse a ce second cas ne demande AUCUN recalcul et n'est pas une
+   * estimation : le moteur a deja produit le meilleur stuff possible pour
+   * la consigne. Ramener chaque cible manquee au niveau que ce stuff
+   * atteint DEJA rend l'ensemble realisable, avec ces pieces exactement.
+   * C'est une garantie, pas une suggestion optimiste. */
+  const bas = [...cibles.entries()]
+    .map(([nom, vise]) => {
+      const atteint = Math.min(plafond(nom), (res.couvert[nom] || 0)
+        + ((res.vinPoints && res.vinPoints.get(nom)) || 0));
+      return { nom, vise, atteint };
+    })
+    .filter((x) => x.atteint < x.vise)
+    .sort((a, b) => (b.vise - b.atteint) - (a.vise - a.atteint));
+
+  if (bas.length) {
+    boite.className = 'grilleMarge';
+    boite.innerHTML = `<div class="margeMot ko">${t('marge.trop', { n: bas.length })}</div>`;
+    if (cpt) cpt.textContent = t('marge.compteBas', { n: bas.length });
+    for (const x of bas) {
+      const b2 = document.createElement('button');
+      b2.className = 'lm baisse';
+      b2.title = t('marge.poser', { nom: x.nom, n: x.atteint });
+      b2.innerHTML = `${pastille((D.affixes[x.nom] || {}).cat)}
+        <span class="nomA">${x.nom}</span>
+        <span class="fleche">${x.vise} → <span class="cible">${x.atteint}</span></span>`;
+      b2.onclick = () => {
+        if (x.atteint > 0) cibles.set(x.nom, x.atteint); else cibles.delete(x.nom);
+        dessinerAffixes(); majBudgetVin(); calculer();
+      };
+      boite.appendChild(b2);
+    }
+    // Tout descendre d'un coup : c'est le geste qu'on allait faire ligne
+    // par ligne, et le resultat est garanti realisable.
+    const tout = document.createElement('button');
+    tout.className = 'lm toutBaisser';
+    tout.textContent = t('marge.toutBaisser');
+    tout.onclick = () => {
+      for (const x of bas) {
+        if (x.atteint > 0) cibles.set(x.nom, x.atteint); else cibles.delete(x.nom);
+      }
+      dessinerAffixes(); majBudgetVin(); calculer();
+    };
+    boite.appendChild(tout);
+    return;
+  }
+
   const liste = marge(res, res.vinPoints || new Map());
-  carte.hidden = !liste.length;
-  if (!liste.length) return;
+  if (cpt) cpt.textContent = liste.length ? t('marge.compteHaut', { n: liste.length }) : '';
   boite.className = 'grilleMarge';
   boite.innerHTML = '';
+  if (!liste.length) {
+    boite.className = '';
+    boite.innerHTML = `<span class="pas">${t('marge.rien')}</span>`;
+    return;
+  }
   // Une dizaine suffit : au-delà, la liste devient un annuaire et personne
   // ne la lit. Les plus gros gains sont en tête.
   for (const m of liste.slice(0, 12)) {
@@ -1578,6 +1700,9 @@ function etatActuel() {
 }
 
 function appliquerEtat(e) {
+  // Changer de build change tout le stuff : garder un cadenas d'un autre
+  // build ferait construire autour d'une piece qui n'est plus la.
+  libererVerrous();
   if (!e) return;
   $('classe').value = String(e.c);
   majArmes();
@@ -2397,7 +2522,7 @@ function calculer() {
   setTimeout(() => {
     try {
       const res = construire(classe, arme, [...cibles.entries()], grade,
-                             $('vin').checked, mixte, planchers, vinManuel);
+                             $('vin').checked, mixte, planchers, vinManuel, verrousObjet());
       dernier = res;
       afficher(res, classe);
       const raretes = {};
@@ -2451,7 +2576,7 @@ function chercherUneIssue(classe, arme, grade, mixte, planchers) {
     let r;
     try {
       r = construire(classe, arme, liste, e.grade, vin, e.mixte,
-                     e.mixte ? planchers : {}, vinManuel);
+                     e.mixte ? planchers : {}, vinManuel, verrousObjet());
     } catch (err) { continue; }
     if (!r.suffisant) continue;
     const raretes = {};
@@ -2494,6 +2619,7 @@ function importer() {
  * rouvert ressortait tout en Légendaire, parce que seule la liste d'affixes
  * avait été gardée et que l'optimiseur repartait de zéro. */
 function afficherCode(code, vinPoints) {
+  libererVerrous();
   {
     // Sans second argument on affiche un code nu — celui qu'un inconnu vient
     // de coller. On ne lui prête aucun vin : rien dans le code ne le dit.
@@ -3654,7 +3780,8 @@ function demarrer(donnees) {
   majBudgetVin();
 
   brancherPlis();
-  $('classe').onchange = () => { majArmes(); };
+  $('classe').onchange = () => { libererVerrous(); majArmes(); };
+  if ($('arme')) $('arme').addEventListener('change', () => libererVerrous());
   $('recherche').oninput = dessinerAffixes;
   $('vider').onclick = () => {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
