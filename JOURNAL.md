@@ -247,6 +247,40 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Images, écoles de compétences, filtres de bibliothèque
+
+**Les icônes.** Le wiki publie une icône par compétence (`/icons/<id>.webp`) :
+les 100 sont récupérées, reconnues à leur texte de remplacement (« <nom>
+icon ») et non à leur position, sinon on ramassait celle d'un talent voisin.
+La fiche gagne un bandeau des pièces portées, un pictogramme par
+statistique, et les pastilles de catégorie devant chaque affixe dans
+« D'où vient chaque nombre ».
+
+`loading="lazy"` retiré des icônes : 25 images de 7 Ko par classe ne
+justifient pas de différer, et l'attente laissait des cases vides quand
+l'IntersectionObserver ne se déclenchait pas.
+
+**Les écoles.** Les pages de classe du wiki groupent les compétences —
+Sorcerer : Stardust / Elemental / Shared Staff Skills ; les autres classes
+se départagent par l'arme. Ces groupes sont récoltés et le panneau les
+présente en dépliants, ouverts sur celui de l'arme du build. Le dernier
+groupe d'une page n'a pas de marqueur de fin : il est **borné par le compte
+annoncé** (« 8 skills »), sans quoi il ramassait 19 compétences au lieu de 8.
+
+**Les filtres de « Mes builds ».** Recherche, classe, rareté, tri. Ils
+n'apparaissent qu'à partir de six builds : au-dessous, ils prennent plus de
+place qu'ils n'en font gagner.
+
+La rareté affichée est celle **réellement portée**, relue dans le code
+d'import — le 3e chiffre d'un identifiant est la rareté (structure vérifiée
+en jeu). Le réglage seul ne disait rien : un build enregistré en « Auto »
+s'affichait « Auto » trois semaines plus tard. Une seule couleur → cette
+couleur ; plusieurs → « Panaché Epic + Legendary ». Le filtre accepte donc
+« panachés seulement » ou une couleur précise, qu'elle soit seule ou mêlée.
+
+Piège évité : après filtrage, l'index d'une ligne ne désigne plus la même
+entrée dans la bibliothèque. La suppression retrouve la ligne par son nom.
+
 ### Descriptions, dégâts bruts par défaut, et la colonne collante
 
 Chaque compétence porte maintenant sa description. Elle est recollée depuis

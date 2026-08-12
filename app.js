@@ -1439,19 +1439,106 @@ function restituer(b) {
   calculer();
 }
 
+/* Le filtre de la bibliothèque locale. Il ne trie pas une liste de trois
+   builds : les contrôles restent cachés tant qu'il n'y en a pas assez pour
+   que chercher coûte moins cher que parcourir. */
+const SEUIL_FILTRES = 6;
+const bEtat = { recherche: '', classe: '', rarete: '', tri: 'nom' };
+
+/* La rareté d'un build enregistré n'est pas celle de son réglage : « Auto »
+   ne dit rien, et le panaché non plus. On la relit donc dans le STUFF, en
+   décodant le code gardé — c'est la seule source qui dise ce qui est
+   réellement porté. Une seule couleur → cette couleur ; plusieurs →
+   panaché. */
+const _raretesCache = new Map();
+function raretesDuBuild(b) {
+  const code = b.code || (b.etat && b.etat.k);
+  if (!code) return null;
+  if (_raretesCache.has(code)) return _raretesCache.get(code);
+  let sortie = null;
+  try {
+    const lu = decoderCode(code);
+    const grades = new Set();
+    // Le 3e chiffre d'un identifiant EST la rareté : structure vérifiée en
+    // jeu, [2 préfixe d'emplacement][1 rareté][2 famille][2 variante]. Pas
+    // besoin de retrouver la pièce dans le catalogue pour la connaître, ce
+    // qui vaut mieux : les 155 pièces reconstituées n'y figurent pas.
+    for (const e of lu.emplacements || []) {
+      const g = Number(String(e.cfg)[2]);
+      if (g >= 1 && g <= 8) grades.add(g);
+    }
+    if (grades.size) {
+      sortie = { grades: [...grades].sort((x, y) => x - y),
+                 panache: grades.size > 1 };
+    }
+  } catch (e) { /* code illisible : on ne prétend rien */ }
+  _raretesCache.set(code, sortie);
+  return sortie;
+}
+
+function etiquetteRarete(b) {
+  const r = raretesDuBuild(b);
+  if (!r) return b.etat.g ? (D.raretes[String(b.etat.g)] || '') : t('perso.auto');
+  if (!r.panache) return D.raretes[String(r.grades[0])] || '';
+  return `${t('perso.mixte')} ${r.grades.map((g) => D.raretes[String(g)]).join(' + ')}`;
+}
+
+function filtrerBuilds(liste) {
+  const q = bEtat.recherche.toLowerCase();
+  let vus = liste.filter((b) => {
+    if (q && !b.nom.toLowerCase().includes(q)) return false;
+    if (bEtat.classe !== '' && String(b.etat.c) !== bEtat.classe) return false;
+    if (bEtat.rarete !== '') {
+      const r = raretesDuBuild(b);
+      if (bEtat.rarete === 'panache') return !!(r && r.panache);
+      if (!r) return String(b.etat.g || '') === bEtat.rarete;
+      // Une couleur demandée : le build la contient, panaché ou non.
+      return r.grades.includes(Number(bEtat.rarete));
+    }
+    return true;
+  });
+  const cle = {
+    nom: (b) => b.nom.toLowerCase(),
+    classe: (b) => (D.classes[String(b.etat.c)] || '').toLowerCase(),
+    affixes: (b) => -((b.etat.t || []).length),
+  }[bEtat.tri] || ((b) => b.nom.toLowerCase());
+  vus = vus.slice().sort((a, b) => {
+    const x = cle(a); const y = cle(b);
+    return x < y ? -1 : x > y ? 1 : a.nom.localeCompare(b.nom);
+  });
+  return vus;
+}
+
 function dessinerBuilds() {
-  const liste = biblio();
+  const toute = biblio();
   const boite = $('listeBuilds');
-  if (!liste.length) {
+  const filtres = $('filtresBuilds');
+  if (filtres) filtres.hidden = toute.length < SEUIL_FILTRES;
+  if (!toute.length) {
     boite.innerHTML = `<div class="vide-liste">${t('builds.vide')}</div>`;
+    if ($('compteBuilds')) $('compteBuilds').textContent = '';
     return;
   }
+  const liste = toute.length < SEUIL_FILTRES ? toute : filtrerBuilds(toute);
+  if ($('compteBuilds')) {
+    $('compteBuilds').textContent = liste.length === toute.length
+      ? '' : t('mesb.compte', { n: liste.length, total: toute.length });
+  }
   boite.innerHTML = '';
-  liste.forEach((b, i) => {
+  if (!liste.length) {
+    boite.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
+    return;
+  }
+  liste.forEach((b) => {
+    // L'index doit désigner la ligne dans la bibliothèque ENTIÈRE : après
+    // filtrage, l'index de la vue supprimerait le mauvais build.
+    const i = toute.findIndex((x) => x.nom === b.nom);
     const ligne = document.createElement('div');
     ligne.className = 'buildLigne';
     const cl = (D.classes[String(b.etat.c)] || '?');
-    const ra = b.etat.g ? (D.raretes[String(b.etat.g)] || '') : 'auto';
+    // La rareté RÉELLEMENT portée, pas le réglage : « Auto » ne dit rien à
+    // qui relit sa liste trois semaines plus tard.
+    const ra = etiquetteRarete(b);
     // La case « public » n'a de sens qu'avec un compte : sans lui, il n'y a
     // nulle part où publier. On la montre grisée plutôt que de la cacher,
     // pour que la possibilité soit visible.
@@ -1897,6 +1984,9 @@ let _galerieChargee = false;
    vérifier ne vaut rien.
    ====================================================================== */
 let _sortChoisi = null;
+// Quels groupes l'utilisateur a ouverts : un redessin ne doit pas les
+// refermer sous ses doigts.
+const _ecolesOuvertes = new Set();
 let _brancheChoisie = 0;
 
 function nb(x, dec) {
@@ -1908,9 +1998,31 @@ function pc(x, dec) {
   return `${(Number(x || 0) * 100).toFixed(dec == null ? 1 : dec)} %`;
 }
 
-function carteStat(lib, val, sous, fort) {
+/* Un pictogramme par statistique. Dessinés ici plutôt que téléchargés : le
+   jeu n'expose pas d'icône pour ses stats, et une image « qui ressemble »
+   prise ailleurs serait une invention de plus. Le trait suit celui des
+   pastilles de catégorie, déjà en place. */
+const PICTO_STAT = {
+  attaque: '<path d="m4 20 8-8M6 4l14 14M14 4h6v6"/>',
+  defense: '<path d="M12 3 20 6v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3Z"/>',
+  vie: '<path d="M12 20s-7-4.3-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.7-7 9-7 9Z"/>',
+  ehp: '<path d="M12 3 20 6v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3Z"/><path d="M9 12h6"/>',
+  physique: '<path d="M14.5 3.5 20 9l-9.5 9.5L5 13l9.5-9.5ZM5 13l-2 6 6-2"/>',
+  magique: '<path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/>',
+  penetration: '<path d="M3 12h13M12 7l5 5-5 5M19 5v14"/>',
+  critique: '<path d="m13 2-8 11h6l-2 9 8-11h-6l2-9Z"/>',
+};
+function pictoStat(nom) {
+  const d = PICTO_STAT[nom];
+  if (!d) return '';
+  return `<svg class="pStat" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+}
+
+function carteStat(lib, val, sous, fort, picto) {
   return `<div class="stat${fort ? ' fort' : ''}">
-    <div class="lib">${lib}</div><div class="val">${val}</div>
+    <div class="lib">${pictoStat(picto)}<span>${lib}</span></div>
+    <div class="val">${val}</div>
     ${sous ? `<div class="sous">${sous}</div>` : ''}</div>`;
 }
 
@@ -1920,24 +2032,40 @@ function dessinerFiche(res, classeId) {
   const f = window.Fiche.ficheDe(res, classeId, D);
   bloc.hidden = false;
 
-  $('fiche').innerHTML = `<div class="statsGrille">
+  // Les pièces du build, en bandeau : la fiche doit dire de QUI elle parle.
+  const vignettes = D.ordreSlots.map((slot) => {
+    const it = res.slotItems[slot];
+    if (!it) return '';
+    const couleur = D.couleurs[String(it.g)] || '#9fb2c4';
+    return `<span class="mini" style="--tinte:${couleur}" title="${infobulle(it)}">
+      ${it.ic ? `<img src="icones/${it.ic}" alt="" decoding="async">`
+              : '<i></i>'}</span>`;
+  }).join('');
+
+  $('fiche').innerHTML = `
+    <div class="enteteFiche">
+      <div class="qui"><b>${f.nomClasse}</b>
+        <small>${$('arme').value || ''} · ${f.pieces} ${t('fiche.pieces')}</small></div>
+      <div class="miniStuff">${vignettes}</div>
+    </div>
+    <div class="statsGrille">
     ${carteStat(t('fiche.attaque'), nb(f.attaque),
                 t('fiche.attaqueSous', { base: nb(f.base.Attack),
-                  stuff: nb(f.stuff.attack || 0) }), true)}
+                  stuff: nb(f.stuff.attack || 0) }), true, 'attaque')}
     ${carteStat(t('fiche.defense'), nb(f.defense),
-                t('fiche.defenseSous', { red: pc(f.reduction) }), true)}
-    ${carteStat(t('fiche.vie'), nb(f.vie))}
+                t('fiche.defenseSous', { red: pc(f.reduction) }), true, 'defense')}
+    ${carteStat(t('fiche.vie'), nb(f.vie), '', false, 'vie')}
     ${carteStat(t('fiche.ehpPhys'), nb(f.ehpPhysique),
-                t('fiche.ehpSous'))}
-    ${carteStat(t('fiche.ehpMag'), nb(f.ehpMagique), t('fiche.ehpSous'))}
-    ${carteStat(t('fiche.degPhys'), '+' + pc(f.bonusPhysique))}
-    ${carteStat(t('fiche.degMag'), '+' + pc(f.bonusMagique))}
-    ${carteStat(t('fiche.resPhys'), pc(f.resistPhysique))}
-    ${carteStat(t('fiche.resMag'), pc(f.resistMagique))}
-    ${carteStat(t('fiche.penetration'), pc(f.penetration))}
-    ${carteStat(t('fiche.resCrit'), pc(f.resistCritique))}
+                t('fiche.ehpSous'), false, 'ehp')}
+    ${carteStat(t('fiche.ehpMag'), nb(f.ehpMagique), t('fiche.ehpSous'), false, 'ehp')}
+    ${carteStat(t('fiche.degPhys'), '+' + pc(f.bonusPhysique), '', false, 'physique')}
+    ${carteStat(t('fiche.degMag'), '+' + pc(f.bonusMagique), '', false, 'magique')}
+    ${carteStat(t('fiche.resPhys'), pc(f.resistPhysique), '', false, 'defense')}
+    ${carteStat(t('fiche.resMag'), pc(f.resistMagique), '', false, 'defense')}
+    ${carteStat(t('fiche.penetration'), pc(f.penetration), '', false, 'penetration')}
+    ${carteStat(t('fiche.resCrit'), pc(f.resistCritique), '', false, 'critique')}
     ${carteStat(t('fiche.critique'), pc(f.critique, 0),
-                t('fiche.critiqueSous'))}
+                t('fiche.critiqueSous'), false, 'critique')}
   </div>`;
 
   // La provenance : chaque ligne dit ce qui vient de la classe, du stuff et
@@ -1966,7 +2094,9 @@ function dessinerFiche(res, classeId) {
   const apports = f.detailAffixes
     .filter((a) => Object.keys(a.apports).length)
     .sort((a, b) => a.nom.localeCompare(b.nom))
-    .map((a) => `<tr><td>${a.nom} <b>${a.niveau}</b></td>
+    .map((a) => `<tr><td><span class="avecPastille">${
+        pastille((D.affixes[a.nom] || {}).cat)}${a.nom}
+        <b class="niv">${a.niveau}</b></span></td>
       <td colspan="4">${echapper(a.phrase)}</td></tr>`).join('');
   const muets = f.detailAffixes.filter((a) => !Object.keys(a.apports).length);
 
@@ -2029,18 +2159,57 @@ function dessinerSorts(res, classeId, f) {
     chiffrees: tous.filter((s) => s.coups.length).length,
   });
 
-  boite.innerHTML = '';
+  // GROUPÉ PAR ÉCOLE, PAS EN VRAC. Le jeu sépare les compétences d'une
+  // classe en branches qui ne se jouent pas ensemble : le Sorcerer choisit
+  // entre Stardust et Elemental, les autres classes se départagent surtout
+  // par l'arme. Les groupes viennent des pages de classe du wiki, pas d'un
+  // découpage inventé ici.
+  const groupes = new Map();
   for (const s of liste) {
+    const cle = s.ecole || s.arme || '—';
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle).push(s);
+  }
+  boite.innerHTML = '';
+  for (const [titre, membres] of groupes) {
+    const bloc = document.createElement('details');
+    bloc.className = 'ecole';
+    // Ouvert par défaut si l'arme du build en fait partie : c'est le groupe
+    // qu'on vient consulter. Les autres restent repliés.
+    const pertinent = !arme || membres.some(memeArme);
+    bloc.open = _ecolesOuvertes.has(titre) || (!_ecolesOuvertes.size && pertinent);
+    const chiffrees = membres.filter((s) => s.coups.length).length;
+    bloc.innerHTML = `<summary><b>${echapper(titre)}</b>
+      <small>${membres.length} · ${t('sorts.chiffrees', { n: chiffrees })}</small></summary>
+      <div class="grilleSorts"></div>`;
+    bloc.addEventListener('toggle', () => {
+      if (bloc.open) _ecolesOuvertes.add(titre); else _ecolesOuvertes.delete(titre);
+    });
+    boite.appendChild(bloc);
+    remplirGroupe(bloc.querySelector('.grilleSorts'), membres,
+                  f, cible, memeArme, res, classeId);
+  }
+  dessinerDetailSort(liste.find((s) => s.nom === _sortChoisi), f, cible,
+                     res, classeId);
+}
+
+function remplirGroupe(boite, membres, f, cible, memeArme, res, classeId) {
+  for (const s of membres) {
     const b = document.createElement('button');
     b.className = 'sort' + (s.coups.length ? '' : ' muet')
       + (memeArme(s) ? '' : ' autreArme')
       + (_sortChoisi === s.nom ? ' actif' : '');
     const tot = window.Fiche.totalCompetence(s, f, cible, _brancheChoisie);
-    b.innerHTML = `<div class="n">${echapper(s.nom)}</div>
-      <div class="d">${s.coups.length ? nb(tot.degats) : t('sorts.sansDegats')}</div>
-      <div class="m">${[s.arme,
-        s.energie != null ? `${nb(s.energie, 1)} ${t('sorts.energie')}` : '',
-        s.cd != null ? `${nb(s.cd, 0)} s` : ''].filter(Boolean).join(' · ')}</div>`;
+    b.innerHTML = `
+      <span class="icoSort">${s.ic
+        ? `<img src="icones_sorts/${s.ic}" alt="" decoding="async">` : '<i></i>'}</span>
+      <span class="txtSort">
+        <span class="n">${echapper(s.nom)}</span>
+        <span class="d">${s.coups.length ? nb(tot.degats) : t('sorts.sansDegats')}</span>
+        <span class="m">${[
+          s.energie != null ? `${nb(s.energie, 1)} ${t('sorts.energie')}` : '',
+          s.cd != null ? `${nb(s.cd, 0)} s` : ''].filter(Boolean).join(' · ')}</span>
+      </span>`;
     b.onclick = () => {
       _sortChoisi = (_sortChoisi === s.nom) ? null : s.nom;
       _brancheChoisie = 0;
@@ -2048,8 +2217,6 @@ function dessinerSorts(res, classeId, f) {
     };
     boite.appendChild(b);
   }
-  dessinerDetailSort(liste.find((s) => s.nom === _sortChoisi), f, cible,
-                     res, classeId);
 }
 
 function dessinerDetailSort(s, f, cible, res, classeId) {
@@ -2059,9 +2226,21 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
   // La description d'abord : c'est ce qu'on lit avant les chiffres.
   const description = s.desc
     ? `<p class="descSort">${echapper(s.desc)}</p>` : '';
+  const entete = `<div class="teteSort">
+    <span class="grandeIco">${s.ic
+      ? `<img src="icones_sorts/${s.ic}" alt="" decoding="async">` : '<i></i>'}</span>
+    <div>
+      <h3>${echapper(s.nom)}</h3>
+      <div class="jetons">
+        ${s.arme ? `<span class="jeton">${echapper(s.arme)}</span>` : ''}
+        ${s.energie != null ? `<span class="jeton">${nb(s.energie, 1)} ${t('sorts.energie')}</span>` : ''}
+        ${s.cd != null ? `<span class="jeton">${nb(s.cd, 0)} s</span>` : ''}
+      </div>
+    </div>
+  </div>`;
   if (!s.coups.length) {
-    boite.innerHTML = `<h3 style="margin:14px 0 6px">${echapper(s.nom)}</h3>
-      ${description}<p class="pas">${t('sorts.riendePublie')}</p>`;
+    boite.innerHTML = entete + description
+      + `<p class="pas">${t('sorts.riendePublie')}</p>`;
     return;
   }
 
@@ -2094,7 +2273,7 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
   const dps = (s.cd || s.anim)
     ? tot.degats / Math.max(s.cd || 0, s.anim || 0) : null;
 
-  boite.innerHTML = `<h3 style="margin:14px 0 6px">${echapper(s.nom)}</h3>
+  boite.innerHTML = entete + `
     ${description}
     ${branches}
     <table>
@@ -2345,6 +2524,7 @@ window.surChangementDeLangue = function () {
     $('rarete').value);
   dessinerAffixes();
   majBudgetVin();
+  if (window._poserFiltresBuilds) window._poserFiltresBuilds();
   dessinerBuilds();
   // Les listes déroulantes portent des libellés traduits : sans ce
   // remplissage, tri et filtres resteraient dans la langue précédente.
@@ -2433,6 +2613,33 @@ function demarrer(donnees) {
   };
   $('sortsCible').onchange = redessinerFiche;
   $('sortsArme').onchange = redessinerFiche;
+
+  // MES BUILDS : tri et filtres. Ils ne touchent que l'affichage, la
+  // bibliotheque reste intacte.
+  const poserFiltresBuilds = () => {
+    remplirSelect($('bClasse'), [['', t('mesb.toutesClasses')]].concat(
+      Object.entries(D.classes).map(([k, v]) => [k, v])), bEtat.classe);
+    remplirSelect($('bRarete'), [['', t('mesb.toutesRaretes')],
+      ['panache', t('mesb.panache')]].concat(
+      [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), bEtat.rarete);
+    remplirSelect($('bTri'), [['nom', t('mesb.triNom')],
+      ['classe', t('mesb.triClasse')],
+      ['affixes', t('mesb.triAffixes')]], bEtat.tri);
+  };
+  poserFiltresBuilds();
+  window._poserFiltresBuilds = poserFiltresBuilds;
+  for (const [id, cle] of [['bClasse', 'classe'], ['bRarete', 'rarete'],
+                           ['bTri', 'tri']]) {
+    $(id).onchange = () => { bEtat[cle] = $(id).value; dessinerBuilds(); };
+  }
+  let mb = null;
+  $('bChercher').oninput = () => {
+    clearTimeout(mb);
+    mb = setTimeout(() => {
+      bEtat.recherche = $('bChercher').value.trim();
+      dessinerBuilds();
+    }, 200);
+  };
 
   poserAideVin();
   $('vin').onchange = () => {

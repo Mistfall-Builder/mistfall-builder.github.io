@@ -131,6 +131,15 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
         display:grid;gap:18px}
 .pleine[hidden]{display:none}
 
+/* Les filtres de la bibliotheque locale : compacts, dans une colonne de
+   330 px, donc deux par ligne plutot qu'une file qui deborde. */
+.filtresBuilds{display:grid;grid-template-columns:1fr 1fr;gap:6px;
+  margin:8px 0 9px}
+.filtresBuilds input{grid-column:1/-1}
+.filtresBuilds select{width:100%;min-width:0;font-size:12px;padding:5px 7px}
+.filtresBuilds[hidden]{display:none}
+.vide-filtre{font-size:12px;color:var(--terne);padding:8px 2px}
+
 /* ------------------------------------------------- filtres et pagination -- */
 .filtres{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .filtres input[type=search]{flex:1 1 200px;min-width:0}
@@ -158,15 +167,38 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 .cb .actions button{width:auto;flex:1;padding:5px 8px;font-size:12px}
 
 /* ----------------------------------------------------------------- fiche -- */
+/* Une bande d'identite au-dessus des chiffres : sans elle, la fiche pouvait
+   appartenir a n'importe quel build de la page. */
+.enteteFiche{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding-bottom:11px;margin-bottom:12px;border-bottom:1px solid var(--bord)}
+.enteteFiche .qui b{font:700 17px/1.1 var(--condense);letter-spacing:.5px;
+  text-transform:uppercase;display:block}
+.enteteFiche .qui small{color:var(--terne);font-size:11.5px}
+.miniStuff{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap}
+.mini{width:34px;height:34px;border:1px solid var(--tinte,#333);border-radius:3px;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--tinte,#333) 16%,transparent),
+                             rgba(0,0,0,.35));
+  display:grid;place-items:center;overflow:hidden}
+.mini img{width:100%;height:100%;object-fit:contain}
+.mini i{width:12px;height:12px;border:1px dashed var(--bord-fort);border-radius:2px}
+
 .statsGrille{display:grid;gap:9px;
-  grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}
-.stat{border:1px solid var(--bord);border-radius:3px;padding:8px 10px;
-      background:rgba(255,255,255,.02)}
+  grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
+.stat{border:1px solid var(--bord);border-radius:3px;padding:9px 11px;
+      background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+      transition:border-color .12s}
+.stat:hover{border-color:var(--bord-fort)}
 .stat .lib{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;
-           color:var(--doux)}
-.stat .val{font-size:19px;font-weight:600;margin-top:2px}
-.stat .sous{font-size:11px;color:var(--doux);margin-top:1px}
+           color:var(--doux);display:flex;align-items:center;gap:6px}
+.stat .val{font-size:21px;font-weight:600;margin-top:3px;
+           font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.stat .sous{font-size:11px;color:var(--terne);margin-top:2px}
+.stat.fort{border-color:var(--accent-sombre);
+  background:linear-gradient(180deg,rgba(240,123,48,.10),rgba(240,123,48,.02))}
 .stat.fort .val{color:var(--accent)}
+.pStat{width:14px;height:14px;flex:0 0 auto;opacity:.75}
+.avecPastille{display:flex;align-items:center;gap:7px}
+.avecPastille .niv{color:var(--accent);font-size:12px}
 #ficheProvenance table{width:100%;border-collapse:collapse;font-size:12px}
 #ficheProvenance td,#ficheProvenance th{border-bottom:1px solid var(--bord);
   padding:4px 7px;text-align:left;vertical-align:top}
@@ -175,19 +207,54 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 #ficheProvenance .n{text-align:right;font-variant-numeric:tabular-nums}
 
 /* ------------------------------------------------------------ competences -- */
-.grilleSorts{display:grid;gap:8px;margin-top:4px;
+/* Un groupe par ecole (Stardust / Elemental) ou par arme : le jeu ne les
+   melange pas, la liste ne doit pas les melanger non plus. */
+.ecole{border:1px solid var(--bord);border-radius:3px;margin-bottom:8px;
+  background:rgba(255,255,255,.015)}
+.ecole>summary{padding:8px 11px;cursor:pointer;list-style:none;
+  display:flex;gap:9px;align-items:baseline;user-select:none}
+.ecole>summary::-webkit-details-marker{display:none}
+.ecole>summary::before{content:'▸';color:var(--accent);font-size:11px;
+  transition:transform .12s;display:inline-block}
+.ecole[open]>summary::before{transform:rotate(90deg)}
+.ecole>summary b{font:700 13px/1 var(--condense);letter-spacing:.7px;
+  text-transform:uppercase}
+.ecole>summary small{color:var(--terne);font-size:11px;margin-left:auto}
+.ecole>summary:hover b{color:var(--accent)}
+.grilleSorts{display:grid;gap:8px;padding:0 9px 10px;
   grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
-.sort{border:1px solid var(--bord);border-radius:3px;padding:8px 10px;
+.sort{border:1px solid var(--bord);border-radius:3px;padding:8px 9px;
       background:rgba(255,255,255,.02);cursor:pointer;text-align:left;
-      width:100%;color:inherit;font:inherit}
+      width:100%;color:inherit;font:inherit;
+      display:flex;gap:9px;align-items:center;transition:.12s}
 .sort:hover{border-color:var(--accent);background:rgba(240,123,48,.06)}
-.sort.actif{border-color:var(--accent);background:rgba(240,123,48,.10)}
-.sort .n{font-size:13px;font-weight:600}
+.sort.actif{border-color:var(--accent);background:rgba(240,123,48,.12)}
+.icoSort{width:38px;height:38px;flex:0 0 auto;border-radius:3px;overflow:hidden;
+  background:var(--creux);border:1px solid var(--bord);display:grid;
+  place-items:center}
+.icoSort img{width:100%;height:100%;object-fit:cover}
+.icoSort i{width:14px;height:14px;border:1px dashed var(--bord-fort);border-radius:2px}
+.txtSort{min-width:0;display:flex;flex-direction:column;gap:1px}
+.sort .n{font-size:12.5px;font-weight:600;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sort .d{font-size:16px;color:var(--accent);font-variant-numeric:tabular-nums;
-         margin-top:3px}
-.sort .m{font-size:10.5px;color:var(--doux);margin-top:2px}
-.sort.muet .d{color:var(--doux);font-size:12px}
-.sort.autreArme{opacity:.55}
+  line-height:1.15}
+.sort .m{font-size:10.5px;color:var(--terne)}
+.sort.muet .d{color:var(--terne);font-size:11.5px}
+.sort.autreArme{opacity:.5}
+
+/* L'entete du detail : grande icone, nom, et les compteurs en jetons. */
+.teteSort{display:flex;gap:13px;align-items:center;margin:16px 0 10px}
+.grandeIco{width:60px;height:60px;flex:0 0 auto;border-radius:4px;
+  overflow:hidden;border:1px solid var(--bord-fort);background:var(--creux);
+  display:grid;place-items:center}
+.grandeIco img{width:100%;height:100%;object-fit:cover}
+.grandeIco i{width:18px;height:18px;border:1px dashed var(--bord-fort)}
+.teteSort h3{margin:0;font:700 18px/1.15 var(--condense);letter-spacing:.5px;
+  text-transform:uppercase}
+.jetons{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.jeton{font-size:10.5px;border:1px solid var(--bord);border-radius:2px;
+  padding:2px 7px;color:var(--doux);background:rgba(255,255,255,.02)}
 #detailSort{margin-top:12px}
 .descSort{font-size:13px;line-height:1.6;color:var(--texte2);margin:0 0 10px;
   border-left:2px solid var(--accent-sombre);padding-left:10px}
@@ -536,7 +603,17 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
           <input type="text" id="nomBuild" data-i18n-ph="builds.nom" placeholder="nom du build…">
           <button id="enregistrerBuild" style="flex:0 0 auto" data-i18n="builds.enregistrer">Enregistrer</button>
         </div>
+        <!-- Les filtres n'apparaissent qu'a partir de quelques builds :
+             au-dessous, ils prennent plus de place qu'ils n'en font gagner. -->
+        <div class="filtresBuilds" id="filtresBuilds" hidden>
+          <input type="search" id="bChercher" data-i18n-ph="mesb.chercher"
+                 placeholder="nom du build…">
+          <select id="bClasse"></select>
+          <select id="bRarete"></select>
+          <select id="bTri"></select>
+        </div>
         <div id="listeBuilds"></div>
+        <div id="compteBuilds" class="pas" style="font-size:11px"></div>
         <div class="rangee" style="margin-top:9px">
           <button id="lienBuild" data-i18n="builds.lien">Lien de partage</button>
           <button id="exporterBuilds" data-i18n="builds.exporter">Exporter</button>
@@ -760,12 +837,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=27"></script>
-<script src="config.js?v=27"></script>
-<script src="comptes.js?v=27"></script>
-<script src="donnees.js?v=27"></script>
-<script src="skills.js?v=27"></script>
-<script src="fiche.js?v=27"></script>
-<script src="app.js?v=27"></script>
+<script src="i18n.js?v=30"></script>
+<script src="config.js?v=30"></script>
+<script src="comptes.js?v=30"></script>
+<script src="donnees.js?v=30"></script>
+<script src="skills.js?v=30"></script>
+<script src="fiche.js?v=30"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>
