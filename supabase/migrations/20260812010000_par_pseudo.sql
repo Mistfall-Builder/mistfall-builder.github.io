@@ -10,9 +10,18 @@
 -- des FONCTIONS qui répondent à une question précise : « qui s'appelle
 -- exactement comme ça ? ». Sans le pseudo exact, on n'obtient rien — et il
 -- n'existe aucune requête qui les énumère.
+--
+-- CE FICHIER SE COLLE TEL QUEL dans SQL Editor si l'intégration GitHub
+-- traîne : tout y est « if exists / if not exists / or replace », donc le
+-- rejouer deux fois ne casse rien.
 
 alter table public.builds
   add column if not exists partage boolean not null default false;
+
+-- Le code ami a été abandonné au profit du pseudo. La colonne ne sert plus
+-- à rien ; on la retire si une base l'a reçue.
+alter table public.profiles
+  drop column if exists code;
 
 -- ------------------------------------------------------ on ferme les portes
 -- Plus aucune lecture directe : ni des profils, ni des builds d'autrui.

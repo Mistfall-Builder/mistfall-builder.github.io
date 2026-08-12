@@ -247,6 +247,41 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Un seul mot, et une case qui dit ce qu'elle fait
+Le même identifiant s'appelait « pseudo public » quand on le choisissait,
+« pseudo exact de ton ami » quand on le tapait, et « code » dans les messages
+d'erreur — restes du code ami supprimé. C'est **pseudonyme** partout, dans
+les trois langues (nickname / никнейм). Les deux clés orphelines laissées par
+le code ami sont retirées.
+
+`perso.vin` perd sa parenthèse « (+2 sur 4 affixes) » : elle décrivait la
+règle du jeu, pas l'effet de la case. L'explication passe en infobulle sur le
+libellé. Surtout, décochée, la case laissait la colonne « Vin » cliquable et
+la ligne de budget annonçait « vin réparti automatiquement (8/8) » alors que
+le build n'en tenait aucun compte — la colonne s'éteint maintenant, et la
+ligne dit « Victory Wine non compté ».
+
+Mesuré : Aegis 6 + Blessing 6 + Block Energy Cost Reduction 6 donne
+1 Damaged + 2 Common + 5 Rare vin compté, **8 Rare** sans. C'est exactement
+ce que fait la case : les 8 points de Sigrid dispensent le stuff de fournir
+autant, donc il descend en rareté.
+
+Contrôle ajouté : les trois dictionnaires ont 187 clés chacun, aucun trou.
+
+### État réel de la base Supabase (mesuré, pas supposé)
+Migrations 1 et 2 appliquées (`builds` avec `public`, `profiles.pseudo`).
+Migration `20260812010000_par_pseudo.sql` **jamais appliquée** :
+`builds.partage` répond 400 et les trois fonctions 404 (PGRST202).
+`GET /profiles?select=pseudo` répond encore **200** — le trou d'énumération
+est ouvert, et n'est inoffensif que parce que la table est vide.
+
+La migration `20260812000000_code_ami.sql` est supprimée : le code ami a été
+abandonné, elle n'a jamais tourné, et elle aurait créé une colonne morte. La
+migration restante devient auto-suffisante et rejouable sans risque.
+
+`supabase/verifier.py` répond en trois secondes si la base est dans l'état
+attendu, avec la clé publique uniquement.
+
 ### Icône dragon, message vide retiré
 L'icône de l'outil et l'en-tête du site prennent le dragon fourni par
 l'utilisateur : la planche est découpée en trois pièces (icône encadrée,
