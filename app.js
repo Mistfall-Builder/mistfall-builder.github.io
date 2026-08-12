@@ -51,7 +51,7 @@ class Lecteur {
     let v = 0;
     for (let i = 0; i < largeur; i += 1) {
       const o = this.pos >> 3;
-      if (o >= this.octets.length) throw new Error('code tronqué');
+      if (o >= this.octets.length) throw new Error(t('code.tronque'));
       v |= ((this.octets[o] >> (this.pos & 7)) & 1) << i;
       this.pos += 1;
     }
@@ -780,16 +780,23 @@ function vignette(fichier, teinte, taille) {
 
 // Les 10 statistiques que portent réellement les objets. Celles en fraction
 // (0.07) sont des pourcentages dans le jeu : on les affiche comme tels.
+/* Les libellés passent par le dictionnaire : écrits en dur, ils restaient
+   en français dans les infobulles des trois versions du site. Le second
+   membre dit si la valeur est un pourcentage. */
 const NOM_STAT = {
-  attack: ['Attaque', 0], defence: ['Défense', 0], maxHealth: ['Vie max', 0],
-  combatValue: ['Puissance', 0], blockRate: ['Blocage', 1],
-  physicalIncrease: ['Dégâts physiques', 1], magicalIncrease: ['Dégâts magiques', 1],
-  physicalReduction: ['Réduction physique', 1], magicalReduction: ['Réduction magique', 1],
-  criticalReduction: ['Réduction critique', 1],
+  attack: ['stat.attack', 0], defence: ['stat.defence', 0],
+  maxHealth: ['stat.maxHealth', 0], combatValue: ['stat.combatValue', 0],
+  blockRate: ['stat.blockRate', 1],
+  physicalIncrease: ['stat.physicalIncrease', 1],
+  magicalIncrease: ['stat.magicalIncrease', 1],
+  physicalReduction: ['stat.physicalReduction', 1],
+  magicalReduction: ['stat.magicalReduction', 1],
+  criticalReduction: ['stat.criticalReduction', 1],
 };
 function statsLisibles(at) {
   return Object.entries(at || {}).map(([k, v]) => {
-    const [nom, pct] = NOM_STAT[k] || [k, 0];
+    const [cle, pct] = NOM_STAT[k] || [null, 0];
+    const nom = cle ? t(cle) : k;
     return pct ? `${nom} ${(v * 100).toFixed(1).replace(/\.0$/, '')} %` : `${nom} ${v}`;
   }).join(' · ');
 }
@@ -806,7 +813,7 @@ function infobulle(it) {
   const bouts = [it.n, D.raretes[String(it.g)]];
   const st = statsLisibles(it.at);
   if (st) bouts.push(st);
-  if (it.i) bouts.push('Inné : ' + it.i);
+  if (it.i) bouts.push(t('equip.inne') + ' ' + it.i);
   if (it.d) bouts.push(it.d);
   return bouts.filter(Boolean).join('\n');
 }
@@ -1418,7 +1425,7 @@ function restituer(b) {
       // calcul plutôt que de ne rien afficher, mais on le DIT.
       $('noteBuilds').innerHTML =
         `<span class="avert">Code du build illisible (${e.message}), `
-        + 'le stuff est recomposé à partir des affixes.</span>';
+        + t('builds.codeKo', { message: e.message }) + '</span>';
     }
   } else if (b && b.nom) {
     // BUILD D'AVANT LA CORRECTION. Il ne contient que des objectifs, pas de
@@ -1427,8 +1434,7 @@ function restituer(b) {
     $('noteBuilds').innerHTML =
       `<span class="avert">« ${b.nom} » a été enregistré avant que les builds `
       + 'gardent leur stuff : il n\'y a que les affixes, le stuff est donc '
-      + 'recomposé et peut différer. Réimporte son code puis réenregistre-le '
-      + 'sous le même nom pour le figer.</span>';
+      + t('builds.vieux', { nom: b.nom }) + '</span>';
   }
   calculer();
 }
@@ -1627,7 +1633,7 @@ function dessinerSuggestions(res, classe) {
       afficher(majeur, classe);
       $('etat').innerHTML = '<span class="ok">Suggestion appliquée</span>'
         + `<span class="pas"> — ${e.avant.n} remplacé par ${e.apres.n}. `
-        + '« Calculer » repart des affixes visés.</span>';
+        + t('etat.suggAppNote', { avant: avant, apres: apres }) + '</span>';
     };
     boite.appendChild(div);
   });
@@ -1862,10 +1868,10 @@ function afficherCode(code) {
       .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
     const tete = hors
       ? `<span class="avert">${hors} pièce(s) inconnue(s) du catalogue `
-        + 'n\'ont pas été chargées.</span>'
-      : '<span class="ok">Build chargé tel quel.</span>';
+        + t('etat.horsCatalogue', { n: perdus }) + '</span>'
+      : `<span class="ok">${t('etat.charge')}</span>`;
     $('etat').innerHTML = `${tete}<br>${detail} — <span class="pas">`
-      + '« Calculer » recomposerait le stuff à partir des affixes visés.</span>';
+      + t('etat.chargeNote') + '</span>';
     return { hors, raretes };
   }
 }
@@ -1966,6 +1972,7 @@ function dessinerFiche(res, classeId) {
 
   $('ficheProvenance').innerHTML = `
     <p class="pas" style="font-size:12px">${t('fiche.explique')}</p>
+    <p class="pas" style="font-size:12px">${t('sorts.reserve')}</p>
     <table>
       <tr><th>${t('fiche.stat')}</th><th class="n">${t('fiche.deClasse')}</th>
           <th class="n">${t('fiche.deStuff')}</th>
@@ -1995,7 +2002,7 @@ function dessinerFiche(res, classeId) {
    l'écran le dit, plutôt que d'être deviné.
    ====================================================================== */
 function cibleCourante(f) {
-  const v = ($('sortsCible') || {}).value || 'monstre';
+  const v = ($('sortsCible') || {}).value || 'brut';
   if (v === 'brut') return { defense: 0, resistPhysique: 0, resistMagique: 0 };
   if (v === 'moi') {
     return { defense: f.defense, resistPhysique: f.resistPhysique,
@@ -2049,9 +2056,12 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
   const boite = $('detailSort');
   if (!boite) return;
   if (!s) { boite.innerHTML = ''; return; }
+  // La description d'abord : c'est ce qu'on lit avant les chiffres.
+  const description = s.desc
+    ? `<p class="descSort">${echapper(s.desc)}</p>` : '';
   if (!s.coups.length) {
-    boite.innerHTML = `<p class="pas">${t('sorts.riendePublie')}
-      <a href="${s.url}" target="_blank" rel="noopener noreferrer">${t('sorts.voirWiki')}</a></p>`;
+    boite.innerHTML = `<h3 style="margin:14px 0 6px">${echapper(s.nom)}</h3>
+      ${description}<p class="pas">${t('sorts.riendePublie')}</p>`;
     return;
   }
 
@@ -2085,6 +2095,7 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
     ? tot.degats / Math.max(s.cd || 0, s.anim || 0) : null;
 
   boite.innerHTML = `<h3 style="margin:14px 0 6px">${echapper(s.nom)}</h3>
+    ${description}
     ${branches}
     <table>
       <tr><th>${t('sorts.coup')}</th><th class="n">${t('sorts.coef')}</th>
@@ -2107,8 +2118,6 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
                   ? f.bonusMagique : f.bonusPhysique) })}
       ${dps ? ' · ' + t('sorts.dps', { n: nb(dps, 1) }) : ''}
     </p>
-    <p class="pas" style="font-size:11.5px">${t('sorts.reserve')}
-      <a href="${s.url}" target="_blank" rel="noopener noreferrer">${t('sorts.voirWiki')}</a></p>
     ${(s.effets || []).length ? `<table style="margin-top:8px">${
       s.effets.map(([k, v]) => `<tr><td>${echapper(k)}</td>
         <td class="n">${echapper(v)}</td></tr>`).join('')}</table>` : ''}`;
@@ -2280,6 +2289,11 @@ function montrerPage(id) {
   for (const el of document.querySelectorAll('main, .page')) {
     el.hidden = (id === 'main') ? (el.tagName !== 'MAIN') : (el.id !== id);
   }
+  // La fiche vit hors de <main> (la colonne collante la recouvrait dedans),
+  // donc la boucle ci-dessus ne la voit pas : elle suit l'onglet Builder et
+  // ne s'affiche que si un build a été calculé.
+  const fiche = $('blocFiche');
+  if (fiche) fiche.hidden = (id !== 'main') || !dernier;
   for (const b of document.querySelectorAll('#nav button')) {
     b.classList.toggle('actif', b.dataset.page === id);
   }
@@ -2335,9 +2349,9 @@ window.surChangementDeLangue = function () {
   // Les listes déroulantes portent des libellés traduits : sans ce
   // remplissage, tri et filtres resteraient dans la langue précédente.
   remplirSelect($('sortsCible'), [
-    ['monstre', t('sorts.cible.monstre')],
     ['brut', t('sorts.cible.brut')],
-    ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'monstre');
+    ['monstre', t('sorts.cible.monstre')],
+    ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'brut');
   // Les listes distantes aussi : elles contiennent des libellés traduits
   // (« Charger », « Copier chez moi ») que seul un redessin met à jour.
   if (comptesDispo()) {
@@ -2378,8 +2392,11 @@ function demarrer(donnees) {
   // avec Epic imposé d'entrée, tout build ayant besoin d'une pièce dorée
   // échouait en annonçant « pas atteignable », ce qui ressemble à une panne
   // alors que c'est une consigne de l'utilisateur qu'il n'a jamais donnée.
+  // Le libellé passe par t() comme partout ailleurs : écrit en dur ici, il
+  // restait en français dans les trois langues et ignorait toute retouche
+  // du dictionnaire.
   remplirSelect($('rarete'),
-    [['', 'Auto — la plus basse qui suffit']].concat(
+    [['', t('perso.auto')]].concat(
       [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
   // Une case par emplacement : plusieurs pièces peuvent monter ensemble.
   const boite = $('plancherSlots');
@@ -2408,9 +2425,9 @@ function demarrer(donnees) {
   // LA FICHE. Changer de cible ou de filtre d'arme ne touche que
   // l'affichage : on redessine sans relancer le moteur de build.
   remplirSelect($('sortsCible'), [
-    ['monstre', t('sorts.cible.monstre')],
     ['brut', t('sorts.cible.brut')],
-    ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'monstre');
+    ['monstre', t('sorts.cible.monstre')],
+    ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'brut');
   const redessinerFiche = () => {
     if (dernier) dessinerFiche(dernier, Number($('classe').value));
   };
@@ -2437,8 +2454,8 @@ function demarrer(donnees) {
     $('noteCompte').innerHTML = `<span class="ko">${retourAuth.erreur}</span>`;
   } else if (retourAuth && retourAuth.connecte) {
     $('noteCompte').innerHTML = retourAuth.type === 'signup'
-      ? '<span class="ok">Adresse confirmée, te voilà connecté.</span>'
-      : '<span class="ok">Connecté.</span>';
+      ? `<span class="ok">${t('compte.confirme')}</span>`
+      : `<span class="ok">${t('compte.connecteOk')}</span>`;
   }
   // Au démarrage ordinaire la synchro est muette (personne n'a rien demandé),
   // mais juste après un lien de confirmation l'utilisateur ATTEND de voir
@@ -2553,7 +2570,7 @@ function demarrer(donnees) {
       majBandeauCompte();
       // Les builds locaux RESTENT : se déconnecter n'est pas effacer.
       $('noteBuilds').innerHTML =
-        '<span class="pas">Déconnecté. Tes builds restent sur cet appareil.</span>';
+        `<span class="pas">${t('compte.deconnecteOk')}</span>`;
     };
     $('compteSync').onclick = () => synchroniser(false);
   }
@@ -2571,14 +2588,16 @@ function demarrer(donnees) {
       `<span class="pas">Lien dans la barre d'adresse — copie-la pour partager ce build.</span>`;
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(lien).then(() => {
-        $('noteBuilds').innerHTML = '<span class="pas">Lien du build copié.</span>';
+        $('noteBuilds').innerHTML =
+          `<span class="pas">${t('builds.lienCopie')}</span>`;
       }, () => {});
     }
   };
   $('exporterBuilds').onclick = () => {
     const liste = biblio();
     if (!liste.length) {
-      $('noteBuilds').innerHTML = '<span class="ko">Rien à exporter.</span>';
+      $('noteBuilds').innerHTML =
+        `<span class="ko">${t('builds.rienExporter')}</span>`;
       return;
     }
     const blob = new Blob([JSON.stringify(liste, null, 2)],

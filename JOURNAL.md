@@ -247,6 +247,47 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Descriptions, dégâts bruts par défaut, et la colonne collante
+
+Chaque compétence porte maintenant sa description. Elle est recollée depuis
+la page : les liens internes la découpent en morceaux, et deux bornes
+naïves l'avaient d'abord tronquée — s'arrêter au nom de la classe coupait
+Rapid Arrows après quatre mots (la classe est citée *dans* le texte), et
+borner à deux lignes avant « Browse Skills » laissait un mot orphelin sur
+les pages qui listent deux armes. 100 descriptions, aucune parasitée.
+
+La cible par défaut passe aux **dégâts bruts** : c'est le chiffre qui se
+compare d'un sort à l'autre sans hypothèse sur l'adversaire.
+
+Les mentions techniques sous chaque sort sont retirées de la vue courante ;
+la réserve sur les critiques et la résistance des monstres tient en une
+ligne dans le dépliant « D'où vient chaque nombre », qui est replié.
+
+**La fiche recouvrait « Calculer le build ».** Elle était un troisième
+élément de la grille de `<main>`, donc en ligne 2 — mais la colonne de
+gauche est `position:sticky` et son aire de grille descend jusqu'au bas de
+la ligne 1 : en défilant, elle passait par-dessus. La fiche est sortie de
+`<main>` dans sa propre `<section>`, et `montrerPage` la suit explicitement.
+
+### Les textes oubliés
+« Auto — la plus basse qui suffit » devient « Auto ». Le libellé était
+écrit en dur dans `app.js` : il restait en français dans les trois langues
+et ignorait le dictionnaire.
+
+Chasse systématique menée à ce moment-là : **12 autres messages** étaient
+dans le même cas (« Rien à exporter », « Build chargé tel quel », « Inné : »,
+les dix libellés de statistiques des infobulles d'objets…). Les clés
+existaient pour la plupart, déclarées puis jamais utilisées — ce qui ne se
+voit pas tant qu'on ne compare pas. Contrôle ajouté : aucune chaîne
+accentuée ne subsiste hors dictionnaire, et les trois langues ont
+**280 clés chacune, zéro écart**.
+
+### D'où vient la Défense 705
+Page `/mechanics/` du wiki, deux fois : « Every monster in the game ships
+Defence 705, a flat 50% reduction », et l'exemple chiffré « Against Defence
+705 (50%) the hit lands for 64.8 ». Notre courbe donne bien 50,0 % à 705 et
+33,1 % à 400, la valeur que le wiki publie comme contrôle.
+
 ### Fiche de personnage, compétences, galerie et guides
 
 **La fiche.** `site/fiche.js` calcule Attaque, Défense, Vie, résistances,

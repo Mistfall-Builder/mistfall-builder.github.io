@@ -125,7 +125,10 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 @media(max-width:1040px){.colonne{position:static}}
 /* La fiche s'étale sous les deux colonnes : ses tableaux de stats et sa
    grille de compétences ne tiennent pas dans 330 px. */
-.pleine{grid-column:1/-1;display:grid;gap:18px}
+/* Hors de <main> : la colonne de gauche est collante, et son aire de
+   grille lui laissait recouvrir tout ce qui suivait dans la grille. */
+.pleine{max-width:1460px;margin:0 auto;padding:0 22px 44px;
+        display:grid;gap:18px}
 .pleine[hidden]{display:none}
 
 /* ------------------------------------------------- filtres et pagination -- */
@@ -186,6 +189,8 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 .sort.muet .d{color:var(--doux);font-size:12px}
 .sort.autreArme{opacity:.55}
 #detailSort{margin-top:12px}
+.descSort{font-size:13px;line-height:1.6;color:var(--texte2);margin:0 0 10px;
+  border-left:2px solid var(--accent-sombre);padding-left:10px}
 #detailSort table{width:100%;border-collapse:collapse;font-size:12px}
 #detailSort td,#detailSort th{border-bottom:1px solid var(--bord);
   padding:4px 7px;text-align:left}
@@ -638,10 +643,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     </div>
   </div>
 
+</main>
+
   <!-- LA FICHE, PLEINE LARGEUR ET EN BAS. Elle ne sert qu'une fois le build
        calculé, et sa place sous les deux colonnes évite de repousser les
        réglages hors de l'écran tant qu'il n'y a rien à montrer. -->
-  <div class="pleine" id="blocFiche" hidden>
+<section class="pleine" id="blocFiche" hidden>
     <div class="carte">
       <h2 data-i18n="fiche.titre">Fiche de personnage</h2>
       <div class="corps">
@@ -667,8 +674,8 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <div id="detailSort"></div>
       </div>
     </div>
-  </div>
-</main>
+</section>
+
 
 <section id="pageGalerie" class="page" hidden>
   <div class="banniere">
@@ -753,12 +760,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=25"></script>
-<script src="config.js?v=25"></script>
-<script src="comptes.js?v=25"></script>
-<script src="donnees.js?v=25"></script>
-<script src="skills.js?v=25"></script>
-<script src="fiche.js?v=25"></script>
-<script src="app.js?v=25"></script>
+<script src="i18n.js?v=27"></script>
+<script src="config.js?v=27"></script>
+<script src="comptes.js?v=27"></script>
+<script src="donnees.js?v=27"></script>
+<script src="skills.js?v=27"></script>
+<script src="fiche.js?v=27"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>
