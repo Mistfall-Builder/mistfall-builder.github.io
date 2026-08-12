@@ -729,6 +729,14 @@ function choisirVin(cibleListe) {
 }
 
 /* --------------------------------------------------------------------- UI */
+/* L'explication de la case « Compter le Victory Wine » tient en infobulle :
+   dans le libellé elle en ferait un pavé, et hors du libellé personne ne
+   la relierait à la case. */
+function poserAideVin() {
+  const l = $('labelVin');
+  if (l) l.title = t('perso.vinAide');
+}
+
 function remplirSelect(el, entrees, valeurSel) {
   el.innerHTML = '';
   for (const [val, txt] of entrees) {
@@ -809,14 +817,15 @@ function majEtatVin(ligne) {
   const nom = ligne.dataset.affixe;
   const vin = ligne.querySelector('.vin');
   if (!vin) return;
+  const compte = $('vin').checked;
   const vise = cibles.has(nom);
-  vin.disabled = !vise;
+  vin.disabled = !vise || !compte;
   // On remet la case sur « auto » : la laisser afficher « +2 » alors que
   // l'affixe n'est plus visé donnerait un réglage qui ne compte pas.
   if (!vise) vin.value = '';
-  vin.title = vise
-    ? t('affixes.vinTitre', { max: D.vin.max, bonus: D.vin.bonus })
-    : t('affixes.vinSansCible');
+  vin.title = !compte ? t('affixes.vinEteint')
+    : (vise ? t('affixes.vinTitre', { max: D.vin.max, bonus: D.vin.bonus })
+            : t('affixes.vinSansCible'));
 }
 
 /* Dit en clair où en est le budget de vin, faute de quoi une consigne rognée
@@ -824,6 +833,13 @@ function majEtatVin(ligne) {
 function majBudgetVin() {
   const el = $('budgetVin');
   if (!el) return;
+  // Decochee, la case rend tout le budget sans objet : l'annoncer quand
+  // meme laissait croire que ces points comptaient dans le build.
+  if (!$('vin').checked) {
+    el.className = 'pas';
+    el.textContent = t('vin.eteint');
+    return;
+  }
   const retenu = repartitionVin([...cibles.entries()], vinManuel);
   const total = [...retenu.values()].reduce((s, v) => s + v, 0);
   const budget = D.vin.max * D.vin.bonus;
@@ -1778,6 +1794,7 @@ function poserLangues() {
    d'affixes, tableau, paperdoll, messages) doit être redessiné. */
 window.surChangementDeLangue = function () {
   poserLangues();
+  poserAideVin();
   if (!D) return;
   remplirSelect($('rarete'),
     [['', t('perso.auto')]].concat(
@@ -1840,7 +1857,11 @@ function demarrer(donnees) {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
   };
   $('calculer').onclick = calculer;
-  $('vin').onchange = majBudgetVin;
+  poserAideVin();
+  $('vin').onchange = () => {
+    document.querySelectorAll('#listeAffixes .affixe').forEach(majEtatVin);
+    majBudgetVin();
+  };
 
   // ------------------------------------------------------- mes builds
   dessinerBuilds();

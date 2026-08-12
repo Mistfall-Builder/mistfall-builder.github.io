@@ -402,8 +402,8 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <select id="arme"></select>
         <label for="rarete" data-i18n="perso.rarete">Rareté</label>
         <select id="rarete"></select>
-        <label class="coche"><input type="checkbox" id="vin" checked>
-          <span data-i18n="perso.vin">Compter le Victory Wine (+2 sur 4 affixes)</span></label>
+        <label class="coche" id="labelVin"><input type="checkbox" id="vin" checked>
+          <span data-i18n="perso.vin">Compter le Victory Wine</span></label>
         <label class="coche"><input type="checkbox" id="mixte">
           <span data-i18n="perso.mixte">Panacher les raretés</span></label>
         <div id="blocPlancher" hidden>
@@ -466,9 +466,9 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
               <button id="compteSync" data-i18n="compte.sync">Synchroniser</button>
               <button id="compteDeconnexion" data-i18n="compte.deconnexion">Se déconnecter</button>
             </div>
-            <label for="pseudo" data-i18n="compte.pseudo">Pseudo public</label>
+            <label for="pseudo" data-i18n="compte.pseudo">Pseudonyme</label>
             <div class="rangee">
-              <input type="text" id="pseudo" data-i18n-ph="compte.pseudoPlace" placeholder="visible par les autres"
+              <input type="text" id="pseudo" data-i18n-ph="compte.pseudoPlace" placeholder="pseudonyme"
                      maxlength="24">
               <button id="enregistrerPseudo" style="flex:0 0 auto" data-i18n="compte.ok">OK</button>
             </div>
@@ -528,7 +528,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <div class="corps">
         <div class="rangee">
           <input type="text" id="amiPseudo" maxlength="24"
-                 data-i18n-ph="ami.place" placeholder="pseudo exact de ton ami">
+                 data-i18n-ph="ami.place" placeholder="pseudonyme">
           <button id="amiAjouter" style="flex:0 0 auto"
                   data-i18n="ami.ajouter">Ajouter</button>
         </div>
@@ -579,10 +579,10 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=19"></script>
-<script src="config.js?v=19"></script>
-<script src="comptes.js?v=19"></script>
-<script src="donnees.js?v=19"></script>
-<script src="app.js?v=19"></script>
+<script src="i18n.js?v=20"></script>
+<script src="config.js?v=20"></script>
+<script src="comptes.js?v=20"></script>
+<script src="donnees.js?v=20"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
