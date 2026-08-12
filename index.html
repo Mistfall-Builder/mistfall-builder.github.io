@@ -208,6 +208,29 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
   font-weight:700}
 .puceP{color:var(--ko);border-color:#4a2c2c;background:#160d0d}
 .sugg .appl{flex:0 0 auto}
+
+/* ------------------------------------------------- pièces interchangeables */
+.altSlot{margin-bottom:10px}
+.altSlot .ou{font:800 10px/1 var(--condense);letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--terne);margin-bottom:5px;
+  display:flex;align-items:center;gap:7px}
+.altSlot .nb{background:var(--releve);border:1px solid var(--bord);
+  border-radius:20px;padding:1px 7px;font-size:9.5px;color:var(--doux)}
+.altListe{display:flex;flex-wrap:wrap;gap:5px}
+.altItem{text-align:left;padding:5px 9px;line-height:1.25;font-size:12px;
+  background:var(--creux);border:1px solid var(--bord);font-weight:600}
+.altItem small{display:block;font-size:10px;color:var(--terne);font-weight:400}
+.altItem:hover{border-color:var(--accent-sombre);background:#12181b}
+.altItem.actuel{border-color:var(--accent);background:#1d1208;cursor:default}
+.altItem.actuel:hover{background:#1d1208}
+
+/* ----------------------------------------------------------- préférences -- */
+.affixe .pref{flex:0 0 auto;width:26px;padding:2px 0;font-size:13px;
+  line-height:1;background:none;border:1px solid transparent;color:var(--terne)}
+.affixe .pref:hover{border-color:var(--bord-fort);background:var(--releve)}
+.affixe .pref[data-etat="bonus"]{color:var(--accent);border-color:var(--accent-sombre)}
+.affixe .pref[data-etat="non"]{color:var(--ko);border-color:#4a2c2c}
+.entetes span:nth-child(4){width:26px;text-align:center}
 .separateur{margin:14px 0 9px;color:var(--terne);
   font:800 10px/1 var(--condense);letter-spacing:1.7px;text-transform:uppercase;
   display:flex;align-items:center;gap:9px}
@@ -336,7 +359,8 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <h2 data-i18n="affixes.titre">Affixes visés</h2>
       <div class="corps">
         <input type="text" id="recherche" data-i18n-ph="affixes.filtrer" placeholder="filtrer la liste…">
-        <div class="entetes"><span data-i18n="affixes.col.nom">Affixe</span><span data-i18n="affixes.col.niveau">Niveau</span><span data-i18n="affixes.col.vin">Vin</span></div>
+        <div class="entetes"><span data-i18n="affixes.col.nom">Affixe</span><span data-i18n="affixes.col.niveau">Niveau</span><span data-i18n="affixes.col.vin">Vin</span>
+          <span data-i18n="affixes.col.pref" title="★">★</span></div>
         <div id="listeAffixes"></div>
         <div id="budgetVin" class="pas"></div>
         <div class="rangee" style="margin-top:9px">
@@ -419,6 +443,14 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </div>
 
+    <div class="carte" id="blocAlternatives" hidden>
+      <h2 data-i18n="alt.titre">Pièces interchangeables</h2>
+      <div class="corps">
+        <div id="listeAlternatives"></div>
+        <div id="noteAlternatives" style="margin-top:9px;font-size:12px"></div>
+      </div>
+    </div>
+
     <div class="carte">
       <h2 data-i18n="table.titre">Affixes obtenus</h2>
       <div class="corps defil" id="tableauAffixes">
@@ -470,10 +502,10 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=12"></script>
-<script src="config.js?v=12"></script>
-<script src="comptes.js?v=12"></script>
-<script src="donnees.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="i18n.js?v=13"></script>
+<script src="config.js?v=13"></script>
+<script src="comptes.js?v=13"></script>
+<script src="donnees.js?v=13"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

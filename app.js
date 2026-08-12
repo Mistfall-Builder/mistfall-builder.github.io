@@ -11,6 +11,22 @@
 let D = null;                       // les données du jeu
 const cibles = new Map();           // affixe -> niveau visé
 const vinManuel = new Map();        // affixe -> points de vin imposés
+
+/* TE GUIDER, QUAND IL LE FAUT — et seulement là.
+ *
+ * Une cible dit « il m'en faut tant ». Ça ne dit pas si un affixe qui tombe
+ * gratuitement est bienvenu ou parasite : le Sky Piercer offert à un mage
+ * n'intéresse personne, alors qu'un Vitality gratuit est toujours bon à
+ * prendre. Sans cette nuance, l'outil proposait les deux à égalité.
+ *
+ * Trois états, un seul bouton, et le neutre par défaut : qui ne veut pas
+ * s'en occuper ne voit rien changer.
+ *   neutre  — l'outil décide seul (comportement d'avant)
+ *   bonus   — « si c'est gratuit, j'en veux » : compte double en suggestion
+ *   non     — « ne me le propose pas » : jamais suggéré
+ */
+const prefs = new Map();            // affixe -> 'bonus' | 'non'
+const CYCLE_PREF = [undefined, 'bonus', 'non'];
 let dernier = null;                 // dernier build calculé
 
 const $ = (id) => document.getElementById(id);
@@ -541,6 +557,47 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
   return res;
 }
 
+/* TOUTES LES PIÈCES QUI CONVIENNENT, EMPLACEMENT PAR EMPLACEMENT.
+ *
+ * « Tous les stuffs possibles » est une question mal posée : si trois pièces
+ * conviennent à chacun des huit emplacements, ça fait 6561 stuffs, et une
+ * liste de 6561 lignes n'aide personne. Ce qui aide, c'est de savoir QUELLES
+ * pièces sont interchangeables à chaque emplacement — le joueur compose
+ * ensuite avec ce qu'il a en stock ou trouve à l'hôtel des ventes.
+ *
+ * Chaque candidate est VÉRIFIÉE : on la pose réellement, on repose les
+ * gemmes, et on ne la garde que si toutes les cibles tiennent encore. La
+ * rareté n'est jamais changée. */
+function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
+  const want = Object.fromEntries(cibleListe);
+  const items = { ...res.slotItems };
+  const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vinPoints.get(n) || 0));
+  const tient = (cov) => cibleListe.every(([n, l]) => tot(cov, n) >= l);
+
+  const sortie = [];
+  for (const slot of D.ordreSlots) {
+    const actuel = items[slot];
+    if (!actuel) continue;
+    const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
+    const bonnes = [];
+    const vus = new Set();
+    for (const alt of opts) {
+      if (alt.g !== actuel.g) continue;
+      // Deux entrées identiques (même nom, mêmes trous, même inné) ne sont
+      // qu'un seul objet pour qui doit l'acheter.
+      const sig = `${alt.n}|${JSON.stringify(alt.s)}|${alt.i}`;
+      if (vus.has(sig)) continue;
+      vus.add(sig);
+      if (alt === actuel) { bonnes.push({ item: alt, actuel: true }); continue; }
+      const cov = assembler({ ...items, [slot]: alt }, want, false).couvert;
+      if (!tient(cov)) continue;
+      bonnes.push({ item: alt, actuel: false });
+    }
+    if (bonnes.length > 1) sortie.push({ slot, bonnes });
+  }
+  return sortie;
+}
+
 /* « En changeant CETTE pièce, tu gagnerais ça. »
  *
  * L'optimiseur rend un build ; il ne dit pas ce qui se jouait à un cheveu.
@@ -587,9 +644,15 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
         if (p && b >= p && a < p) paliers.push(n);
       }
       if (!gains.length || (pertes.length && !paliers.length)) continue;
+      // Un affixe marqué « ne me le propose pas » disqualifie l'échange :
+      // c'est une consigne, pas une pondération.
+      if (gains.some(([n]) => prefs.get(n) === 'non')) continue;
+      // Un affixe visé pèse le plus, un bonus explicitement souhaité vient
+      // juste après, le reste ne compte que pour mémoire.
+      const poids = (n) => (want[n] ? 3 : (prefs.get(n) === 'bonus' ? 2 : 1));
       let valeur = 0;
-      for (const [n, a, b] of gains) valeur += (b - a) * (want[n] ? 3 : 1);
-      for (const [n, a, b] of pertes) valeur -= (a - b) * (want[n] ? 3 : 1);
+      for (const [n, a, b] of gains) valeur += (b - a) * poids(n);
+      for (const [n, a, b] of pertes) valeur -= (a - b) * poids(n);
       valeur += paliers.length * 5;
       // D'OÙ VIENT LE GAIN. « Sky Piercer +1 » ne dit rien : est-ce l'inné de
       // la pièce, ou une gemme qu'un emplacement libéré a permis de poser ?
@@ -600,7 +663,8 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
       }
       const e = { slot, avant: actuel, apres: alt, gains, pertes, paliers,
                   valeur, origine,
-                  demande: Object.fromEntries(gains.map(([n]) => [n, !!want[n]])) };
+                  demande: Object.fromEntries(gains.map(([n]) =>
+                    [n, want[n] ? 'cible' : (prefs.get(n) === 'bonus' ? 'bonus' : '')])) };
       if (!meilleur || e.valeur > meilleur.valeur) meilleur = e;
     }
     if (meilleur) sortie.push(meilleur);
@@ -815,6 +879,27 @@ function dessinerAffixes() {
       majBudgetVin();
     };
     ligne.appendChild(vin);
+
+    const pref = document.createElement('button');
+    pref.className = 'pref';
+    const majPref = () => {
+      const v = prefs.get(nom);
+      pref.dataset.etat = v || 'neutre';
+      pref.textContent = v === 'bonus' ? '★' : (v === 'non' ? '✕' : '☆');
+      pref.title = t(v === 'bonus' ? 'pref.bonus'
+                     : (v === 'non' ? 'pref.non' : 'pref.neutre'));
+    };
+    pref.onclick = () => {
+      const i = CYCLE_PREF.indexOf(prefs.get(nom));
+      const suivant = CYCLE_PREF[(i + 1) % CYCLE_PREF.length];
+      if (suivant) prefs.set(nom, suivant); else prefs.delete(nom);
+      majPref();
+      if (dernier) setTimeout(() => dessinerSuggestions(dernier,
+        Number($('classe').value)), 0);
+    };
+    majPref();
+    ligne.appendChild(pref);
+
     majEtatVin(ligne);
     conteneur.appendChild(ligne);
   }
@@ -879,7 +964,8 @@ function afficher(res, classe) {
 
   // En différé : chercher les suggestions coûte presque autant qu'un build,
   // et le faire ici retarderait l'affichage de tout le reste pour rien.
-  setTimeout(() => dessinerSuggestions(res, classe), 0);
+  setTimeout(() => { dessinerSuggestions(res, classe);
+                     dessinerAlternatives(res, classe); }, 0);
 
   const libres = res.sockets.filter((s) => !s.gem).length;
   const compte = {};
@@ -1259,13 +1345,13 @@ function dessinerSuggestions(res, classe) {
     const couleurB = D.couleurs[String(e.apres.g)] || '#9fb0c4';
     const puces = e.gains.map(([n, a, b]) => {
       const pal = e.paliers.includes(n);
-      const vise = e.demande && e.demande[n];
+      const quoi = (e.demande && e.demande[n]) || '';
       const src = e.origine && e.origine[n] === 'inne'
         ? t('sugg.inne') : t('sugg.gemme');
-      return `<span class="puceG${pal ? ' palier' : ''}${vise ? '' : ' bonus'}" `
-        + `title="${src}">${n} ${a}→${b}`
-        + `${pal ? ' · ' + t('sugg.palier') : ''}`
-        + `${vise ? '' : ' · ' + t('sugg.nonDemande')}</span>`;
+      const etiq = pal ? ' · ' + t('sugg.palier')
+        : (quoi === 'bonus' ? ' · ★' : (quoi ? '' : ' · ' + t('sugg.nonDemande')));
+      return `<span class="puceG${pal ? ' palier' : ''}${quoi ? '' : ' bonus'}" `
+        + `title="${src}">${n} ${a}→${b}${etiq}</span>`;
     }).join('')
       + e.pertes.map(([n, a, b]) =>
         `<span class="puceP">${n} ${a}→${b}</span>`).join('');
@@ -1293,6 +1379,66 @@ function dessinerSuggestions(res, classe) {
     };
     boite.appendChild(div);
   });
+}
+
+/* Les pièces interchangeables, à l'écran. Une ligne par emplacement, la
+   pièce en place marquée, les autres cliquables. Rien n'est appliqué sans
+   clic — comme les suggestions. */
+function dessinerAlternatives(res, classe) {
+  const carte = $('blocAlternatives');
+  const boite = $('listeAlternatives');
+  if (!carte || !res || !res.slotItems) return;
+  let liste = [];
+  try {
+    const pl = {};
+    if ($('mixte').checked && $('plancherActif').checked) {
+      const gr = Number($('plancherGrade').value);
+      for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
+        pl[c.value] = gr;
+      }
+    }
+    liste = alternatives(res, classe, $('arme').value || null,
+                         [...cibles.entries()], pl, res.vinPoints || new Map());
+  } catch (e) { liste = []; }
+  carte.hidden = !liste.length;
+  if (!liste.length) return;
+  const total = liste.reduce((s, e) => s * e.bonnes.length, 1);
+  $('noteAlternatives').innerHTML =
+    `<span class="pas">${t('alt.total', { n: total })}</span>`;
+  boite.innerHTML = '';
+  for (const e of liste) {
+    const bloc = document.createElement('div');
+    bloc.className = 'altSlot';
+    const couleur = D.couleurs[String(e.bonnes[0].item.g)] || '#9fb0c4';
+    bloc.innerHTML = `<div class="ou">${D.nomsSlots[e.slot] || e.slot}
+      <span class="nb">${e.bonnes.length}</span></div>`;
+    const rangee = document.createElement('div');
+    rangee.className = 'altListe';
+    for (const b of e.bonnes) {
+      const el = document.createElement('button');
+      el.className = 'altItem' + (b.actuel ? ' actuel' : '');
+      el.style.color = couleur;
+      el.innerHTML = `${b.item.n}<small>${b.item.i
+        ? t('equip.inne') + ' ' + b.item.i : t('equip.aucunInne')}</small>`;
+      el.title = b.actuel ? t('alt.actuel') : t('alt.poser');
+      if (!b.actuel) {
+        el.onclick = () => {
+          const neufs = { ...res.slotItems, [e.slot]: b.item };
+          const a = assembler(neufs, Object.fromEntries(cibles), true);
+          const maj = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
+                        sources: a.sources, vin: res.vin,
+                        vinPoints: res.vinPoints, suffisant: true };
+          dernier = maj;
+          afficher(maj, classe);
+          $('etat').innerHTML = `<span class="ok">${t('alt.pose')}</span>`
+            + `<span class="pas"> — ${b.item.n}.</span>`;
+        };
+      }
+      rangee.appendChild(el);
+    }
+    bloc.appendChild(rangee);
+    boite.appendChild(bloc);
+  }
 }
 
 function calculer() {
