@@ -937,7 +937,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <span class="compte" id="compteCibles"></span></summary>
       <div class="corps">
         <div class="rangee">
-          <input type="text" id="recherche" data-i18n-ph="affixes.filtrer"
+          <input type="search" id="recherche" name="filtre-affixes" autocomplete="off" data-form-type="other" data-i18n-ph="affixes.filtrer"
                  placeholder="filtrer la liste…" style="flex:1">
           <div class="chipsPref" id="triPref"></div>
           <button id="ouvrirGrille" class="loupe" style="flex:0 0 auto"
@@ -962,13 +962,13 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <summary><span data-i18n="builds.titre">Mes builds</span></summary>
       <div class="corps">
         <div class="rangee">
-          <input type="text" id="nomBuild" data-i18n-ph="builds.nom" placeholder="nom du build…">
+          <input type="text" id="nomBuild" name="nom-du-build" autocomplete="off" data-form-type="other" data-i18n-ph="builds.nom" placeholder="nom du build…">
           <button id="enregistrerBuild" style="flex:0 0 auto" data-i18n="builds.enregistrer">Enregistrer</button>
         </div>
         <!-- Les filtres n'apparaissent qu'a partir de quelques builds :
              au-dessous, ils prennent plus de place qu'ils n'en font gagner. -->
         <div class="filtresBuilds" id="filtresBuilds" hidden>
-          <input type="search" id="bChercher" data-i18n-ph="mesb.chercher"
+          <input type="search" id="bChercher" name="filtre-mes-builds" autocomplete="off" data-form-type="other" data-i18n-ph="mesb.chercher"
                  placeholder="nom du build…">
           <select id="bClasse"></select>
           <select id="bRarete"></select>
@@ -1005,7 +1005,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
             </div>
             <label for="pseudo" data-i18n="compte.pseudo">Pseudonyme</label>
             <div class="rangee">
-              <input type="text" id="pseudo" data-i18n-ph="compte.pseudoPlace" placeholder="pseudonyme"
+              <input type="text" id="pseudo" name="mon-pseudo" autocomplete="off" data-form-type="other" data-i18n-ph="compte.pseudoPlace" placeholder="pseudonyme"
                      maxlength="24">
               <button id="enregistrerPseudo" style="flex:0 0 auto" data-i18n="compte.ok">OK</button>
             </div>
@@ -1026,7 +1026,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <summary><span data-i18n="ami.titre">Builds de mes amis</span></summary>
       <div class="corps">
         <div class="rangee">
-          <input type="text" id="amiPseudo" maxlength="24"
+          <input type="text" id="amiPseudo" name="pseudo-ami" autocomplete="off" data-form-type="other" maxlength="24"
                  data-i18n-ph="ami.place" placeholder="pseudonyme">
           <button id="amiAjouter" style="flex:0 0 auto"
                   data-i18n="ami.ajouter">Ajouter</button>
@@ -1187,7 +1187,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <!-- Les filtres partent en base, pas dans le navigateur : à mille
            builds, tout télécharger pour en cacher 990 n'a pas de sens. -->
       <div class="filtres">
-        <input type="search" id="galRecherche" data-i18n-ph="gal.chercher"
+        <input type="search" id="galRecherche" name="filtre-galerie" autocomplete="off" data-form-type="other" data-i18n-ph="gal.chercher"
                placeholder="nom du build ou pseudonyme…">
         <select id="galClasse"></select>
         <select id="galTri"></select>
@@ -1216,7 +1216,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     <h2 data-i18n="guide.ecrire">Écrire un guide</h2>
     <div class="corps">
       <div class="rangee">
-        <input type="text" id="guideTitre" maxlength="120"
+        <input type="text" id="guideTitre" name="titre-du-guide" autocomplete="off" data-form-type="other" maxlength="120"
                data-i18n-ph="guide.titrePlace" placeholder="titre du guide…">
         <select id="guideClasse" style="flex:0 0 auto"></select>
       </div>
@@ -1237,7 +1237,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     <h2 data-i18n="guide.titre">Guides publics</h2>
     <div class="corps">
       <div class="filtres">
-        <input type="search" id="guRecherche" data-i18n-ph="guide.chercher"
+        <input type="search" id="guRecherche" name="filtre-guides" autocomplete="off" data-form-type="other" data-i18n-ph="guide.chercher"
                placeholder="titre ou pseudonyme…">
         <select id="guClasse"></select>
         <button id="guRafraichir" data-i18n="gal.rafraichir">Rafraîchir</button>
@@ -1258,7 +1258,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
   <div class="grilleBoite" role="dialog" aria-modal="true" aria-labelledby="grilleTitre">
     <div class="grilleTete">
       <h2 id="grilleTitre" data-i18n="grille.titre">Tous les affixes</h2>
-      <input type="search" id="grilleRecherche" data-i18n-ph="grille.chercher"
+      <input type="search" id="grilleRecherche" name="filtre-affixes-plein-ecran" autocomplete="off" data-form-type="other" data-i18n-ph="grille.chercher"
              placeholder="tape un nom ou un effet…">
       <div class="chipsPref" id="triPrefGrille"></div>
       <span class="grilleCompte" id="grilleCompte"></span>
@@ -1290,15 +1290,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=68"></script>
-<script src="config.js?v=68"></script>
-<script src="comptes.js?v=68"></script>
-<script src="donnees.js?v=68"></script>
-<script src="skills.js?v=68"></script>
-<script src="talents.js?v=68"></script>
-<script src="builds_reference.js?v=68"></script>
-<script src="guides_classes.js?v=68"></script>
-<script src="fiche.js?v=68"></script>
-<script src="app.js?v=68"></script>
+<script src="i18n.js?v=69"></script>
+<script src="config.js?v=69"></script>
+<script src="comptes.js?v=69"></script>
+<script src="donnees.js?v=69"></script>
+<script src="skills.js?v=69"></script>
+<script src="talents.js?v=69"></script>
+<script src="builds_reference.js?v=69"></script>
+<script src="guides_classes.js?v=69"></script>
+<script src="fiche.js?v=69"></script>
+<script src="app.js?v=69"></script>
 </body>
 </html>

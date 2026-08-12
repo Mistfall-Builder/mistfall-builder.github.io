@@ -3832,10 +3832,23 @@ function demarrer(donnees) {
   majBudgetVin();
 
   brancherPlis();
-  // Le navigateur restaure parfois seul la valeur d'un champ au
-  // rechargement. Sur le filtre des affixes, ça vide la grille sans
-  // explication : on repart toujours d'un filtre neutre.
-  if ($('recherche')) $('recherche').value = '';
+  /* LE FILTRE REPART TOUJOURS VIDE.
+   *
+   * Le navigateur remplissait ce champ tout seul — une fois un code
+   * d'import, une fois une adresse e-mail piochee dans son gestionnaire de
+   * saisie : sans `name` ni `autocomplete`, il le prenait pour un champ de
+   * formulaire. Les 44 affixes disparaissaient alors derriere un filtre
+   * que personne n'avait tape, et une adresse personnelle s'affichait au
+   * milieu de la liste.
+   *
+   * Le champ porte desormais un nom explicite et `autocomplete="off"` ;
+   * cette remise a zero reste la ceinture, y compris au retour arriere
+   * (bfcache), ou la page revient telle qu'elle etait. */
+  const netFiltre = () => {
+    if ($('recherche') && $('recherche').value) { $('recherche').value = ''; dessinerAffixes(); }
+  };
+  netFiltre();
+  window.addEventListener('pageshow', netFiltre);
   $('classe').onchange = () => { libererVerrous(); majArmes(); };
   if ($('arme')) $('arme').addEventListener('change', () => libererVerrous());
   $('recherche').oninput = dessinerAffixes;
