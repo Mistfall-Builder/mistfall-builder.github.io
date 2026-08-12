@@ -247,6 +247,46 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### Le Victory Wine ne comptait que pour le contrôle, pas pour la recherche
+
+Signalé sur Reddit avec deux codes reproductibles, reproduit à l'identique.
+
+Un Sorcerer visant Eloquence 7, Valor 7, Elusive 5, Fervid 5 **avec +2 de vin
+sur chacun** sortait 8 pièces **Epic**. Demander 5/5/3/3 **sans vin** — la même
+chose exactement, puisque le vin apporte les 2 manquants — sortait 8 pièces
+**Excellent**. Un cran de rareté de trop sur les huit pièces.
+
+**Cause.** `vinPoints` n'entrait que dans `suffit()`, le contrôle final. La
+recherche, elle, visait les niveaux PLEINS : elle dépensait ses gemmes à
+pousser Eloquence vers 7 alors que le vin en apportait déjà 2, puis concluait
+qu'il fallait monter d'un cran. Le commentaire du moteur Python annonçait
+pourtant l'intention (« un affixe déjà porté à 5 par le vin ne doit pas se
+voir attribuer trois gemmes de plus ») — elle n'avait jamais été implémentée.
+
+**Correctif.** Le vin se retire des cibles AVANT de chercher :
+`cibleGear = visé − vin`, un affixe entièrement couvert par le vin sortant de
+la recherche. Le contrôle final reste sur les cibles pleines, la promesse
+faite à l'utilisateur. Même règle appliquée à `alleger`, `alternatives` et
+`suggestions`, avec une allocation de vin vide quand elle est déjà soustraite
+— sinon elle compterait deux fois.
+
+**Mesuré, 140 cas déterministes, avant / après :**
+
+| | avant | après |
+|---|---|---|
+| erreurs | 0 | 0 |
+| suffisants | 88 | 88 |
+| incohérents | 0 | 0 |
+| somme des raretés | 4252 | **4052** |
+| durée | 9093 ms | 6315 ms |
+
+Rien de ce qui passait n'échoue, 200 crans de rareté rendus, et c'est plus
+rapide puisque la recherche ne poursuit plus des niveaux déjà acquis. Les
+deux réglages du rapport donnent désormais le **même code d'import**.
+
+Côté Python : même correctif, 80 builds tirés au sort, 0 erreur, 0 promesse
+rompue. L'exécutable n'est pas reconstruit pour autant.
+
 ### Images, écoles de compétences, filtres de bibliothèque
 
 **Les icônes.** Le wiki publie une icône par compétence (`/icons/<id>.webp`) :

@@ -482,19 +482,40 @@ function sommeRaretes(slotItems) {
 }
 
 function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi) {
-  const want = Object.fromEntries(cibleListe);
   const affinite = D.affinites[String(classe)] || null;
   const vinPoints = vin ? repartitionVin(cibleListe, vinChoisi) : new Map();
   const vinNoms = new Set(vinPoints.keys());
 
+  /* LE VIN SE RETIRE DES CIBLES AVANT DE CHERCHER, PAS APRÈS.
+   *
+   * Il ne servait qu'au contrôle final : la recherche, elle, visait les
+   * niveaux PLEINS. Elle dépensait donc ses gemmes à pousser Eloquence
+   * vers 7 alors que le vin en apportait déjà 2, et concluait qu'il fallait
+   * monter d'un cran de rareté.
+   *
+   * Symptôme rapporté, reproduit à l'identique : Sorcerer visant Eloquence 7,
+   * Valor 7, Elusive 5, Fervid 5 avec +2 de vin sur chacun sortait 8 pièces
+   * Epic, alors que demander 5/5/3/3 sans vin — exactement la même chose —
+   * sortait 8 pièces Excellent.
+   *
+   * Le stuff n'a donc à fournir que `niveau visé − vin`. Un affixe entièrement
+   * couvert par le vin disparaît de la recherche : lui réserver une gemme
+   * volerait la place d'une cible qui, elle, en a besoin. */
+  const cibleGear = cibleListe
+    .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
+    .filter(([, l]) => l > 0);
+  const want = Object.fromEntries(cibleGear);
+
   const essai = (g, mx, dep) => {
-    const a = construireAuGrade(classe, arme, cibleListe, g, mx, planchers, null, dep);
+    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep);
     if (!affinite) return a;
-    const b = construireAuGrade(classe, arme, cibleListe, g, mx, planchers, affinite, dep);
+    const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep);
     const na = [couvertureEffective(a.couvert, want, null), surplus(a.couvert, want)];
     const nb = [couvertureEffective(b.couvert, want, null), surplus(b.couvert, want)];
     return (nb[0] > na[0] || (nb[0] === na[0] && nb[1] >= na[1])) ? b : a;
   };
+  // Le contrôle reste sur les cibles PLEINES : c'est la promesse faite à
+  // l'utilisateur, et elle doit être vérifiée telle qu'il l'a formulée.
   const suffit = (r) => cibleListe.every(([n, l]) =>
     (r.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
 
@@ -539,8 +560,10 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
   // ALLÈGEMENT FINAL, uniquement en panaché : à rareté unique toutes les
   // pièces partagent le même cran, il n'y a rien à rendre.
   if (mixte && res.suffisant) {
-    const legers = alleger(res.slotItems, classe, arme, cibleListe,
-                           planchers, vinPoints);
+    // Le vin est DÉJÀ retiré de `cibleGear` : on passe une allocation vide,
+    // sinon il serait compté deux fois et l'allègement descendrait trop bas.
+    const legers = alleger(res.slotItems, classe, arme, cibleGear,
+                           planchers, new Map());
     if (sommeRaretes(legers) < sommeRaretes(res.slotItems)) {
       const a = assembler(legers, want, true);
       const candidat = { slotItems: legers, sockets: a.sockets,
@@ -569,15 +592,25 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
  * gemmes, et on ne la garde que si toutes les cibles tiennent encore. La
  * rareté n'est jamais changée. */
 function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
-  const want = Object.fromEntries(cibleListe);
   const items = { ...res.slotItems };
+  // MÊME RÈGLE QUE DANS LE MOTEUR : la POSE DE GEMMES vise ce que le stuff
+  // doit réellement fournir, c'est-à-dire la cible moins le vin. La viser
+  // pleine faisait dépenser des gemmes sur des niveaux déjà couverts, et
+  // rejetait des pièces pourtant valables.
+  //
+  // `tient` et les paliers, eux, restent sur le TOTAL (stuff + vin) : un
+  // palier se franchit avec le vin compris.
+  const wantGear = Object.fromEntries(cibleListe
+    .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
+    .filter(([, l]) => l > 0));
+
   const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vinPoints.get(n) || 0));
 
   // LES PALIERS DÉJÀ FRANCHIS COMPTENT AUTANT QUE LES CIBLES. Un affixe visé
   // à 3 mais obtenu à 5 franchit son palier ; le laisser redescendre à 3
   // respecterait la cible tout en perdant le bonus, sans que rien ne le
   // dise. On relève donc ce qui est franchi, et on l'exige aussi.
-  const base = assembler(items, want, false).couvert;
+  const base = assembler(items, wantGear, false).couvert;
   const paliersTenus = [];
   for (const n of Object.keys(base)) {
     const p = palier(n);
@@ -601,7 +634,7 @@ function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
       if (vus.has(sig)) continue;
       vus.add(sig);
       if (alt === actuel) { bonnes.push({ item: alt, actuel: true }); continue; }
-      const cov = assembler({ ...items, [slot]: alt }, want, false).couvert;
+      const cov = assembler({ ...items, [slot]: alt }, wantGear, false).couvert;
       if (!tient(cov)) continue;
       bonnes.push({ item: alt, actuel: false });
     }
@@ -625,10 +658,21 @@ function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
 function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
   const want = Object.fromEntries(cibleListe);
   const items = { ...res.slotItems };
+  // MÊME RÈGLE QUE DANS LE MOTEUR : la POSE DE GEMMES vise ce que le stuff
+  // doit réellement fournir, c'est-à-dire la cible moins le vin. La viser
+  // pleine faisait dépenser des gemmes sur des niveaux déjà couverts, et
+  // rejetait des pièces pourtant valables.
+  //
+  // `tient` et les paliers, eux, restent sur le TOTAL (stuff + vin) : un
+  // palier se franchit avec le vin compris.
+  const wantGear = Object.fromEntries(cibleListe
+    .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
+    .filter(([, l]) => l > 0));
+
   // La référence est mesurée COMME les essais (pose gloutonne). Comparer une
   // pose exacte à des poses gloutonnes faisait paraître perdant tout
   // échange, et la fonction ne rendait jamais rien.
-  const base = assembler(items, want, false).couvert;
+  const base = assembler(items, wantGear, false).couvert;
   const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vinPoints.get(n) || 0));
   const tient = (cov) => cibleListe.every(([n, l]) => tot(cov, n) >= l);
 
@@ -645,7 +689,7 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
     for (const alt of opts) {
       if (alt === actuel || alt.g !== actuel.g) continue;
       const essai = { ...items, [slot]: alt };
-      const cov = assembler(essai, want, false).couvert;
+      const cov = assembler(essai, wantGear, false).couvert;
       if (!tient(cov)) continue;
       const gains = [], pertes = [], paliers = [];
       for (const n of new Set([...Object.keys(cov), ...Object.keys(base)])) {
@@ -2238,9 +2282,25 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
       </div>
     </div>
   </div>`;
+  // TOUT CE QU'ON A, MEME SANS COEFFICIENT. Une compétence sans dégâts
+  // publiés garde son cooldown, son coût, ses effets et sa durée
+  // d'animation : les cacher parce qu'il manque UN chiffre reviendrait à
+  // perdre les quatre autres.
+  const tableauEffets = () => {
+    const l = [];
+    if (s.cd != null) l.push([t('sorts.cooldown'), `${nb(s.cd, 0)} s`]);
+    if (s.energie != null) l.push([t('sorts.coutEnergie'), nb(s.energie, 1)]);
+    if (s.anim != null) l.push([t('sorts.animation'), `${nb(s.anim, 2)} s`]);
+    for (const [k, v] of (s.effets || [])) l.push([echapper(k), echapper(v)]);
+    if (!l.length) return '';
+    return `<table style="margin-top:10px">${l.map(([k, v]) =>
+      `<tr><td>${k}</td><td class="n">${v}</td></tr>`).join('')}</table>`;
+  };
+
   if (!s.coups.length) {
     boite.innerHTML = entete + description
-      + `<p class="pas">${t('sorts.riendePublie')}</p>`;
+      + `<p class="pas">${t('sorts.riendePublie')}</p>`
+      + tableauEffets();
     return;
   }
 
@@ -2297,9 +2357,7 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
                   ? f.bonusMagique : f.bonusPhysique) })}
       ${dps ? ' · ' + t('sorts.dps', { n: nb(dps, 1) }) : ''}
     </p>
-    ${(s.effets || []).length ? `<table style="margin-top:8px">${
-      s.effets.map(([k, v]) => `<tr><td>${echapper(k)}</td>
-        <td class="n">${echapper(v)}</td></tr>`).join('')}</table>` : ''}`;
+    ${tableauEffets()}`;
 
   for (const b of boite.querySelectorAll('.branches button')) {
     b.onclick = () => {
