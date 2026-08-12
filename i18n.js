@@ -326,6 +326,9 @@
       'equip.vide': 'vide',
       'equip.libres': '{n} emplacement(s) encore libre(s) :',
       'equip.pleins': 'Tous les emplacements de gemme sont remplis.',
+      'marge.titre': 'Encore disponible',
+      'marge.aide': "Ce que les emplacements de gemme libres permettent encore, chaque ligne prise SEULE : deux affixes peuvent convoiter le même emplacement, leurs marges ne s'additionnent donc pas.",
+      'marge.poser': 'Viser {nom} au niveau {n}',
 
       'pied.texte': 'Le code produit ici se colle dans',
       'pied.texte2': 'Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.',
@@ -644,6 +647,9 @@
       'equip.vide': 'empty',
       'equip.libres': '{n} socket(s) still free:',
       'equip.pleins': 'Every gem socket is filled.',
+      'marge.titre': 'Still available',
+      'marge.aide': 'What the free gem sockets could still give you, each line taken ON ITS OWN: two affixes can want the same socket, so these do not add up.',
+      'marge.poser': 'Target {nom} at level {n}',
 
       'pied.texte': 'The code produced here pastes into',
       'pied.texte2': 'Format verified in game both ways. No prices, no market.',
@@ -972,6 +978,9 @@
       'equip.vide': 'пусто',
       'equip.libres': 'Свободных слотов: {n}:',
       'equip.pleins': 'Все слоты под камни заполнены.',
+      'marge.titre': 'Ещё доступно',
+      'marge.aide': 'Что ещё могут дать свободные слоты под камни — каждая строка ОТДЕЛЬНО: два аффикса могут претендовать на один слот, поэтому они не складываются.',
+      'marge.poser': 'Взять {nom} на уровень {n}',
 
       'pied.texte': 'Полученный код вставляется в',
       'pied.texte2': 'Формат проверен в игре в обе стороны. Без цен и рынка.',

@@ -22,6 +22,10 @@
   --condense:'Bahnschrift Condensed','Bahnschrift','Arial Narrow','Aptos Narrow',
              'Segoe UI',sans-serif;
   --corps:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  /* Largeur utile du site. 1460 px laissait un tiers d'un ecran
+     1440p vide ; au-dela de 1800 les lignes de tableau deviennent
+     trop longues a suivre a l'oeil. */
+  --large:1800px;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--fond);color:var(--texte);
@@ -52,7 +56,7 @@ body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
 header{position:sticky;top:0;z-index:30;height:64px;
   background:rgba(8,10,11,.96);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--bord)}
-.barre{max-width:1460px;height:100%;margin:0 auto;padding:0 22px;
+.barre{max-width:var(--large);height:100%;margin:0 auto;padding:0 22px;
        display:flex;align-items:center;gap:14px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
 /* Le dragon déborde volontairement de la barre : posé dedans il aurait
@@ -81,7 +85,7 @@ header{position:sticky;top:0;z-index:30;height:64px;
 .nav button:hover{color:var(--texte2);background:#12181b}
 .nav button.actif{color:var(--accent);border-color:var(--accent-sombre);
   background:#1d1208}
-.page{max-width:1460px;margin:0 auto;padding:20px 22px 44px}
+.page{max-width:var(--large);margin:0 auto;padding:20px 22px 44px}
 /* `display:grid` sur main l'emporterait sur l'attribut hidden : sans cette
    règle, changer de page laisserait les deux affichées. */
 main[hidden],.page[hidden]{display:none}
@@ -117,8 +121,8 @@ main[hidden],.page[hidden]{display:none}
 .buildLigne .ami:has(input:disabled){opacity:.4;cursor:default}
 
 /* ------------------------------------------------------------- structure -- */
-main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
-     display:grid;grid-template-columns:330px minmax(0,1fr);gap:18px;
+main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
+     display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;
      align-items:start}
 @media(max-width:1040px){main{grid-template-columns:1fr}}
 .colonne{position:sticky;top:84px}
@@ -127,7 +131,7 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
    grille de compétences ne tiennent pas dans 330 px. */
 /* Hors de <main> : la colonne de gauche est collante, et son aire de
    grille lui laissait recouvrir tout ce qui suivait dans la grille. */
-.pleine{max-width:1460px;margin:0 auto;padding:0 22px 44px;
+.pleine{max-width:var(--large);margin:0 auto;padding:0 22px 44px;
         display:grid;gap:18px}
 .pleine[hidden]{display:none}
 
@@ -211,6 +215,23 @@ main{max-width:1460px;margin:0 auto;padding:20px 22px 44px;
 #ficheProvenance th{color:var(--doux);font-weight:500;font-size:11px;
   text-transform:uppercase;letter-spacing:.7px}
 #ficheProvenance .n{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ------------------------------------------------------------ marge libre -- */
+.grilleMarge{display:grid;gap:6px;
+  grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.lm{display:flex;align-items:center;gap:8px;padding:6px 9px;
+  border:1px solid var(--bord);border-radius:3px;
+  background:rgba(255,255,255,.02);width:100%;text-align:left;
+  color:inherit;font:inherit;cursor:pointer;transition:.12s}
+.lm:hover{border-color:var(--accent);background:rgba(240,123,48,.07)}
+.lm .nomA{flex:1;min-width:0;font-size:12.5px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.lm .fleche{font-size:12px;color:var(--terne);font-variant-numeric:tabular-nums}
+.lm .cible{color:var(--accent);font-weight:600}
+.lm.pal{border-color:var(--avert)}
+.lm .marquePal{font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;
+  color:var(--avert);border:1px solid var(--avert);border-radius:2px;
+  padding:0 4px}
 
 /* ------------------------------------------------------------ competences -- */
 /* Un groupe par ecole (Stardust / Elemental) ou par arme : le jeu ne les
@@ -487,6 +508,11 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 
 /* ------------------------------------------------------------ paperdoll -- */
 #paperdoll{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+@media(min-width:1600px){
+  .grilleSorts{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .grilleBuilds{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .statsGrille{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+}
 @media(max-width:1280px){#paperdoll{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:640px){#paperdoll{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .piece{background:var(--creux);border:1px solid var(--bord);border-radius:3px;
@@ -722,6 +748,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <div class="corps">
         <div id="paperdoll"></div>
         <div id="bilan" class="avert" style="margin-top:10px"></div>
+        <!-- Repond a « quand est-ce que je peux m'arreter d'ajouter des
+             affixes ? » : ce que les emplacements libres permettent encore. -->
+        <div id="carteMarge" hidden>
+          <div class="separateur" data-i18n="marge.titre">Encore disponible</div>
+          <div class="pas" style="font-size:12px;margin-bottom:7px"
+               data-i18n="marge.aide">Ce que les emplacements de gemme libres
+            permettent encore, chaque ligne prise seule.</div>
+          <div id="listeMarge"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -843,12 +878,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=33"></script>
-<script src="config.js?v=33"></script>
-<script src="comptes.js?v=33"></script>
-<script src="donnees.js?v=33"></script>
-<script src="skills.js?v=33"></script>
-<script src="fiche.js?v=33"></script>
-<script src="app.js?v=33"></script>
+<script src="i18n.js?v=35"></script>
+<script src="config.js?v=35"></script>
+<script src="comptes.js?v=35"></script>
+<script src="donnees.js?v=35"></script>
+<script src="skills.js?v=35"></script>
+<script src="fiche.js?v=35"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>

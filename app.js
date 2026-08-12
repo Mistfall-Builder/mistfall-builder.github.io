@@ -643,6 +643,79 @@ function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
   return sortie;
 }
 
+/* « QUAND EST-CE QUE JE PEUX M'ARRÊTER ? »
+ *
+ * Un build laisse presque toujours des emplacements de gemme vides. L'écran
+ * disait combien il en restait et de quel matériau — ce qui oblige à
+ * tâtonner : ajouter un affixe, recalculer, voir si ça passe, recommencer.
+ *
+ * On répond directement : pour chaque affixe, jusqu'où les emplacements
+ * LIBRES pourraient le monter, sans rien changer d'autre au stuff.
+ *
+ * CHAQUE LIGNE EST PRISE SEULE, et l'écran le dit. Deux affixes peuvent
+ * convoiter le même emplacement : additionner les marges donnerait un total
+ * qu'aucun build ne réalise. C'est la même règle que pour les pièces
+ * interchangeables — un chiffre vérifié vaut mieux qu'un chiffre flatteur. */
+function marge(res, vinPoints) {
+  // LES EMPLACEMENTS NE SONT JAMAIS VIDES. L'optimiseur comble les trous
+  // restants avec des gemmes bonus — c'était voulu, mais ça rend « compter
+  // les emplacements libres » faux : il n'y en a aucun.
+  //
+  // Ce qui est réellement disponible, ce sont les emplacements
+  // RÉAFFECTABLES : ceux dont la gemme ne sert AUCUNE cible demandée. Les
+  // vider ne coûte rien, donc leur contenu est négociable.
+  const vises = new Set(cibles.keys());
+  const sockets = res.sockets || [];
+  const negociables = [];
+  for (const s of sockets) {
+    if (!s.gem) { negociables.push(s); continue; }
+    if (!s.gem.a.some((a) => vises.has(a))) negociables.push(s);
+  }
+  if (!negociables.length) return [];
+
+  // La base : ce qui reste quand on a retiré les gemmes négociables. Sans
+  // cette soustraction, un affixe déjà porté par une gemme bonus verrait sa
+  // marge comptée deux fois.
+  const base = {};
+  for (const it of Object.values(res.slotItems || {})) {
+    if (it && it.i) base[it.i] = (base[it.i] || 0) + 1;
+  }
+  const negoSet = new Set(negociables);
+  for (const s of sockets) {
+    if (!s.gem || negoSet.has(s)) continue;
+    for (const a of s.gem.a) base[a] = (base[a] || 0) + 1;
+  }
+
+  const sortie = [];
+  for (const nom of Object.keys(D.affixes)) {
+    const cap = plafond(nom);
+    const socle = Math.min(cap, (base[nom] || 0)
+                                + ((vinPoints && vinPoints.get(nom)) || 0));
+    const actuel = Math.min(cap, (res.couvert[nom] || 0)
+                                 + ((vinPoints && vinPoints.get(nom)) || 0));
+    if (socle >= cap) continue;
+    const gemmes = affixVersGemmes.get(nom) || [];
+    if (!gemmes.length) continue;
+    // Un emplacement compte s'il existe AU MOINS une gemme de cet affixe
+    // qu'il accepte : bon matériau, et niveau de gemme dans ses moyens.
+    let places = 0;
+    for (const s of negociables) {
+      if (gemmes.some((g) => socketAccepte(s, g.t, g.l))) places += 1;
+    }
+    if (!places) continue;
+    const atteignable = Math.min(cap, socle + places);
+    // On n'annonce que ce qui dépasse ce que le build donne DÉJÀ.
+    if (atteignable <= actuel) continue;
+    sortie.push({ nom, actuel, atteignable, gain: atteignable - actuel,
+                  vise: vises.has(nom), palier: palier(nom) });
+  }
+  // Le plus gros gain d'abord ; à gain égal, ce qui franchit un palier.
+  return sortie.sort((a, b) => (b.gain - a.gain)
+    || ((b.palier && b.atteignable >= b.palier ? 1 : 0)
+        - (a.palier && a.atteignable >= a.palier ? 1 : 0))
+    || a.nom.localeCompare(b.nom));
+}
+
 /* « En changeant CETTE pièce, tu gagnerais ça. »
  *
  * L'optimiseur rend un build ; il ne dit pas ce qui se jouait à un cheveu.
@@ -904,12 +977,38 @@ function majBudgetVin() {
         { total, budget, n: retenu.size, max: D.vin.max });
 }
 
+/* Le texte cherchable d'un affixe : son nom, sa description, et les libellés
+   de tous ses niveaux. Calculé une fois puis gardé — refaire la
+   concaténation à chaque frappe sur 44 affixes × 7 niveaux se sentirait. */
+const _texteAffixe = new Map();
+function texteCherchable(nom) {
+  if (_texteAffixe.has(nom)) return _texteAffixe.get(nom);
+  const info = D.affixes[nom] || {};
+  const t = [nom, info.desc || '', ...(info.eff || [])]
+    .join(' ').toLowerCase();
+  _texteAffixe.set(nom, t);
+  return t;
+}
+
+function correspondAffixe(nom, filtre) {
+  // Plusieurs mots = tous doivent être présents, dans n'importe quel ordre :
+  // « magic res » doit trouver « Magic Damage Reduction ».
+  const mots = filtre.split(/\s+/).filter(Boolean);
+  if (!mots.length) return true;
+  const t = texteCherchable(nom);
+  return mots.every((m) => t.includes(m));
+}
+
 function dessinerAffixes() {
   const filtre = ($('recherche').value || '').toLowerCase();
   const conteneur = $('listeAffixes');
   conteneur.innerHTML = '';
   for (const nom of Object.keys(D.affixes).sort()) {
-    if (filtre && !nom.toLowerCase().includes(filtre)) continue;
+    // LA RECHERCHE PORTE AUSSI SUR L'EFFET, PAS SEULEMENT SUR LE NOM.
+    // Personne ne devine que la vitesse de déplacement s'appelle « Swift »
+    // ou « Focused » : chercher « speed » doit les trouver. On balaie donc
+    // la description et les libellés d'effet de chaque niveau.
+    if (filtre && !correspondAffixe(nom, filtre)) continue;
     const info = D.affixes[nom];
     const ligne = document.createElement('div');
     ligne.dataset.affixe = nom;
@@ -1058,6 +1157,8 @@ function afficher(res, classe) {
       Object.entries(compte).map(([k, n]) => `${n} ${k}`).join(' · ')
     : t('equip.pleins');
 
+  dessinerMarge(res);
+
   try {
     const objets = {};
     for (const [codeSlot, slotOutil] of Object.entries(D.codec.versGameData)) {
@@ -1077,6 +1178,38 @@ function afficher(res, classe) {
     $('code').value = '';
     $('copier').disabled = true;
     $('noteCode').textContent = t('code.impossible', { message: err.message });
+  }
+}
+
+/* La marge à l'écran. Cliquer une ligne pose l'affixe comme cible au niveau
+   annoncé : c'est le geste qu'on allait faire à la main juste après. */
+function dessinerMarge(res) {
+  const carte = $('carteMarge');
+  const boite = $('listeMarge');
+  if (!carte || !boite) return;
+  const liste = marge(res, res.vinPoints || new Map());
+  carte.hidden = !liste.length;
+  if (!liste.length) return;
+  boite.className = 'grilleMarge';
+  boite.innerHTML = '';
+  // Une dizaine suffit : au-delà, la liste devient un annuaire et personne
+  // ne la lit. Les plus gros gains sont en tête.
+  for (const m of liste.slice(0, 12)) {
+    const b = document.createElement('button');
+    const franchit = m.palier && m.atteignable >= m.palier && m.actuel < m.palier;
+    b.className = 'lm' + (franchit ? ' pal' : '');
+    b.title = t('marge.poser', { nom: m.nom, n: m.atteignable });
+    b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
+      <span class="nomA">${m.nom}</span>
+      ${franchit ? `<span class="marquePal">${t('sugg.palier')}</span>` : ''}
+      <span class="fleche">${m.actuel} → <span class="cible">${m.atteignable}</span></span>`;
+    b.onclick = () => {
+      cibles.set(m.nom, m.atteignable);
+      dessinerAffixes();
+      majBudgetVin();
+      calculer();
+    };
+    boite.appendChild(b);
   }
 }
 

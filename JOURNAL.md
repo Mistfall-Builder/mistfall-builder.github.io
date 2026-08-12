@@ -247,6 +247,48 @@ doit figurer dans les `hidden imports` de `build_exe.py` (`innes_deduits`,
 
 Entrées les plus récentes en premier.
 
+### « Quand est-ce que je peux m'arrêter ? »
+
+Demandé sur Discord : après un build, savoir ce qu'on peut ENCORE prendre
+sans rien perdre, au lieu de tâtonner en ajoutant un affixe, recalculant, et
+recommençant.
+
+Une carte « Encore disponible » liste, pour chaque affixe, jusqu'où on
+pourrait le monter. Cliquer une ligne le pose comme cible à ce niveau et
+relance le calcul.
+
+**Première version fausse, corrigée avant publication.** J'ai d'abord compté
+les emplacements de gemme VIDES — il n'y en a jamais : l'optimiseur comble
+les trous restants avec des gemmes bonus, c'était voulu. La carte ne
+s'affichait donc jamais.
+
+Ce qui est réellement disponible, ce sont les emplacements **réaffectables**
+— ceux dont la gemme ne sert aucune cible demandée. Les vider ne coûte rien.
+Le socle est recalculé en retirant ces gemmes, sinon un affixe déjà porté par
+une gemme bonus verrait sa marge comptée deux fois.
+
+**Chaque ligne est prise SEULE, et l'écran le dit** : deux affixes peuvent
+convoiter le même emplacement, leurs marges ne s'additionnent pas. Même
+discipline que les pièces interchangeables.
+
+Contrôlé : 33 builds, **132 promesses, 132 tenues**, et les cibles d'origine
+gardées dans les 132 cas.
+
+### La recherche d'affixes lit aussi les effets
+Signalé sur Reddit : personne ne devine que la vitesse de déplacement
+s'appelle « Swift » ou « Focused ». La recherche balaie maintenant le nom, la
+description et les libellés des sept niveaux. « speed » ramène Eloquence,
+Energy Recovery Speed Increase, Focused, Seamless, Seeker, Sleight of Hand et
+Swift. Plusieurs mots se cumulent dans n'importe quel ordre : « magic res »
+trouve « Magic Damage Reduction ».
+
+### Le site occupe les grands écrans
+1460 px laissaient un tiers d'un écran 1440p vide. La largeur passe à
+1800 px, déclarée une seule fois (`--large`) au lieu de quatre valeurs
+identiques dispersées, la colonne de réglages à 360 px, et au-delà de
+1600 px les grilles de compétences, de builds et de statistiques prennent une
+colonne de plus plutôt que d'étirer leurs cartes.
+
 ### Le Victory Wine ne comptait que pour le contrôle, pas pour la recherche
 
 Signalé sur Reddit avec deux codes reproductibles, reproduit à l'identique.
