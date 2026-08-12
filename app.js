@@ -1381,7 +1381,12 @@ function afficher(res, classe) {
     const total = Math.min(plafond(nom), eq + v);
     const cls = vise == null ? '' : (total >= vise ? 'ok' : 'ko');
     const cat = (D.affixes[nom] || {}).cat;
-    return `<tr><td><span style="display:flex;align-items:center;gap:8px">
+    // TOUTE LA LIGNE EST MARQUÉE, pas seulement le total. Un chiffre rouge
+    // isolé dans la dernière colonne oblige à repartir vers la gauche pour
+    // savoir DE QUEL affixe il s'agit ; sur dix lignes on se trompe. La
+    // ligne entière porte la couleur, le nom est trouvé sans chercher.
+    return `<tr${cls === 'ko' ? ' class="ligneKo"' : ''}>
+            <td><span style="display:flex;align-items:center;gap:8px">
               ${pastille(cat)}${nom}</span></td>
             <td class="n">${vise == null ? '—' : vise}</td><td class="n">${eq}</td>
             <td class="n">${v || ''}</td><td class="n ${cls}">${total}</td></tr>`;
@@ -1514,6 +1519,45 @@ function dessinerMarge(res) {
    et un build enregistré profite des corrections futures du moteur. Le code
    d'import est gardé à côté, pour le relire sans tout recalculer. */
 const CLE_BIBLIO = 'mistfall.builds.v1';
+
+/* ======================================================================
+   LES SECTIONS REPLIÉES SE SOUVIENNENT
+
+   Replier « Mes builds » pour ne plus l'avoir sous les yeux n'a d'intérêt
+   que si ça tient : sans mémoire, tout se rouvrait au rechargement et il
+   fallait recommencer à chaque visite.
+
+   C'est gardé dans le navigateur, pas sur le compte : la mise en page est
+   propre à l'écran devant lequel on est, et on n'a pas besoin d'un compte
+   pour l'avoir. Sur une autre machine, on retrouve les valeurs par défaut.
+
+   Ce qui est enregistré, c'est l'ÉCART au défaut, pas l'état brut : ainsi
+   changer un jour un défaut dans le HTML s'applique à tout le monde, sauf
+   à ceux qui avaient justement touché à cette section-là.
+   ====================================================================== */
+const CLE_PLIS = 'mistfall.plis.v1';
+
+function lirePlis() {
+  try { return JSON.parse(localStorage.getItem(CLE_PLIS) || '{}'); }
+  catch (e) { return {}; }
+}
+
+function brancherPlis() {
+  const plis = lirePlis();
+  for (const d of document.querySelectorAll('details.carte.pliable[id]')) {
+    // Les cartes qui apparaissent et disparaissent selon le build (les
+    // suggestions, les pièces interchangeables) gardent leur propre
+    // logique : leur état ne veut rien dire d'une visite à l'autre.
+    if (d.hasAttribute('hidden')) continue;
+    const defaut = d.hasAttribute('open');
+    if (Object.prototype.hasOwnProperty.call(plis, d.id)) d.open = !!plis[d.id];
+    d.addEventListener('toggle', () => {
+      const p = lirePlis();
+      if (d.open === defaut) delete p[d.id]; else p[d.id] = d.open;
+      try { localStorage.setItem(CLE_PLIS, JSON.stringify(p)); } catch (e) { /* quota */ }
+    });
+  }
+}
 
 function etatActuel() {
   return {
@@ -3609,6 +3653,7 @@ function demarrer(donnees) {
   dessinerAffixes();
   majBudgetVin();
 
+  brancherPlis();
   $('classe').onchange = () => { majArmes(); };
   $('recherche').oninput = dessinerAffixes;
   $('vider').onclick = () => {
