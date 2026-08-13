@@ -4296,6 +4296,149 @@ async function enregistrerGuide() {
   }
 }
 
+/* ============================================================ LE CATALOGUE
+ *
+ * 1482 objets. Trois regles pour que cet onglet ne coute rien au reste :
+ *
+ * 1. IL NE SE DESSINE QU'A L'OUVERTURE. Tant qu'on est sur le Builder, ce
+ *    code ne tourne pas et pas une icone ne part sur le reseau.
+ * 2. IL SE PAGINE. Soixante cartes a l'ecran, pas quinze cents noeuds DOM.
+ * 3. SES ICONES SONT DIFFEREES. `loading="lazy"` : le navigateur ne demande
+ *    que ce qui entre dans le champ de vision.
+ *
+ * Les donnees viennent de `D.objets`, deja chargees pour le moteur : aucun
+ * fichier supplementaire.
+ */
+const OBJ_PAR_PAGE = 60;
+const objEtat = { page: 0, total: 0 };
+let _catalogue = null;
+
+/* LE CATALOGUE EST GROUPE PAR FAMILLE, PAS PAR VARIANTE.
+ *
+ * Le jeu compte 1482 objets distincts pour seulement 213 NOMS : « Ace Assassin
+ * Boots » existe en sept exemplaires qui ne different que par leur inne. Les
+ * lister a plat donnait sept cartes identiques d'affilee, illisibles — alors
+ * qu'un joueur cherche une famille et veut savoir quels innes elle porte.
+ *
+ * Une carte par nom, donc, avec ses innes en pastilles. */
+function catalogue() {
+  if (_catalogue) return _catalogue;
+  const vus = new Map();
+  for (const [cle, arr] of Object.entries(D.objets || {})) {
+    const [classe, slot] = cle.split('|');
+    for (const it of arr) {
+      let fam = vus.get(it.n);
+      if (!fam) {
+        fam = { n: it.n, ic: it.ic, slot, g: it.g, at: it.at, d: it.d,
+                innes: [], logs: 0, classes: [], ids: [] };
+        vus.set(it.n, fam);
+      }
+      if (!fam.classes.includes(classe)) fam.classes.push(classe);
+      if (it.i && !fam.innes.includes(it.i)) fam.innes.push(it.i);
+      fam.logs = Math.max(fam.logs, (it.s || []).length);
+      fam.ids.push(it.id);
+      if (!fam.ic && it.ic) fam.ic = it.ic;
+    }
+  }
+  for (const fam of vus.values()) fam.innes.sort();
+  _catalogue = [...vus.values()].sort((a, b) =>
+    (b.g - a.g)
+    || D.ordreSlots.indexOf(a.slot) - D.ordreSlots.indexOf(b.slot)
+    || a.n.localeCompare(b.n));
+  return _catalogue;
+}
+
+function objFiltres() {
+  const q = ($('objRecherche').value || '').trim().toLowerCase();
+  const cl = $('objClasse').value;
+  const sl = $('objSlot').value;
+  const ra = $('objRarete').value;
+  return catalogue().filter((f) => {
+    if (cl && !f.classes.includes(cl)) return false;
+    if (sl && f.slot !== sl) return false;
+    if (ra && String(f.g) !== ra) return false;
+    if (!q) return true;
+    return f.n.toLowerCase().includes(q)
+        || f.innes.some((i) => libelleAffixe(i).toLowerCase().includes(q));
+  });
+}
+
+function carteObjet(f) {
+  const el = document.createElement('div');
+  el.className = 'objCarte';
+  const coul = D.couleurs[String(f.g)] || 'var(--bord)';
+  el.style.borderLeftColor = coul;
+  const logs = f.logs
+    ? `<span class="objLogs">${'<i></i>'.repeat(f.logs)}</span>` : '';
+  const innes = f.innes.length
+    ? `<span class="objInnes">${f.innes
+        .map((i) => `<em>${echapper(libelleAffixe(i))}</em>`).join('')}</span>`
+    : `<span class="objMeta objSansInne">${t('obj.sansInne')}</span>`;
+  el.innerHTML = `
+    ${f.ic ? `<img src="icones/${echapper(f.ic)}" alt="" loading="lazy" decoding="async">`
+           : '<span class="objSansIcone" aria-hidden="true"></span>'}
+    <div class="objTxt">
+      <span class="objNom">${echapper(f.n)}</span>
+      <span class="objMeta"><span style="color:${coul}">${
+        echapper(D.raretes[String(f.g)] || '')}</span>
+        · ${echapper(D.nomsSlots[f.slot] || f.slot)}${
+        f.innes.length > 1 ? ` · ${t('obj.variantes', { n: f.innes.length })}` : ''}</span>
+      ${innes}
+      ${logs}
+    </div>
+    <span class="objOu" title="${echapper(t('obj.ouInconnu'))}">?</span>`;
+  return el;
+}
+
+function dessinerObjets(page) {
+  const boite = $('objGrille');
+  if (!boite || !D) return;
+  if (typeof page === 'number') objEtat.page = page;
+  const liste = objFiltres();
+  objEtat.total = liste.length;
+  const debut = objEtat.page * OBJ_PAR_PAGE;
+  if (debut >= liste.length) { objEtat.page = 0; }
+  const tranche = liste.slice(objEtat.page * OBJ_PAR_PAGE,
+                              objEtat.page * OBJ_PAR_PAGE + OBJ_PAR_PAGE);
+  boite.innerHTML = '';
+  if (!tranche.length) {
+    boite.innerHTML = `<div class="objVide">${t('obj.rien')}</div>`;
+  } else {
+    const f = document.createDocumentFragment();
+    for (const it of tranche) f.appendChild(carteObjet(it));
+    boite.appendChild(f);
+  }
+  $('objCompte').textContent = t('obj.compte', { n: liste.length });
+  if ($('objNote')) $('objNote').innerHTML = `<b>?</b> ${t('obj.noteOu')}`;
+  dessinerPages($('objPages'), objEtat, OBJ_PAR_PAGE, dessinerObjets);
+}
+
+/* Les listes deroulantes portent des libelles traduits : on les repose a
+   chaque changement de langue, en gardant la selection. */
+function poserFiltresObjets() {
+  if (!$('objClasse') || !D) return;
+  remplirSelect($('objClasse'),
+    [['', t('obj.toutesClasses')]].concat(
+      Object.entries(D.classes).map(([k, v]) => [k, v])), $('objClasse').value);
+  remplirSelect($('objSlot'),
+    [['', t('obj.tousSlots')]].concat(
+      D.ordreSlots.map((sl) => [sl, D.nomsSlots[sl] || sl])), $('objSlot').value);
+  remplirSelect($('objRarete'),
+    [['', t('obj.toutesRaretes')]].concat(
+      [6, 5, 4, 3, 2, 1].map((g) => [String(g), D.raretes[String(g)]])),
+    $('objRarete').value);
+}
+
+function brancherObjets() {
+  if (!$('objRecherche')) return;
+  poserFiltresObjets();
+  const relire = () => dessinerObjets(0);
+  $('objRecherche').oninput = relire;
+  $('objClasse').onchange = relire;
+  $('objSlot').onchange = relire;
+  $('objRarete').onchange = relire;
+}
+
 function montrerPage(id) {
   for (const el of document.querySelectorAll('main, .page')) {
     el.hidden = (id === 'main') ? (el.tagName !== 'MAIN') : (el.id !== id);
@@ -4308,6 +4451,9 @@ function montrerPage(id) {
   for (const b of document.querySelectorAll('#nav button')) {
     b.classList.toggle('actif', b.dataset.page === id);
   }
+  // Le catalogue ne se dessine qu'ici : c'est ce qui garantit qu'il ne
+  // coute rien tant qu'on reste sur le Builder.
+  if (id === 'pageObjets') dessinerObjets();
   if (id === 'pageCommunaute') {
     dessinerBuildsClasses();
     dessinerGuidesClasses();
@@ -4361,6 +4507,8 @@ window.surChangementDeLangue = function () {
   // sans redessin ils restaient dans la langue du premier affichage.
   dessinerBuildsClasses();
   dessinerAccueil();
+  poserFiltresObjets();
+  if (!$('pageObjets').hidden) dessinerObjets();
   dessinerGuidesClasses();
   dessinerComparaison();
   // Le compteur de la grille et les infobulles des paliers sont posés en
@@ -4485,6 +4633,7 @@ function demarrer(donnees) {
   majBudgetVin();
 
   brancherPlis();
+  brancherObjets();
   /* L'INVENTAIRE COMPLET SE PAIE A L'OUVERTURE, PAS AVANT. Sept secondes de
    * calcul a chaque build seraient insupportables ; la carte etant repliee
    * par defaut, on ne les depense que si quelqu'un veut vraiment savoir. */
