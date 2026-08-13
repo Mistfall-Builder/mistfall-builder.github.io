@@ -899,8 +899,10 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .objBarre{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
   margin:0 0 14px;padding:11px 13px;background:var(--panneau);
   border:1px solid var(--bord);border-radius:3px}
-.objBarre input[type=search]{flex:2 1 220px;min-width:0}
+.objBarre input[type=search]{flex:2 1 200px;min-width:0}
 .objBarre select{flex:1 1 130px;min-width:0}
+/* La case et son libelle ne se coupent pas : ils passent a la ligne. */
+#resSuLabel{flex:0 1 auto;white-space:nowrap}
 .objCompte{margin-left:auto;font-size:12px;color:var(--terne);
   font-variant-numeric:tabular-nums}
 .objGrille{display:grid;gap:8px;
@@ -949,6 +951,50 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   font-weight:700}
 .objCat{font-size:10.5px;color:var(--terne);border:1px solid var(--bord-fort);
   border-radius:2px;padding:1px 5px;margin-left:5px}
+
+/* ---------------------------------------------------------- la carte ---- */
+.carteBloc{margin:0 0 16px;padding:11px 13px 9px;background:var(--panneau);
+  border:1px solid var(--bord);border-radius:3px}
+.carteTete{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  margin-bottom:9px}
+/* `margin-left:auto` poussait la legende hors du cadre des qu'elle
+   depassait : elle prend sa propre ligne plutot que de deborder. */
+.carteLegende{display:flex;flex-wrap:wrap;gap:5px;flex:1 1 100%}
+@media(min-width:1100px){.carteLegende{flex:0 1 auto;margin-left:auto}}
+.cLeg{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;
+  font-size:11px;background:var(--creux);border:1px solid var(--bord);
+  border-radius:3px;color:var(--terne);opacity:.5}
+.cLeg.actif{opacity:1;color:var(--texte2)}
+.cLeg i{width:8px;height:8px;border-radius:50%;display:block;background:currentColor}
+.cLeg b{color:var(--terne);font-weight:600}
+.carteZone{position:relative;width:100%;max-width:660px;margin:0 auto;
+  aspect-ratio:1/1}
+.carteZone svg{width:100%;height:100%;display:block}
+.cFond{fill:rgba(255,255,255,.015);stroke:var(--bord);stroke-width:14}
+/* Les regions : une ellipse au barycentre de leurs points. Elles ne
+   pretendent pas a une frontiere, seulement a une position. */
+.cz ellipse{fill:rgba(255,255,255,.03);stroke:var(--bord-fort);stroke-width:10}
+.cz text{fill:var(--terne);font:600 210px/1 var(--condense);
+  letter-spacing:8px;text-transform:uppercase;pointer-events:none}
+.cz.czIci ellipse{fill:rgba(122,168,116,.14);stroke:var(--ok);stroke-width:22}
+.cz.czIci text{fill:var(--texte)}
+/* DEDUITE, PAS CITEE. Les guides et l'atlas emploient deux vocabulaires de
+   zones et personne ne publie la correspondance : quand on la deduit, le
+   pointille le dit. */
+.cz.czDeduit ellipse{fill:rgba(240,123,48,.10);stroke:var(--accent);
+  stroke-width:20;stroke-dasharray:70 55}
+.cz.czDeduit text{fill:var(--accent-clair)}
+.cp{stroke:rgba(0,0,0,.55);stroke-width:16;opacity:.75;cursor:help}
+.cp:hover{opacity:1}
+.cp.cpIci{opacity:1;stroke:var(--ok);stroke-width:34}
+/* Une couleur par type, la meme dans la legende et sur la carte. */
+.cp-sortie{fill:#6fbf73} .cLeg.cp-sortie{color:#6fbf73}
+.cp-faille{fill:#b07ad0} .cLeg.cp-faille{color:#b07ad0}
+.cp-marchand{fill:#e0a94a} .cLeg.cp-marchand{color:#e0a94a}
+.cp-passage{fill:#6aa6c8} .cLeg.cp-passage{color:#6aa6c8}
+.cp-ferry{fill:#d2705a} .cLeg.cp-ferry{color:#d2705a}
+.carteNote{margin:8px 0 0;font-size:11px;line-height:1.5;color:var(--terne)}
+.carteNote a{color:var(--accent)}
 
 /* ------------------------------------------- ou se ramasse un objet ----- */
 /* Le repere remplace le « ? » quand la provenance est connue ET verifiee.
@@ -1431,6 +1477,17 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     <span class="objCompte" id="resCompte"></span>
   </div>
   <div class="objNote" id="resNote"></div>
+
+  <!-- La carte : dessinee depuis les coordonnees de l'atlas, pas recopiee. -->
+  <div class="carteBloc" id="carteBloc">
+    <div class="carteTete">
+      <div class="sousOnglets" id="carteOnglets"></div>
+      <div class="carteLegende" id="carteLegende"></div>
+    </div>
+    <div class="carteZone" id="carteZone"></div>
+    <p class="carteNote" id="carteNote"></p>
+  </div>
+
   <div class="objGrille resGrille" id="resGrille"></div>
   <div class="pages" id="resPages"></div>
 </section>
@@ -1574,15 +1631,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=107"></script>
-<script src="config.js?v=107"></script>
-<script src="comptes.js?v=107"></script>
-<script src="donnees.js?v=107"></script>
-<script src="skills.js?v=107"></script>
-<script src="talents.js?v=107"></script>
-<script src="builds_reference.js?v=107"></script>
-<script src="guides_classes.js?v=107"></script>
-<script src="fiche.js?v=107"></script>
-<script src="app.js?v=107"></script>
+<script src="i18n.js?v=108"></script>
+<script src="config.js?v=108"></script>
+<script src="comptes.js?v=108"></script>
+<script src="donnees.js?v=108"></script>
+<script src="skills.js?v=108"></script>
+<script src="talents.js?v=108"></script>
+<script src="builds_reference.js?v=108"></script>
+<script src="guides_classes.js?v=108"></script>
+<script src="fiche.js?v=108"></script>
+<script src="app.js?v=108"></script>
 </body>
 </html>

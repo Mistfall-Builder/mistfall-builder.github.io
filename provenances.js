@@ -47,8 +47,18 @@ self.D_PROVENANCES = {
   objets: [
     {
       n: 'Celestigold',
-      cartes: [{ m: 'Brandrgarde', z: ['Mine Pit', 'Pathway', 'Gold Mine Pit',
-                                       'Cobalt Grove'] }],
+      /* LES GUIDES ET L'ATLAS NE PARLENT PAS LE MEME LANGAGE.
+         Les guides situent Celestigold dans « Mine Pit », « Gold Mine Pit »,
+         « Miner's Path », « Cobalt Grove ». L'atlas, lui, ne connait qu'une
+         region miniere : « Mining Quarter ». Ce sont deux vocabulaires, et
+         personne ne publie la correspondance.
+         `z` garde les noms des guides, tels qu'ils sont ecrits.
+         `deduites` porte la region d'atlas qu'on en DEDUIT — et la carte la
+         montre en pointilles, pas en trait plein, parce qu'une deduction
+         n'est pas une source. */
+      cartes: [{ m: 'Brandrgarde',
+                 z: ['Mine Pit', 'Gold Mine Pit', "Miner's Path", 'Cobalt Grove'],
+                 deduites: ['Mining Quarter'] }],
       noeuds: ['Lazurite', 'Large Ore Pile', 'Medium Ore Pile', 'Mining Cart',
                'Gilded Chest', 'Forge Furnace'],
       note: {

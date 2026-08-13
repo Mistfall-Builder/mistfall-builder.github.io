@@ -4296,6 +4296,150 @@ async function enregistrerGuide() {
   }
 }
 
+/* ------------------------------------------------------------ LA CARTE ---
+ *
+ * Dessinee, pas recopiee. Les points viennent de l'atlas du jeu, dans son
+ * systeme 0-10 000 ; le SVG les replace tels quels. Les REGIONS, elles, ne
+ * sont pas connues : on n'a que des nuages de points. Chacune est donc
+ * figuree par une ellipse posee au barycentre de ses points, dimensionnee
+ * sur leur dispersion. C'est juste dans les positions relatives, et honnete
+ * sur le reste — ça dit ou aller, pas ou poser le pied.
+ */
+const CARTE_TYPES = ['sortie', 'faille', 'marchand', 'passage', 'ferry'];
+let _carteActive = 'Brandrgarde';
+let _carteFiltre = new Set(CARTE_TYPES);
+
+/* Barycentre et dispersion d'une region, calcules depuis ses points. */
+function regionsDe(pts) {
+  const par = new Map();
+  for (const [, region, x, y] of pts) {
+    if (!par.has(region)) par.set(region, []);
+    par.get(region).push([x, y]);
+  }
+  const out = [];
+  for (const [nom, liste] of par) {
+    const n = liste.length;
+    const cx = liste.reduce((s, p) => s + p[0], 0) / n;
+    const cy = liste.reduce((s, p) => s + p[1], 0) / n;
+    const ec = (i) => Math.sqrt(
+      liste.reduce((s, p) => s + (p[i] - (i ? cy : cx)) ** 2, 0) / n);
+    // Un rayon plancher : une region a deux points ne doit pas devenir un trait.
+    out.push({ nom, cx, cy, n,
+               rx: Math.max(520, ec(0) * 1.7 + 260),
+               ry: Math.max(520, ec(1) * 1.7 + 260) });
+  }
+  return out;
+}
+
+function dessinerCarte(zonesVisees, zonesDeduites) {
+  const boite = $('carteZone');
+  const C = self.D_CARTES;
+  if (!boite || !C) return;
+  const pts = (C.cartes[_carteActive] || [])
+    .filter((p) => _carteFiltre.has(p[0]));
+  const regions = regionsDe(C.cartes[_carteActive] || []);
+  const vises = new Set(zonesVisees || []);
+  // Une region DEDUITE se voit autrement qu'une region citee par une source.
+  const deduites = new Set(zonesDeduites || []);
+
+  const zones = regions.map((r) => {
+    const ici = vises.has(r.nom);
+    const ded = !ici && deduites.has(r.nom);
+    return `<g class="cz${ici ? ' czIci' : ''}${ded ? ' czDeduit' : ''}">
+        <ellipse cx="${r.cx.toFixed(0)}" cy="${r.cy.toFixed(0)}"
+                 rx="${r.rx.toFixed(0)}" ry="${r.ry.toFixed(0)}"></ellipse>
+        <text x="${r.cx.toFixed(0)}" y="${r.cy.toFixed(0)}"
+              text-anchor="middle" dominant-baseline="middle">${echapper(r.nom)}</text>
+      </g>`;
+  }).join('');
+
+  const marques = pts.map(([type, region, x, y]) => {
+    const ici = vises.has(region) || deduites.has(region);
+    const titre = `${t('carte.' + type)} — ${region}`;
+    return `<circle class="cp cp-${type}${ici ? ' cpIci' : ''}"
+              cx="${x}" cy="${y}" r="78"><title>${echapper(titre)}</title></circle>`;
+  }).join('');
+
+  boite.innerHTML = `<svg viewBox="0 0 ${C.echelle} ${C.echelle}"
+      preserveAspectRatio="xMidYMid meet" role="img"
+      aria-label="${echapper(_carteActive)}">
+      <rect class="cFond" x="0" y="0" width="${C.echelle}" height="${C.echelle}"></rect>
+      ${zones}${marques}
+    </svg>`;
+}
+
+function dessinerLegendeCarte() {
+  const l = $('carteLegende');
+  const C = self.D_CARTES;
+  if (!l || !C) return;
+  const dispo = new Set((C.cartes[_carteActive] || []).map((p) => p[0]));
+  l.innerHTML = CARTE_TYPES.filter((x) => dispo.has(x)).map((x) => {
+    const n = (C.cartes[_carteActive] || []).filter((p) => p[0] === x).length;
+    return `<button class="cLeg cp-${x}${_carteFiltre.has(x) ? ' actif' : ''}"
+        data-type="${x}"><i></i>${t('carte.' + x)} <b>${n}</b></button>`;
+  }).join('');
+  for (const b of l.querySelectorAll('.cLeg')) {
+    b.onclick = () => {
+      const x = b.dataset.type;
+      if (_carteFiltre.has(x)) _carteFiltre.delete(x); else _carteFiltre.add(x);
+      dessinerLegendeCarte();
+      dessinerCarte(_carteZones, _carteDeduites);
+    };
+  }
+}
+
+let _carteZones = [];
+let _carteDeduites = [];
+
+function brancherCarte() {
+  const onglets = $('carteOnglets');
+  if (!onglets || !self.D_CARTES) return;
+  onglets.innerHTML = Object.keys(self.D_CARTES.cartes).map((m) =>
+    `<button data-m="${echapper(m)}"${m === _carteActive ? ' class="actif"' : ''}
+      >${echapper(m)}</button>`).join('');
+  for (const b of onglets.querySelectorAll('button')) {
+    b.onclick = () => {
+      _carteActive = b.dataset.m;
+      for (const x of onglets.querySelectorAll('button')) {
+        x.classList.toggle('actif', x === b);
+      }
+      dessinerLegendeCarte();
+      dessinerCarte(_carteZones, _carteDeduites);
+    };
+  }
+  const note = $('carteNote');
+  if (note) {
+    note.innerHTML = t('carte.note') + ' '
+      + (self.D_CARTES.src || []).map((u, i) =>
+          `<a href="${echapper(u)}" target="_blank"
+              rel="noopener noreferrer nofollow">${i + 1}</a>`).join(' · ');
+  }
+  dessinerLegendeCarte();
+  dessinerCarte([]);
+}
+
+/* Cliquer un objet situe deplace la carte sur SA carte et allume ses zones. */
+function viserSurCarte(prov) {
+  if (!self.D_CARTES || !prov) return;
+  const c = (prov.cartes || [])[0];
+  if (!c) return;
+  if (self.D_CARTES.cartes[c.m]) {
+    _carteActive = c.m;
+    const onglets = $('carteOnglets');
+    if (onglets) {
+      for (const x of onglets.querySelectorAll('button')) {
+        x.classList.toggle('actif', x.dataset.m === c.m);
+      }
+    }
+  }
+  _carteZones = (prov.cartes || []).flatMap((x) => x.z || []);
+  _carteDeduites = (prov.cartes || []).flatMap((x) => x.deduites || []);
+  dessinerLegendeCarte();
+  dessinerCarte(_carteZones, _carteDeduites);
+  const boite = $('carteBloc');
+  if (boite) boite.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
 /* ------------------------------------------------------- LES RESSOURCES --
  *
  * 530 objets consommables, materiaux, contenants, munitions — jusqu'au tier
@@ -4331,7 +4475,8 @@ function chargerRessources() {
     // Les provenances sont facultatives : leur absence ne doit pas empecher
     // le catalogue de s'afficher.
     charge('ressources.js')
-      .then(() => charge('provenances.js').catch(() => {}))
+      .then(() => Promise.all([charge('provenances.js').catch(() => {}),
+                               charge('cartes.js').catch(() => {})]))
       .then(() => ok(self.D_RESSOURCES || []))
       .catch(ko);
   });
@@ -4461,7 +4606,11 @@ function carteRessource(o) {
     el.appendChild(plan);
     // Au survol ET au clic : la souris pour aller vite, le clic pour le
     // tactile, ou survoler n'existe pas.
-    marque.onclick = (ev) => { ev.stopPropagation(); el.classList.toggle('ouvert'); };
+    marque.onclick = (ev) => {
+      ev.stopPropagation();
+      el.classList.toggle('ouvert');
+      viserSurCarte(prov);
+    };
   }
   return el;
 }
@@ -4515,6 +4664,7 @@ async function ouvrirRessources() {
       return;
     }
     poserFiltresRessources();
+    brancherCarte();
     const relire = () => dessinerRessources(0);
     $('resRecherche').oninput = relire;
     $('resCat').onchange = relire;
