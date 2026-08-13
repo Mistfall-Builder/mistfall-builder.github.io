@@ -1759,16 +1759,27 @@ function lancerAnalyseComplete(res) {
           return !!(r && r.suffisant);
         } catch (e) { return false; }
       };
-      /* ON VISE LE PALIER, PAS LE CRAN SUIVANT.
+      /* ON CHERCHE LE MAXIMUM, PAS LE CRAN SUIVANT.
        *
-       * Proposer « Sky Piercer 0 → 1 » quand 0 → 5 passe oblige a cliquer
-       * cinq fois pour decouvrir la seule information qui compte : le niveau
-       * ou l'affixe gagne son second effet. On demande donc le palier
-       * d'abord ; s'il ne passe pas, on retombe sur le cran suivant, qui
-       * reste vrai. Deux essais au pire, pour une reponse utile du premier
-       * coup. */
+       * Annoncer « 0 → 1 » quand le build encaisse 0 → 5 d'un coup oblige a
+       * cliquer cinq fois pour decouvrir ce qu'on pouvait savoir tout de
+       * suite. Tester le palier puis retomber sur +1 ne suffisait pas non
+       * plus : quand le palier ne passe pas, +4 passe peut-etre.
+       *
+       * On cherche donc le plus haut niveau qui tient, par dichotomie. Une
+       * cible plus basse est toujours plus facile qu'une cible plus haute,
+       * donc la reponse est monotone et la dichotomie est valide : trois
+       * essais suffisent la ou en essayer sept coutait le double. */
       const p = palier(nom);
-      const vise = (p && p > a && essaye(p)) ? p : (essaye(a + 1) ? a + 1 : 0);
+      const cap = plafond(nom);
+      let bas = a;
+      let haut = cap;
+      let vise = 0;
+      while (bas < haut) {
+        const milieu = Math.ceil((bas + haut) / 2);
+        if (essaye(milieu)) { vise = milieu; bas = milieu; } else { haut = milieu - 1; }
+      }
+      if (!vise && bas > a) vise = bas;
       const existante = dejaLa.get(nom);
       if (!vise) {
         // Le moteur dement l'estimation : la ligne s'en va.
