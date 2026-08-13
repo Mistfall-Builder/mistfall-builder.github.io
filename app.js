@@ -532,22 +532,31 @@ function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tour
   const bloque = verrous || {};
   const figees = {};
   for (const [sl, v] of Object.entries(bloque)) figees[sl] = v.gemmes || [];
-  /* ON JUGE AVEC LA POSE QUI FERA FOI.
+  /* POURQUOI CETTE VERIFICATION EST GLOUTONNE, ET NON EXACTE.
    *
-   * Cette fonction validait chaque baisse de rareté avec la pose GLOUTONNE,
-   * alors que `construire` finalise avec la DP EXACTE. Une pièce que la DP
-   * saurait exploiter était donc refusée, et le set rendu n'était pas le
-   * moins cher — ce qui est pourtant toute la promesse de l'outil.
+   * `construire` finalise avec la DP exacte, alors qu'on juge ici avec la
+   * pose gloutonne : une piece que la DP saurait exploiter est donc parfois
+   * refusee, et le set rendu n'est pas toujours le moins cher. C'est un
+   * defaut connu, et il est assume.
    *
-   * Le glouton reste en pré-filtre : quand il suffit, il tranche, et la DP
-   * n'est payée que sur les candidates qu'il rejette — exactement les cas
-   * qu'on perdait jusqu'ici. */
-  const verifie = (items, exact) => {
-    const a = assembler(items, want, exact, figees);
+   * La version exacte a ete essayee, mesuree, et retiree. En secours de
+   * chaque refus glouton, elle multipliait par cinq le nombre d'appels a la
+   * DP — 397 pour un seul build a cinq cibles hautes, 70 % du temps total —
+   * et faisait passer le calcul de 4,4 a 18 secondes : le navigateur
+   * annoncait « la page ralentit ». Rationnee a vingt-quatre appels, elle
+   * cessait d'etre monotone : `alleger` etant glouton d'un tour a l'autre,
+   * un secours accorde tot bloque un meilleur allegement plus tard, et un
+   * build sur 120 ressortait PLUS CHER qu'avec le glouton seul.
+   *
+   * Gagner une rarete sur deux builds sur 120 ne vaut pas de figer la page
+   * ni de rendre le resultat instable. Si ce defaut doit etre corrige un
+   * jour, c'est en rendant la DP moins chere, pas en l'appelant plus. */
+  const tient = (items) => {
+    const a = assembler(items, want, false, figees);
     return cibleListe.every(([n, l]) =>
       (a.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
   };
-  const tient = (items) => verifie(items, false) || verifie(items, true);
+
   if (!tient(slotItems)) return slotItems;
 
   let courant = { ...slotItems };
