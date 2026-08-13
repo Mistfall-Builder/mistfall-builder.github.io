@@ -4040,7 +4040,8 @@ function dessinerBuildsClasses() {
     bloc.className = 'classeBloc';
     const img = CLASSE_IMAGE[classe];
     bloc.innerHTML = `<div class="classeTete">
-        ${img ? `<img src="icones_classes/${img}.webp" alt="" decoding="async">` : ''}
+        ${img ? `<img src="icones_classes/${img}.webp" alt=""
+             loading="lazy" decoding="async">` : ''}
         <div><h3>${D.classes[String(classe)] || classe}</h3>
           <small>${[...new Set(liste.map((b) => b.a))].join(' · ')}
             — ${t('ref.combien', { n: liste.length })}</small></div>
