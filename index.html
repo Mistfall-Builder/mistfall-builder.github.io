@@ -1144,7 +1144,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     <nav class="nav" id="nav">
       <button data-page="main" class="actif" data-i18n="nav.builder">Builder</button>
       <button data-page="pageCommunaute" data-i18n="nav.communaute">Communauté</button>
-      <button data-page="pageObjets" data-i18n="nav.objets">Objets</button>
+      <button data-page="pageObjets" data-i18n="nav.objets">Ressources</button>
     </nav>
     <div class="droite">
       <div class="langues" id="langues" title="Change language"></div>
@@ -1416,41 +1416,23 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      1482 objets : on ne les rend pas d'un bloc. La page ne se dessine qu'a
      l'ouverture de l'onglet, par pages de 60, et les icones ne partent sur
      le reseau que lorsqu'elles entrent dans le champ. -->
+<!-- LES RESSOURCES.
+     Ce qui se ramasse sur le terrain : materiaux, consommables, munitions,
+     boissons. Ni coffres a butin ni cles — ils encombraient sans repondre a
+     la question qu'on pose ici, qui est « ou est-ce que je trouve ça ». -->
 <section id="pageObjets" class="page" hidden>
-  <div class="sousOnglets" id="objOnglets">
-    <button data-vue="vueEquip" class="actif" data-i18n="obj.vueEquip">Équipement</button>
-    <button data-vue="vueRess" data-i18n="obj.vueRess">Ressources</button>
+  <div class="objBarre">
+    <input type="search" id="resRecherche" name="recherche-ressource" autocomplete="off"
+           data-form-type="other" data-i18n-ph="res.chercher" placeholder="nom de ressource…">
+    <select id="resCat"></select>
+    <select id="resTier"></select>
+    <label class="coche" id="resSuLabel"><input type="checkbox" id="resSu">
+      <span data-i18n="res.seulementSus">Seulement ceux qu'on sait où trouver</span></label>
+    <span class="objCompte" id="resCompte"></span>
   </div>
-
-  <div class="vue" id="vueEquip">
-    <div class="objBarre">
-      <input type="search" id="objRecherche" name="recherche-objet" autocomplete="off"
-             data-form-type="other" data-i18n-ph="obj.chercher" placeholder="nom d'objet…">
-      <select id="objClasse"></select>
-      <select id="objSlot"></select>
-      <select id="objRarete"></select>
-      <span class="objCompte" id="objCompte"></span>
-    </div>
-    <div class="objNote" id="objNote"></div>
-    <div class="objGrille" id="objGrille"></div>
-    <div class="pages" id="objPages"></div>
-  </div>
-
-  <!-- Les ressources vivent dans leur propre fichier, injecte a la premiere
-       ouverture de cette vue : 104 Ko que personne ne paie s'il ne vient
-       jamais ici. -->
-  <div class="vue" id="vueRess" hidden>
-    <div class="objBarre">
-      <input type="search" id="resRecherche" name="recherche-ressource" autocomplete="off"
-             data-form-type="other" data-i18n-ph="res.chercher" placeholder="nom de ressource…">
-      <select id="resCat"></select>
-      <select id="resTier"></select>
-      <span class="objCompte" id="resCompte"></span>
-    </div>
-    <div class="objNote" id="resNote"></div>
-    <div class="objGrille" id="resGrille"></div>
-    <div class="pages" id="resPages"></div>
-  </div>
+  <div class="objNote" id="resNote"></div>
+  <div class="objGrille resGrille" id="resGrille"></div>
+  <div class="pages" id="resPages"></div>
 </section>
 
 <section id="pageCommunaute" class="page" hidden>
@@ -1592,15 +1574,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=106"></script>
-<script src="config.js?v=106"></script>
-<script src="comptes.js?v=106"></script>
-<script src="donnees.js?v=106"></script>
-<script src="skills.js?v=106"></script>
-<script src="talents.js?v=106"></script>
-<script src="builds_reference.js?v=106"></script>
-<script src="guides_classes.js?v=106"></script>
-<script src="fiche.js?v=106"></script>
-<script src="app.js?v=106"></script>
+<script src="i18n.js?v=107"></script>
+<script src="config.js?v=107"></script>
+<script src="comptes.js?v=107"></script>
+<script src="donnees.js?v=107"></script>
+<script src="skills.js?v=107"></script>
+<script src="talents.js?v=107"></script>
+<script src="builds_reference.js?v=107"></script>
+<script src="guides_classes.js?v=107"></script>
+<script src="fiche.js?v=107"></script>
+<script src="app.js?v=107"></script>
 </body>
 </html>
