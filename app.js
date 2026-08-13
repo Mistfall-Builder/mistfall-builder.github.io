@@ -1731,9 +1731,10 @@ function afficher(res, classe) {
      deux qui etaient vides s'ouvrent — sauf si l'utilisateur les avait
      explicitement repliees, auquel cas son choix prime. */
   dessinerAccueil();
-  poserPliAuto('carteCode', true);
+  // Seul l'equipement s'ouvre tout seul : c'est ce qu'on vient chercher. Le
+  // code d'import et le tableau restent replies tant qu'on ne les demande
+  // pas, et ce choix-la est retenu.
   poserPliAuto('carteEquip', true);
-  poserPliAuto('carteTableau', true);
 }
 
 function activerCopie(oui) {
@@ -2261,18 +2262,17 @@ function dessinerAccueil() {
   boite.innerHTML = '';
   const liste = buildsDeLaClasse(Number($('classe').value)).slice(0, 3);
   if (!liste.length) return;
-  const titre = document.createElement('div');
-  titre.className = 'pas';
-  titre.style.cssText = 'grid-column:1/-1;font-size:12px;margin-bottom:1px';
-  titre.textContent = t('accueil.essaie');
-  boite.appendChild(titre);
+  const mot = document.createElement('span');
+  mot.className = 'vgnMot';
+  mot.textContent = t('accueil.essaie');
+  boite.appendChild(mot);
   for (const b of liste) {
     const src = (window.D_SOURCES || {})[b.src];
     const v = document.createElement('button');
     v.className = 'vgn';
-    v.innerHTML = `<b>${echapper(nomDeReference(b))}</b>
-      <small>${echapper(b.a)} · ${echapper(b.r)}${
-        src ? ` · ${echapper(src.nom)}` : ''}</small>`;
+    // Le nom et la source suffisent : c'est sur la source qu'on juge.
+    v.innerHTML = `<b>${echapper(nomDeReference(b))}</b>${
+      src ? `<small>${echapper(src.nom)}</small>` : ''}`;
     v.onclick = () => { chargerReference(b); montrerBandeauDemo(b); };
     boite.appendChild(v);
   }
@@ -4789,9 +4789,7 @@ function demarrer(donnees) {
   // les deux cartes vides se replient plutôt que d'afficher un champ vide
   // et un bouton grisé.
   dessinerAccueil();
-  poserPliAuto('carteCode', false);
   poserPliAuto('carteEquip', false);
-  poserPliAuto('carteTableau', false);
   $('etat').textContent = t('etat.pret');
 }
 
