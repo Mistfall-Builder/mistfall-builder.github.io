@@ -1726,6 +1726,14 @@ function afficher(res, classe) {
     activerCopie(false);
     $('noteCode').textContent = t('code.impossible', { message: err.message });
   }
+
+  /* Un resultat existe : la colonne cede l'accueil aux vraies cartes, et les
+     deux qui etaient vides s'ouvrent — sauf si l'utilisateur les avait
+     explicitement repliees, auquel cas son choix prime. */
+  dessinerAccueil();
+  poserPliAuto('carteCode', true);
+  poserPliAuto('carteEquip', true);
+  poserPliAuto('carteTableau', true);
 }
 
 function activerCopie(oui) {
@@ -2179,6 +2187,122 @@ function lirePlis() {
   catch (e) { return {}; }
 }
 
+/* ------------------------------------------------ LES SOIXANTE PREMIERES
+ * SECONDES.
+ *
+ * Un joueur qui arrive ne connait ni l'outil, ni le mot « palier ». Il voit
+ * un gros bouton orange et clique dessus. Sans cible, ce clic ne produisait
+ * qu'une ligne de refus de 12 px et rendait la main : le geste le plus
+ * probable du nouveau venu ne menait nulle part, et les douze builds tires
+ * de guides publies — exactement la reponse a « je clique ou ? » — vivaient
+ * dans un onglet qu'aucun chemin du code ne designait.
+ *
+ * Rien ici ne touche au moteur : on ne fait que rendre atteignable ce qui
+ * existe deja. builds_reference.js est charge en fin de page ; toutes ces
+ * fonctions sortent en silence s'il manque. */
+
+function buildsDeLaClasse(classe) {
+  if (!window.D_BUILDS) return [];
+  return window.D_BUILDS.filter((b) => b.c === classe);
+}
+
+function nomDeReference(b) {
+  const lg = (window.I18N && I18N.courante()) || 'fr';
+  return (b.nom && (b.nom[lg] || b.nom.fr)) || b.k;
+}
+
+function chargerReference(b) {
+  const etat = { k: b.code, c: b.c, a: b.a, g: null, v: true, m: false,
+                 pa: false, pg: 6, ps: [], t: b.t, w: [] };
+  appliquerEtat(etat);
+  restituer({ nom: `${D.classes[String(b.c)] || ''} — ${nomDeReference(b)}`,
+              etat, code: b.code });
+}
+
+/* Le bandeau qui evite le malentendu : ces cibles ne sont pas les tiennes. */
+function montrerBandeauDemo(b) {
+  const el = $('bandeauDemo');
+  if (!el) return;
+  const src = (window.D_SOURCES || {})[b.src];
+  el.textContent = t('demo.bandeau',
+    { nom: nomDeReference(b), source: src ? src.nom : '—' });
+  el.hidden = false;
+  // Charger un build fait defiler la page vers le stuff : sans ce retour en
+  // haut, l'avertissement « ce n'est pas ton build » reste hors de vue.
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cacherBandeauDemo() {
+  const el = $('bandeauDemo');
+  if (el) el.hidden = true;
+}
+
+/* Appele par le CLIC sur « Calculer », jamais par calculer() lui-meme :
+   sinon la page se remplirait toute seule au chargement. Rend vrai si une
+   demonstration a ete chargee, donc s'il n'y a plus rien a calculer. */
+function demarrerParUnExemple() {
+  if (cibles.size) return false;
+  const liste = buildsDeLaClasse(Number($('classe').value));
+  if (!liste.length) return false;
+  const b = liste[0];
+  chargerReference(b);
+  montrerBandeauDemo(b);
+  return true;
+}
+
+/* La colonne de resultats, tant qu'elle n'a pas de resultat : ce que fait
+   l'outil, et deux ou trois builds pour partir de quelque part. */
+function dessinerAccueil() {
+  const bloc = $('accueilResultats');
+  const boite = $('accueilBuilds');
+  if (!bloc || !boite) return;
+  bloc.hidden = !!(dernier && dernier.slotItems);
+  if (bloc.hidden) return;
+  boite.innerHTML = '';
+  const liste = buildsDeLaClasse(Number($('classe').value)).slice(0, 3);
+  if (!liste.length) return;
+  const titre = document.createElement('div');
+  titre.className = 'pas';
+  titre.style.cssText = 'grid-column:1/-1;font-size:12px;margin-bottom:1px';
+  titre.textContent = t('accueil.essaie');
+  boite.appendChild(titre);
+  for (const b of liste) {
+    const src = (window.D_SOURCES || {})[b.src];
+    const v = document.createElement('button');
+    v.className = 'vgn';
+    v.innerHTML = `<b>${echapper(nomDeReference(b))}</b>
+      <small>${echapper(b.a)} · ${echapper(b.r)}${
+        src ? ` · ${echapper(src.nom)}` : ''}</small>`;
+    v.onclick = () => { chargerReference(b); montrerBandeauDemo(b); };
+    boite.appendChild(v);
+  }
+  const tous = document.createElement('button');
+  tous.className = 'vgnTous';
+  tous.textContent = t('accueil.tous');
+  tous.onclick = () => montrerPage('pageCommunaute');
+  boite.appendChild(tous);
+}
+
+/* PLIER OU DEPLIER SANS FAIRE PASSER CA POUR UN CHOIX DE L'UTILISATEUR.
+ *
+ * `brancherPlis` retient l'ECART AU DEFAUT. Le defaut de ces deux cartes
+ * reste donc « ouvert » dans le HTML : si on l'avait mis a « replie », un
+ * repli voulu par l'utilisateur serait devenu indiscernable du defaut, donc
+ * non enregistre, et la carte se serait rouverte au build suivant.
+ *
+ * Le code se contente de replier a l'arrivee et de rouvrir au premier
+ * resultat, en marquant chaque fois l'element pour que le `toggle` — qui
+ * part de facon asynchrone, d'ou le marqueur sur l'element plutot qu'une
+ * variable — ne prenne pas ce geste pour une preference. Des que
+ * l'utilisateur a exprime un choix, on ne touche plus a rien. */
+function poserPliAuto(id, ouvert) {
+  const d = $(id);
+  if (!d || d.open === ouvert) return;
+  if (Object.prototype.hasOwnProperty.call(lirePlis(), id)) return;
+  d.dataset.pliAuto = '1';
+  d.open = ouvert;
+}
+
 function brancherPlis() {
   const plis = lirePlis();
   for (const d of document.querySelectorAll('details.carte.pliable[id]')) {
@@ -2189,6 +2313,7 @@ function brancherPlis() {
     const defaut = d.hasAttribute('open');
     if (Object.prototype.hasOwnProperty.call(plis, d.id)) d.open = !!plis[d.id];
     d.addEventListener('toggle', () => {
+      if (d.dataset.pliAuto) { delete d.dataset.pliAuto; return; }
       const p = lirePlis();
       if (d.open === defaut) delete p[d.id]; else p[d.id] = d.open;
       try { localStorage.setItem(CLE_PLIS, JSON.stringify(p)); } catch (e) { /* quota */ }
@@ -3024,6 +3149,9 @@ function dessinerAlternatives(res, classe) {
 }
 
 function calculer() {
+  // Des que l'utilisateur calcule quelque chose a lui, l'exemple n'a plus
+  // lieu d'etre annonce.
+  cacherBandeauDemo();
   if (!cibles.size) {
     $('etat').textContent = t('etat.choisir');
     // Sans cible, le verdict d'en bas n'a plus d'objet : le laisser
@@ -4188,6 +4316,7 @@ window.surChangementDeLangue = function () {
   // Les builds de référence portent leurs textes dans les trois langues :
   // sans redessin ils restaient dans la langue du premier affichage.
   dessinerBuildsClasses();
+  dessinerAccueil();
   dessinerGuidesClasses();
   dessinerComparaison();
   // Le compteur de la grille et les infobulles des paliers sont posés en
@@ -4338,13 +4467,20 @@ function demarrer(donnees) {
   };
   netFiltre();
   window.addEventListener('pageshow', netFiltre);
-  $('classe').onchange = () => { libererVerrous(); majArmes(); };
+  $('classe').onchange = () => {
+    libererVerrous(); majArmes();
+    // Les builds proposés sont ceux de la classe affichée.
+    dessinerAccueil();
+  };
   if ($('arme')) $('arme').addEventListener('change', () => libererVerrous());
   $('recherche').oninput = dessinerAffixes;
   $('vider').onclick = () => {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
+    cacherBandeauDemo();
   };
-  $('calculer').onclick = calculer;
+  /* Le clic a vide ne refuse plus : il montre. Le refus reste dans
+     `calculer` pour tous les autres appelants. */
+  $('calculer').onclick = () => { if (!demarrerParUnExemple()) calculer(); };
 
   // La grille plein écran.
   if ($('ouvrirGrille')) {
@@ -4649,6 +4785,13 @@ function demarrer(donnees) {
     restituer({ code: (_etatPartage && _etatPartage.k) || '' });
     return;
   }
+  // Rien à montrer encore : la colonne propose des builds à charger, et
+  // les deux cartes vides se replient plutôt que d'afficher un champ vide
+  // et un bouton grisé.
+  dessinerAccueil();
+  poserPliAuto('carteCode', false);
+  poserPliAuto('carteEquip', false);
+  poserPliAuto('carteTableau', false);
   $('etat').textContent = t('etat.pret');
 }
 
