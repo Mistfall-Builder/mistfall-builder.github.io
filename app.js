@@ -1843,9 +1843,29 @@ function lancerAnalyseComplete(res) {
     }
     if (note) {
       note.className = 'pas';
-      note.textContent = i < aTester.length
-        ? t('marge.recherche', { fait: i, total: aTester.length })
-        : t('marge.aideCourt2');
+      if (i < aTester.length) {
+        note.textContent = t('marge.recherche', { fait: i, total: aTester.length });
+      } else if (boite.querySelector('.lm')) {
+        note.textContent = t('marge.aideCourt2');
+      } else {
+        /* LE BALAYAGE PEUT TOUT REFUTER.
+         *
+         * Les deux voies rapides posent des lignes, le moteur les dement une
+         * a une, et la liste finit vide — mais le texte d'introduction, lui,
+         * restait celui qui annonce « voici ce que tu peux prendre ». On
+         * lisait donc une promesse au-dessus d'un vide, sur un build ou
+         * quatre pieces sans inne sautaient aux yeux. La carte doit dire ce
+         * qu'elle a trouve : rien, et pourquoi. */
+        let raisons = [];
+        try {
+          raisons = pourquoiRien(res, Number($('classe').value), $('arme').value || null);
+        } catch (e) { raisons = []; }
+        note.innerHTML = `${echapper(t('marge.rien'))}`
+          + (raisons.length
+            ? '<ul style="margin:7px 0 0;padding-left:18px;line-height:1.6">'
+              + raisons.map((r) => `<li>${echapper(r)}</li>`).join('') + '</ul>'
+            : '');
+      }
     }
     _nbMarge = boite.querySelectorAll('.lm').length;
     majCompteMarge();
@@ -1898,6 +1918,53 @@ function majCompteMarge() {
   // section et leur propre titre. Additionner les deux donnait « 46 » a
   // cote d'une liste de 41 lignes.
   c.textContent = _nbMarge ? t('marge.compteHaut', { n: _nbMarge }) : '';
+}
+
+/* POURQUOI IL N'Y A RIEN.
+ *
+ * Une carte vide se lit comme une panne. Sur un build sature elle l'etait,
+ * alors que la reponse existe et qu'elle est interessante : quatre pieces
+ * sans inne, et pourtant aucune marge.
+ *
+ * La raison tient a une regle du jeu que la carte ne disait pas — sur un
+ * meme cran, une piece a SOIT un inne, SOIT deux logements de gemme, jamais
+ * les deux. Echanger une piece sans inne contre une piece qui en a un fait
+ * donc perdre un logement ; si ce logement servait une cible, l'echange
+ * coute plus qu'il ne rapporte. C'est exactement ce que le moteur trouve,
+ * et c'est ce qu'il faut ecrire.
+ */
+function pourquoiRien(res, classe, arme) {
+  const raisons = [];
+  const vp = res.vinPoints || new Map();
+  const cibleListe = [...cibles.entries()];
+  const wantGear = Object.fromEntries(cibleListe
+    .map(([n, l]) => [n, l - (vp.get(n) || 0)]).filter(([, l]) => l > 0));
+  const tot = (cov, n) => Math.min(plafond(n), (cov[n] || 0) + (vp.get(n) || 0));
+  const items = { ...res.slotItems };
+
+  const libres = (res.sockets || []).filter((s) => !s.gem).length;
+  const servent = (res.sockets || []).filter((s) => s.gem
+    && s.gem.a.some((a) => cibles.has(a))).length;
+  if (!libres && servent) raisons.push(t('marge.rienSockets', { n: servent }));
+
+  // Les echanges qui gagneraient un inne mais couteraient un logement.
+  for (const slot of D.ordreSlots) {
+    const it = items[slot];
+    if (!it || it.i || verrouilles.has(slot)) continue;
+    const pool = poolDe(classe, slot, arme, 1, true)
+      .filter((o) => o.g === it.g && o.i && (o.s || []).length < (it.s || []).length);
+    if (!pool.length) continue;
+    const cov = assembler({ ...items, [slot]: pool[0] }, wantGear, false).couvert;
+    const casse = cibleListe.filter(([n, l]) => tot(cov, n) < l)
+      .map(([n]) => libelleAffixe(n));
+    if (!casse.length) continue;
+    raisons.push(t('marge.rienEchange', {
+      slot: D.nomsSlots[slot] || slot,
+      inne: libelleAffixe(pool[0].i),
+      casse: casse.join(', '),
+    }));
+  }
+  return raisons;
 }
 
 function dessinerMarge(res) {
@@ -1994,7 +2061,22 @@ function dessinerMarge(res) {
   _nbMarge = liste.length;
   if (mot) {
     mot.className = 'pas'; mot.style.fontSize = '12px';
-    mot.textContent = liste.length ? t('marge.aideCourt2') : t('marge.rien');
+    if (liste.length) {
+      mot.textContent = t('marge.aideCourt2');
+    } else {
+      /* UNE CARTE VIDE SE LIT COMME UNE PANNE. Elle l'etait sur un build
+       * sature : quatre pieces sans inne a l'ecran, et pas un mot. La
+       * reponse existe pourtant, et elle est instructive. */
+      let raisons = [];
+      try {
+        raisons = pourquoiRien(res, Number($('classe').value), $('arme').value || null);
+      } catch (e) { raisons = []; }
+      mot.innerHTML = `${echapper(t('marge.rien'))}`
+        + (raisons.length
+          ? '<ul style="margin:7px 0 0;padding-left:18px;line-height:1.6">'
+            + raisons.map((r) => `<li>${echapper(r)}</li>`).join('') + '</ul>'
+          : '');
+    }
   }
   // Une dizaine suffit : au-delà, la liste devient un annuaire et personne
   // ne la lit. Les plus gros gains sont en tête.
