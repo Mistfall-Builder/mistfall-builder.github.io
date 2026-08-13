@@ -473,9 +473,17 @@ table.cmp .ec.nul{color:var(--terne)}
 .gAff{border:1px solid var(--bord);border-radius:3px;padding:7px 9px 8px;
   background:var(--creux);display:flex;flex-direction:column;gap:6px;
   transition:opacity .12s,border-color .12s,box-shadow .12s}
-.gTete{display:flex;align-items:center;gap:7px;min-width:0}
+/* LE NOM NE SE COUPE PAS. Le commentaire ci-dessus disait qu'il « se lit en
+   entier » ; il ne le faisait pas. Le selecteur de vin et l'etoile prennent
+   une largeur fixe, si bien qu'a 1600 px cinq noms tombaient sous l'ellipse
+   dans la vue plein ecran — celle dont tout l'interet est de tout montrer.
+   Mesure : « Increased Stamina Recovery Speed » demandait 199 px pour 150
+   recus. On le laisse donc passer a la ligne, ce qui ne depend d'aucune
+   largeur d'ecran ; `min-height` sur la tete evite l'effet d'escalier entre
+   une tuile a une ligne et sa voisine a deux. */
+.gTete{display:flex;align-items:flex-start;gap:7px;min-width:0;min-height:34px}
 .gTete .txt{flex:1;min-width:0;font-size:13px;color:var(--texte);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  line-height:1.3;overflow-wrap:anywhere}
 .gAff.actif{border-color:var(--accent-sombre);background:var(--panneau2)}
 /* La recherche ne FILTRE pas dans la vue plein ecran, elle designe : la
    grille garde ses positions d'une frappe a l'autre, donc l'oeil retrouve
@@ -1453,15 +1461,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=97"></script>
-<script src="config.js?v=97"></script>
-<script src="comptes.js?v=97"></script>
-<script src="donnees.js?v=97"></script>
-<script src="skills.js?v=97"></script>
-<script src="talents.js?v=97"></script>
-<script src="builds_reference.js?v=97"></script>
-<script src="guides_classes.js?v=97"></script>
-<script src="fiche.js?v=97"></script>
-<script src="app.js?v=97"></script>
+<script src="i18n.js?v=98"></script>
+<script src="config.js?v=98"></script>
+<script src="comptes.js?v=98"></script>
+<script src="donnees.js?v=98"></script>
+<script src="skills.js?v=98"></script>
+<script src="talents.js?v=98"></script>
+<script src="builds_reference.js?v=98"></script>
+<script src="guides_classes.js?v=98"></script>
+<script src="fiche.js?v=98"></script>
+<script src="app.js?v=98"></script>
 </body>
 </html>
