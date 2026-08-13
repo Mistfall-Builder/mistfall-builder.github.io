@@ -940,6 +940,15 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .objNote{margin:-6px 0 12px;font-size:11.5px;color:var(--terne)}
 .objNote b{color:var(--avert)}
 .objVide{padding:26px 4px;color:var(--terne);font-size:13px}
+/* Une ressource se lit autrement qu'une piece : ce qui compte, c'est a quoi
+   elle sert. La carte est donc plus large et laisse la place au texte. */
+.resGrille{grid-template-columns:repeat(auto-fill,minmax(310px,1fr))}
+.objUsage{font-size:11.5px;line-height:1.45;color:var(--doux);margin-top:2px}
+.objUsage b{color:var(--accent-clair);font-weight:600}
+.objTier{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;
+  font-weight:700}
+.objCat{font-size:10.5px;color:var(--terne);border:1px solid var(--bord-fort);
+  border-radius:2px;padding:1px 5px;margin-left:5px}
 
 /* --------------------------------------------- accueil de la colonne --- */
 #accueilResultats{margin-bottom:14px}
@@ -1374,17 +1383,40 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      l'ouverture de l'onglet, par pages de 60, et les icones ne partent sur
      le reseau que lorsqu'elles entrent dans le champ. -->
 <section id="pageObjets" class="page" hidden>
-  <div class="objBarre">
-    <input type="search" id="objRecherche" name="recherche-objet" autocomplete="off"
-           data-form-type="other" data-i18n-ph="obj.chercher" placeholder="nom d'objet…">
-    <select id="objClasse"></select>
-    <select id="objSlot"></select>
-    <select id="objRarete"></select>
-    <span class="objCompte" id="objCompte"></span>
+  <div class="sousOnglets" id="objOnglets">
+    <button data-vue="vueEquip" class="actif" data-i18n="obj.vueEquip">Équipement</button>
+    <button data-vue="vueRess" data-i18n="obj.vueRess">Ressources</button>
   </div>
-  <div class="objNote" id="objNote"></div>
-  <div class="objGrille" id="objGrille"></div>
-  <div class="pages" id="objPages"></div>
+
+  <div class="vue" id="vueEquip">
+    <div class="objBarre">
+      <input type="search" id="objRecherche" name="recherche-objet" autocomplete="off"
+             data-form-type="other" data-i18n-ph="obj.chercher" placeholder="nom d'objet…">
+      <select id="objClasse"></select>
+      <select id="objSlot"></select>
+      <select id="objRarete"></select>
+      <span class="objCompte" id="objCompte"></span>
+    </div>
+    <div class="objNote" id="objNote"></div>
+    <div class="objGrille" id="objGrille"></div>
+    <div class="pages" id="objPages"></div>
+  </div>
+
+  <!-- Les ressources vivent dans leur propre fichier, injecte a la premiere
+       ouverture de cette vue : 104 Ko que personne ne paie s'il ne vient
+       jamais ici. -->
+  <div class="vue" id="vueRess" hidden>
+    <div class="objBarre">
+      <input type="search" id="resRecherche" name="recherche-ressource" autocomplete="off"
+             data-form-type="other" data-i18n-ph="res.chercher" placeholder="nom de ressource…">
+      <select id="resCat"></select>
+      <select id="resTier"></select>
+      <span class="objCompte" id="resCompte"></span>
+    </div>
+    <div class="objNote" id="resNote"></div>
+    <div class="objGrille" id="resGrille"></div>
+    <div class="pages" id="resPages"></div>
+  </div>
 </section>
 
 <section id="pageCommunaute" class="page" hidden>
@@ -1526,15 +1558,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=104"></script>
-<script src="config.js?v=104"></script>
-<script src="comptes.js?v=104"></script>
-<script src="donnees.js?v=104"></script>
-<script src="skills.js?v=104"></script>
-<script src="talents.js?v=104"></script>
-<script src="builds_reference.js?v=104"></script>
-<script src="guides_classes.js?v=104"></script>
-<script src="fiche.js?v=104"></script>
-<script src="app.js?v=104"></script>
+<script src="i18n.js?v=105"></script>
+<script src="config.js?v=105"></script>
+<script src="comptes.js?v=105"></script>
+<script src="donnees.js?v=105"></script>
+<script src="skills.js?v=105"></script>
+<script src="talents.js?v=105"></script>
+<script src="builds_reference.js?v=105"></script>
+<script src="guides_classes.js?v=105"></script>
+<script src="fiche.js?v=105"></script>
+<script src="app.js?v=105"></script>
 </body>
 </html>

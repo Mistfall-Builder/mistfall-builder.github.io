@@ -4439,6 +4439,159 @@ function brancherObjets() {
   $('objRarete').onchange = relire;
 }
 
+/* ------------------------------------------------------- LES RESSOURCES --
+ *
+ * 530 objets consommables, materiaux, contenants, munitions — jusqu'au tier
+ * Holy. Ils vivent dans `ressources.js`, 104 Ko qui ne sont JAMAIS charges
+ * tant que personne n'ouvre cette vue : un `<script>` injecte a la demande,
+ * une seule fois.
+ *
+ * Ce que les donnees du jeu contiennent : le nom, la categorie, le tier de
+ * rarete, l'icone, et A QUOI L'OBJET SERT. Ce qu'elles ne contiennent pas :
+ * ou il se ramasse. D'ou le meme « ? » que pour l'equipement.
+ */
+const RES_PAR_PAGE = 60;
+const resEtat = { page: 0, total: 0 };
+let _resCharge = null;
+
+function chargerRessources() {
+  if (_resCharge) return _resCharge;
+  _resCharge = new Promise((ok, ko) => {
+    if (self.D_RESSOURCES) { ok(self.D_RESSOURCES); return; }
+    /* Le meme numero de version que le reste, sinon ce fichier resterait en
+       cache indefiniment : bump.py reecrit tous les `?v=` d'index.html, on
+       relit donc celui d'app.js plutot que d'inventer une constante que
+       personne ne penserait a incrementer. */
+    const moi = document.querySelector('script[src^="app.js"]');
+    const v = ((moi && moi.getAttribute('src').match(/\?v=(\d+)/)) || [])[1] || '1';
+    const sc = document.createElement('script');
+    sc.src = 'ressources.js?v=' + v;
+    sc.onload = () => ok(self.D_RESSOURCES || []);
+    sc.onerror = () => ko(new Error('ressources.js'));
+    document.head.appendChild(sc);
+  });
+  return _resCharge;
+}
+
+function resFiltres() {
+  const liste = self.D_RESSOURCES || [];
+  const q = ($('resRecherche').value || '').trim().toLowerCase();
+  const c = $('resCat').value;
+  const g = $('resTier').value;
+  return liste.filter((o) => {
+    if (c && o.c !== c) return false;
+    if (g !== '' && String(o.g) !== g) return false;
+    if (!q) return true;
+    return o.n.toLowerCase().includes(q)
+        || (o.u && o.u.t.toLowerCase().includes(q));
+  });
+}
+
+/* L'usage est du texte du jeu, avec son propre balisage <Emphasize>. Il a ete
+   decoupe a la generation en { t: texte plat, f: [passages mis en avant] } :
+   la page n'interprete donc jamais de balisage venu d'ailleurs, elle se
+   contente de rehausser des morceaux qu'elle retrouve dans son propre texte. */
+function usageEnHtml(u) {
+  if (!u) return '';
+  let html = echapper(u.t);
+  for (const f of (u.f || [])) {
+    if (!f) continue;
+    html = html.replace(echapper(f), `<b>${echapper(f)}</b>`);
+  }
+  return html;
+}
+
+function carteRessource(o) {
+  const el = document.createElement('div');
+  el.className = 'objCarte';
+  const coul = D.couleurs[String(o.g)] || 'var(--bord)';
+  el.style.borderLeftColor = coul;
+  el.innerHTML = `
+    ${o.ic ? `<img src="icones_objets/${echapper(o.ic)}" alt=""
+                   loading="lazy" decoding="async">`
+           : '<span class="objSansIcone" aria-hidden="true"></span>'}
+    <div class="objTxt">
+      <span class="objNom">${echapper(o.n)}</span>
+      <span class="objMeta"><span class="objTier" style="color:${coul}">${
+        echapper(D.raretes[String(o.g)] || t('res.sansTier'))}</span
+        ><span class="objCat">${echapper(t('res.cat.' + o.c) || o.c)}</span></span>
+      ${o.u ? `<span class="objUsage">${usageEnHtml(o.u)}</span>` : ''}
+    </div>
+    <span class="objOu" title="${echapper(t('obj.ouInconnu'))}">?</span>`;
+  return el;
+}
+
+function dessinerRessources(page) {
+  const boite = $('resGrille');
+  if (!boite) return;
+  if (typeof page === 'number') resEtat.page = page;
+  const liste = resFiltres();
+  resEtat.total = liste.length;
+  if (resEtat.page * RES_PAR_PAGE >= liste.length) resEtat.page = 0;
+  const tranche = liste.slice(resEtat.page * RES_PAR_PAGE,
+                              resEtat.page * RES_PAR_PAGE + RES_PAR_PAGE);
+  boite.innerHTML = '';
+  if (!tranche.length) {
+    boite.innerHTML = `<div class="objVide">${t('obj.rien')}</div>`;
+  } else {
+    const f = document.createDocumentFragment();
+    for (const o of tranche) f.appendChild(carteRessource(o));
+    boite.appendChild(f);
+  }
+  $('resCompte').textContent = t('obj.compte', { n: liste.length });
+  if ($('resNote')) $('resNote').innerHTML = `<b>?</b> ${t('obj.noteOu')}`;
+  dessinerPages($('resPages'), resEtat, RES_PAR_PAGE, dessinerRessources);
+}
+
+function poserFiltresRessources() {
+  if (!$('resCat') || !D) return;
+  const cats = [...new Set((self.D_RESSOURCES || []).map((o) => o.c))].sort();
+  remplirSelect($('resCat'),
+    [['', t('res.toutesCat')]].concat(cats.map((c) => [c, t('res.cat.' + c) || c])),
+    $('resCat').value);
+  const tiers = [...new Set((self.D_RESSOURCES || []).map((o) => o.g))]
+    .sort((a, b) => b - a);
+  remplirSelect($('resTier'),
+    [['', t('res.tousTiers')]].concat(
+      tiers.map((g) => [String(g), D.raretes[String(g)] || t('res.sansTier')])),
+    $('resTier').value);
+}
+
+async function ouvrirRessources() {
+  const boite = $('resGrille');
+  if (!boite) return;
+  if (!self.D_RESSOURCES) {
+    boite.innerHTML = `<div class="objVide">${t('res.chargement')}</div>`;
+    try { await chargerRessources(); } catch (e) {
+      boite.innerHTML = `<div class="objVide">${t('res.chargeKo')}</div>`;
+      return;
+    }
+    poserFiltresRessources();
+    const relire = () => dessinerRessources(0);
+    $('resRecherche').oninput = relire;
+    $('resCat').onchange = relire;
+    $('resTier').onchange = relire;
+  }
+  dessinerRessources();
+}
+
+/* Les deux vues de l'onglet Objets. La seconde ne se charge qu'au clic. */
+function brancherVuesObjets() {
+  const barre = $('objOnglets');
+  if (!barre) return;
+  for (const b of barre.querySelectorAll('button')) {
+    b.onclick = () => {
+      for (const x of barre.querySelectorAll('button')) {
+        x.classList.toggle('actif', x === b);
+      }
+      $('vueEquip').hidden = b.dataset.vue !== 'vueEquip';
+      $('vueRess').hidden = b.dataset.vue !== 'vueRess';
+      if (b.dataset.vue === 'vueRess') ouvrirRessources();
+      else dessinerObjets();
+    };
+  }
+}
+
 function montrerPage(id) {
   for (const el of document.querySelectorAll('main, .page')) {
     el.hidden = (id === 'main') ? (el.tagName !== 'MAIN') : (el.id !== id);
@@ -4453,7 +4606,10 @@ function montrerPage(id) {
   }
   // Le catalogue ne se dessine qu'ici : c'est ce qui garantit qu'il ne
   // coute rien tant qu'on reste sur le Builder.
-  if (id === 'pageObjets') dessinerObjets();
+  if (id === 'pageObjets') {
+    if ($('vueRess') && !$('vueRess').hidden) ouvrirRessources();
+    else dessinerObjets();
+  }
   if (id === 'pageCommunaute') {
     dessinerBuildsClasses();
     dessinerGuidesClasses();
@@ -4508,7 +4664,11 @@ window.surChangementDeLangue = function () {
   dessinerBuildsClasses();
   dessinerAccueil();
   poserFiltresObjets();
-  if (!$('pageObjets').hidden) dessinerObjets();
+  if (!$('pageObjets').hidden) {
+    if ($('vueRess') && !$('vueRess').hidden) {
+      poserFiltresRessources(); dessinerRessources();
+    } else dessinerObjets();
+  }
   dessinerGuidesClasses();
   dessinerComparaison();
   // Le compteur de la grille et les infobulles des paliers sont posés en
@@ -4634,6 +4794,7 @@ function demarrer(donnees) {
 
   brancherPlis();
   brancherObjets();
+  brancherVuesObjets();
   /* L'INVENTAIRE COMPLET SE PAIE A L'OUVERTURE, PAS AVANT. Sept secondes de
    * calcul a chaque build seraient insupportables ; la carte etant repliee
    * par defaut, on ne les depense que si quelqu'un veut vraiment savoir. */
