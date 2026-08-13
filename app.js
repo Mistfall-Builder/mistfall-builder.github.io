@@ -4464,17 +4464,41 @@ function chargerRessources() {
        personne ne penserait a incrementer. */
     const moi = document.querySelector('script[src^="app.js"]');
     const v = ((moi && moi.getAttribute('src').match(/\?v=(\d+)/)) || [])[1] || '1';
-    const sc = document.createElement('script');
-    sc.src = 'ressources.js?v=' + v;
-    sc.onload = () => ok(self.D_RESSOURCES || []);
-    sc.onerror = () => ko(new Error('ressources.js'));
-    document.head.appendChild(sc);
+    const charge = (nom) => new Promise((o2, k2) => {
+      const sc = document.createElement('script');
+      sc.src = nom + '?v=' + v;
+      sc.onload = o2;
+      sc.onerror = () => k2(new Error(nom));
+      document.head.appendChild(sc);
+    });
+    // Les provenances sont facultatives : leur absence ne doit pas empecher
+    // le catalogue de s'afficher.
+    charge('ressources.js')
+      .then(() => charge('provenances.js').catch(() => {}))
+      .then(() => ok(self.D_RESSOURCES || []))
+      .catch(ko);
   });
   return _resCharge;
 }
 
+let _resUniq = null;
+
+/* La base porte des doublons — Celestigold y figure deux fois, Golden Coffer
+   sept. Ce sont des identifiants distincts pour un meme objet aux yeux du
+   joueur : on n'en affiche qu'un. */
+function ressourcesUniques() {
+  if (_resUniq) return _resUniq;
+  const vus = new Map();
+  for (const o of (self.D_RESSOURCES || [])) {
+    const cle = o.n + '|' + o.c + '|' + o.g;
+    if (!vus.has(cle)) vus.set(cle, o);
+  }
+  _resUniq = [...vus.values()];
+  return _resUniq;
+}
+
 function resFiltres() {
-  const liste = self.D_RESSOURCES || [];
+  const liste = ressourcesUniques();
   const q = ($('resRecherche').value || '').trim().toLowerCase();
   const c = $('resCat').value;
   const g = $('resTier').value;
@@ -4501,6 +4525,50 @@ function usageEnHtml(u) {
   return html;
 }
 
+/* La provenance, quand on la connait. `provenances.js` voyage avec
+   `ressources.js` : deux fichiers, un seul chargement differe. */
+function provenanceDe(nom) {
+  const P = self.D_PROVENANCES;
+  if (!P) return null;
+  return (P.objets || []).find((x) => x.n === nom) || null;
+}
+
+/* LE PLAN DES ZONES.
+ *
+ * Ce n'est pas la carte du jeu : je n'en ai pas la geographie, et la
+ * dessiner de memoire reviendrait a l'inventer. C'est un plan des ZONES
+ * CONNUES, ou s'allument celles qui concernent l'objet survole. Ça repond a
+ * la seule question qu'on se pose vraiment — ou est-ce que je vais ? — sans
+ * pretendre a une precision qu'on n'a pas. */
+function planDesZones(prov) {
+  const P = self.D_PROVENANCES || {};
+  const dedans = new Map();
+  for (const c of (prov.cartes || [])) dedans.set(c.m, new Set(c.z || []));
+  const cartes = Object.entries(P.cartes || {}).map(([m, zones]) => {
+    const vises = dedans.get(m);
+    const actif = vises ? ' plActif' : '';
+    return `<div class="plCarte${actif}">
+        <h5>${echapper(m)}</h5>
+        <div class="plZones">${zones.map((z) => {
+          const ici = vises && vises.has(z);
+          return `<span class="plZone${ici ? ' ici' : ''}">${echapper(z)}</span>`;
+        }).join('')}</div>
+      </div>`;
+  }).join('');
+  const noeuds = (prov.noeuds || []).length
+    ? `<div class="plNoeuds"><span class="plTitre">${t('prov.noeuds')}</span>
+        ${prov.noeuds.map((n) => `<em>${echapper(n)}</em>`).join('')}</div>` : '';
+  const lg = (window.I18N && I18N.courante()) || 'fr';
+  const texte = prov.note && (typeof prov.note === 'string'
+    ? prov.note : (prov.note[lg] || prov.note.en || prov.note.fr));
+  const note = texte ? `<p class="plNote">${echapper(texte)}</p>` : '';
+  const src = (prov.src || []).length
+    ? `<p class="plSrc">${t('prov.sources')} ${prov.src.map((u, i) =>
+        `<a href="${echapper(u)}" target="_blank"
+            rel="noopener noreferrer nofollow">${i + 1}</a>`).join(' · ')}</p>` : '';
+  return `<div class="plan">${cartes}${noeuds}${note}${src}</div>`;
+}
+
 function carteRessource(o) {
   const el = document.createElement('div');
   el.className = 'objCarte';
@@ -4518,6 +4586,21 @@ function carteRessource(o) {
       ${o.u ? `<span class="objUsage">${usageEnHtml(o.u)}</span>` : ''}
     </div>
     <span class="objOu" title="${echapper(t('obj.ouInconnu'))}">?</span>`;
+
+  const prov = provenanceDe(o.n);
+  if (prov) {
+    const marque = el.querySelector('.objOu');
+    marque.className = 'objOu objSu';
+    marque.textContent = '◉';
+    marque.title = t('prov.voir');
+    const plan = document.createElement('div');
+    plan.className = 'planBoite';
+    plan.innerHTML = planDesZones(prov);
+    el.appendChild(plan);
+    // Au survol ET au clic : la souris pour aller vite, le clic pour le
+    // tactile, ou survoler n'existe pas.
+    marque.onclick = (ev) => { ev.stopPropagation(); el.classList.toggle('ouvert'); };
+  }
   return el;
 }
 
@@ -4539,17 +4622,20 @@ function dessinerRessources(page) {
     boite.appendChild(f);
   }
   $('resCompte').textContent = t('obj.compte', { n: liste.length });
-  if ($('resNote')) $('resNote').innerHTML = `<b>?</b> ${t('obj.noteOu')}`;
+  if ($('resNote')) {
+    const su = (self.D_PROVENANCES && self.D_PROVENANCES.objets || []).length;
+    $('resNote').innerHTML = `<b>◉</b> ${t('prov.note', { n: su })}`;
+  }
   dessinerPages($('resPages'), resEtat, RES_PAR_PAGE, dessinerRessources);
 }
 
 function poserFiltresRessources() {
   if (!$('resCat') || !D) return;
-  const cats = [...new Set((self.D_RESSOURCES || []).map((o) => o.c))].sort();
+  const cats = [...new Set(ressourcesUniques().map((o) => o.c))].sort();
   remplirSelect($('resCat'),
     [['', t('res.toutesCat')]].concat(cats.map((c) => [c, t('res.cat.' + c) || c])),
     $('resCat').value);
-  const tiers = [...new Set((self.D_RESSOURCES || []).map((o) => o.g))]
+  const tiers = [...new Set(ressourcesUniques().map((o) => o.g))]
     .sort((a, b) => b - a);
   remplirSelect($('resTier'),
     [['', t('res.tousTiers')]].concat(

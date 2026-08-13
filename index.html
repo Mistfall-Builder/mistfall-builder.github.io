@@ -950,6 +950,40 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .objCat{font-size:10.5px;color:var(--terne);border:1px solid var(--bord-fort);
   border-radius:2px;padding:1px 5px;margin-left:5px}
 
+/* ------------------------------------------- ou se ramasse un objet ----- */
+/* Le repere remplace le « ? » quand la provenance est connue ET verifiee.
+   Deux etats seulement, et ils veulent dire exactement ce qu'ils montrent :
+   on sait, ou on ne sait pas. */
+.objSu{color:var(--ok);opacity:.85}
+.objSu:hover{opacity:1}
+.planBoite{display:none;position:absolute;z-index:20;left:8px;right:8px;
+  top:calc(100% - 4px);padding:10px 11px;background:var(--panneau);
+  border:1px solid var(--accent-sombre);border-radius:3px;
+  box-shadow:0 10px 26px rgba(0,0,0,.6)}
+.objCarte:hover .planBoite,.objCarte.ouvert .planBoite{display:block}
+.objCarte:hover{z-index:21}
+.plCarte{margin-bottom:7px;opacity:.4}
+.plCarte.plActif{opacity:1}
+.plCarte h5{margin:0 0 4px;font:700 10.5px/1 var(--condense);letter-spacing:.9px;
+  text-transform:uppercase;color:var(--terne)}
+.plCarte.plActif h5{color:var(--accent)}
+.plZones{display:flex;flex-wrap:wrap;gap:3px}
+.plZone{font-size:10.5px;padding:2px 6px;border-radius:2px;color:var(--terne);
+  border:1px solid var(--bord)}
+/* La zone ou l'objet se trouve : c'est la seule chose qu'on vient chercher,
+   elle doit se voir sans lire. */
+.plZone.ici{color:var(--texte);border-color:var(--ok);
+  background:rgba(122,168,116,.14)}
+.plNoeuds{margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.plTitre{font-size:10px;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--terne);margin-right:2px}
+.plNoeuds em{font-style:normal;font-size:10.5px;padding:2px 6px;
+  border-radius:2px;color:var(--doux);background:var(--creux);
+  border:1px solid var(--bord)}
+.plNote{margin:7px 0 0;font-size:11px;line-height:1.45;color:var(--doux)}
+.plSrc{margin:5px 0 0;font-size:10.5px;color:var(--terne)}
+.plSrc a{color:var(--accent)}
+
 /* --------------------------------------------- accueil de la colonne --- */
 #accueilResultats{margin-bottom:14px}
 /* Une seule ligne, qui s'enveloppe si besoin. Ces builds sont une porte
@@ -1558,15 +1592,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=105"></script>
-<script src="config.js?v=105"></script>
-<script src="comptes.js?v=105"></script>
-<script src="donnees.js?v=105"></script>
-<script src="skills.js?v=105"></script>
-<script src="talents.js?v=105"></script>
-<script src="builds_reference.js?v=105"></script>
-<script src="guides_classes.js?v=105"></script>
-<script src="fiche.js?v=105"></script>
-<script src="app.js?v=105"></script>
+<script src="i18n.js?v=106"></script>
+<script src="config.js?v=106"></script>
+<script src="comptes.js?v=106"></script>
+<script src="donnees.js?v=106"></script>
+<script src="skills.js?v=106"></script>
+<script src="talents.js?v=106"></script>
+<script src="builds_reference.js?v=106"></script>
+<script src="guides_classes.js?v=106"></script>
+<script src="fiche.js?v=106"></script>
+<script src="app.js?v=106"></script>
 </body>
 </html>
