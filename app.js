@@ -1161,11 +1161,46 @@ function majBudgetVin() {
 /* Le texte cherchable d'un affixe : son nom, sa description, et les libellés
    de tous ses niveaux. Calculé une fois puis gardé — refaire la
    concaténation à chaque frappe sur 44 affixes × 7 niveaux se sentirait. */
+/* LES DEUX NOMS DU MÊME AFFIXE.
+ *
+ * Un joueur a signale que « Deft » manquait. Il ne manquait pas : le jeu
+ * l'appelle « Deft » dans les noms de gemmes — « Deft Peridot », « Fierce
+ * Battle: Deft Peridot » — et « Sleight of Hand » dans la table des
+ * affixes, d'ou vient notre catalogue. Six affixes sont dans ce cas, la
+ * plupart sur le couple energie/vigueur.
+ *
+ * On ne renomme rien : nos noms viennent des tables du codec, et c'est
+ * elles qui font foi pour le code d'import. Mais chercher l'autre nom doit
+ * marcher, et l'infobulle doit le dire — sinon chacun croit a un oubli.
+ *
+ * Verifie affixe par affixe contre le wiki : meme description, meme
+ * plafond, meme famille.
+ */
+const AUTRES_NOMS = {
+  'Sleight of Hand': 'Deft',
+  'Critical Damage': 'Headshot Damage',
+  'Magic Damage Reduction': 'Magical Damage Reduction',
+  'Energy Recovery Speed Increase': 'Increased Stamina Recovery Speed',
+  'Block Energy Cost Reduction': 'Reduced Block Stamina Cost',
+  'Skill Energy Cost Reduction': 'Reduced Skill Stamina Cost',
+};
+
+/* ON AFFICHE LE NOM DU JEU, ON GARDE LA CLE INTERNE.
+ *
+ * « Deft » est le nom que le joueur voit : c'est celui du wiki, celui de
+ * MistfallDB, et celui de nos propres gemmes (« Deft Peridot »). « Sleight
+ * of Hand » ne vit que dans la table du codec.
+ *
+ * Renommer la CLE casserait tous les builds deja enregistres, qui la
+ * citent. On ne touche donc qu'a l'etiquette : les cibles, les preferences
+ * et les codes d'import continuent de parler la meme langue qu'avant. */
+function libelleAffixe(nom) { return AUTRES_NOMS[nom] || nom; }
+
 const _texteAffixe = new Map();
 function texteCherchable(nom) {
   if (_texteAffixe.has(nom)) return _texteAffixe.get(nom);
   const info = D.affixes[nom] || {};
-  const t = [nom, info.desc || '', ...(info.eff || [])]
+  const t = [nom, AUTRES_NOMS[nom] || '', info.desc || '', ...(info.eff || [])]
     .join(' ').toLowerCase();
   _texteAffixe.set(nom, t);
   return t;
@@ -1249,7 +1284,11 @@ function tuileAffixe(nom) {
   const el = document.createElement('div');
   el.className = 'gAff affixe';
   el.dataset.affixe = nom;
-  el.title = (info.desc || '')
+  // L'autre nom du jeu en tete : c'est ce que cherchera le joueur qui l'a
+  // On affiche le nom du jeu ; l'infobulle rappelle l'AUTRE, celui de nos
+  // tables, pour qui l'aurait croise dans un vieux build ou un export.
+  el.title = (AUTRES_NOMS[nom] ? t('affixes.aussi', { nom }) + '\n\n' : '')
+    + (info.desc || '')
     + (info.eff ? '\n\n' + info.eff.map((e, i) => `${i + 1}. ${e}`).join('\n') : '');
   // DEUX LIGNES, PAS UNE. Sur une seule, le nom devait céder sa place aux
   // huit boutons et « Energy Recovery Speed Increase » finissait en
@@ -1259,7 +1298,7 @@ function tuileAffixe(nom) {
   // « max 7 » à côté prendrait la place du nom pour ne rien apprendre.
   el.innerHTML = `<div class="gTete">
       <button class="gPref pref"></button>
-      ${pastille(info.cat)}<span class="txt">${echapper(nom)}</span>
+      ${pastille(info.cat)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
       <select class="vin"></select>
     </div>
     <div class="gNiv"></div>`;
@@ -1524,7 +1563,7 @@ function afficher(res, classe) {
     const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
     return `<tr${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
-              ${pastille(cat)}${nom}</span></td>
+              ${pastille(cat)}${libelleAffixe(nom)}</span></td>
             <td class="n appoint">${vise == null ? '—' : vise}</td>
             <td class="n appoint">${eq}</td>
             <td class="n appoint">${v || ''}</td>
@@ -1712,24 +1751,41 @@ function lancerAnalyseComplete(res) {
     while (i < aTester.length && performance.now() - t0 < 90) {
       const nom = aTester[i]; i += 1;
       const a = actuelDe(nom);
-      let ok = false;
-      try {
-        const r = construire(classe, arme,
-          cibleBase.filter(([x]) => x !== nom).concat([[nom, a + 1]]),
-          grade, vin, mixte, {}, vinManuel, verrousObjet());
-        ok = !!(r && r.suffisant);
-      } catch (e) { ok = false; }
+      const essaye = (niveau) => {
+        try {
+          const r = construire(classe, arme,
+            cibleBase.filter(([x]) => x !== nom).concat([[nom, niveau]]),
+            grade, vin, mixte, {}, vinManuel, verrousObjet());
+          return !!(r && r.suffisant);
+        } catch (e) { return false; }
+      };
+      /* ON VISE LE PALIER, PAS LE CRAN SUIVANT.
+       *
+       * Proposer « Sky Piercer 0 → 1 » quand 0 → 5 passe oblige a cliquer
+       * cinq fois pour decouvrir la seule information qui compte : le niveau
+       * ou l'affixe gagne son second effet. On demande donc le palier
+       * d'abord ; s'il ne passe pas, on retombe sur le cran suivant, qui
+       * reste vrai. Deux essais au pire, pour une reponse utile du premier
+       * coup. */
+      const p = palier(nom);
+      const vise = (p && p > a && essaye(p)) ? p : (essaye(a + 1) ? a + 1 : 0);
       const existante = dejaLa.get(nom);
-      if (!ok) {
+      if (!vise) {
         // Le moteur dement l'estimation : la ligne s'en va.
         if (existante) { existante.remove(); dejaLa.delete(nom); }
         continue;
       }
-      // Confirmee : on garde la ligne rapide, qui en dit plus (elle nomme le
-      // moyen, et va parfois plus haut que +1).
-      if (existante) continue;
-      boite.appendChild(ligneMarge({ nom, actuel: a, atteignable: a + 1,
-                                     gain: 1, palier: palier(nom), via: 'moteur' }));
+      if (existante) {
+        // La ligne rapide existe deja ; on ne la remplace que si le moteur
+        // va PLUS HAUT qu'elle ne l'annonçait.
+        const dit = Number(existante.dataset.niveau || 0);
+        if (dit >= vise) continue;
+        existante.remove(); dejaLa.delete(nom);
+      }
+      const ligne = ligneMarge({ nom, actuel: a, atteignable: vise,
+                                 gain: vise - a, palier: p, via: 'moteur' });
+      boite.appendChild(ligne);
+      dejaLa.set(nom, ligne);
     }
     if (note) {
       note.className = 'pas';
@@ -1758,6 +1814,7 @@ function ligneMarge(m) {
   const franchit = m.palier && m.atteignable >= m.palier && m.actuel < m.palier;
   b.className = 'lm' + (franchit ? ' pal' : '') + (m.via === 'piece' ? ' viaPiece' : '');
   b.dataset.affixe = m.nom;
+  b.dataset.niveau = String(m.atteignable);
   b.title = m.via === 'piece'
     ? t('marge.parPiece', { nom: m.nom, n: m.atteignable,
                             piece: m.piece.n, slot: D.nomsSlots[m.slot] || m.slot })
@@ -1765,7 +1822,7 @@ function ligneMarge(m) {
   const moyen = m.via === 'piece' ? 'marge.viaPiece'
               : (m.via === 'moteur' ? 'marge.viaMoteur' : 'marge.viaGemme');
   b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
-    <span class="nomA">${m.nom}</span>
+    <span class="nomA">${libelleAffixe(m.nom)}</span>
     ${franchit ? `<span class="marquePal"
       title="${t('palier.quoi', { n: m.palier })}">${t('sugg.palier')}</span>` : ''}
     <span class="moyen">${t(moyen)}</span>
@@ -1819,7 +1876,7 @@ function dessinerMarge(res) {
       b.className = 'lm baisse';
       b.title = t('marge.poser', { nom: x.nom, n: x.a });
       b.innerHTML = `${pastille((D.affixes[x.nom] || {}).cat)}
-        <span class="nomA">${x.nom}</span>
+        <span class="nomA">${libelleAffixe(x.nom)}</span>
         <span class="fleche">${x.vise} → <span class="cible">${x.a}</span></span>`;
       b.onclick = () => {
         if (x.a > 0) cibles.set(x.nom, x.a); else cibles.delete(x.nom);
@@ -3496,7 +3553,7 @@ function dessinerComparaison() {
     const d = b - a;
     const signe = d === 0 ? 'nul' : (d > 0 ? 'plus' : 'moins');
     return `<tr><td><span class="avecPastille">${
-      pastille((D.affixes[n] || {}).cat)}${n}</span></td>
+      pastille((D.affixes[n] || {}).cat)}${libelleAffixe(n)}</span></td>
       <td class="n">${a || '—'}</td><td class="n">${b || '—'}</td>
       <td class="n ec ${signe}">${d === 0 ? '=' : (d > 0 ? '+' : '−') + Math.abs(d)}</td></tr>`;
   }).join('');
