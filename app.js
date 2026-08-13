@@ -765,6 +765,7 @@ function marge(res, vinPoints) {
 
   const sortie = [];
   for (const nom of Object.keys(D.affixes)) {
+    if (!affixeReel(nom)) continue;
     const cap = plafond(nom);
     const socle = Math.min(cap, (base[nom] || 0)
                                 + ((vinPoints && vinPoints.get(nom)) || 0));
@@ -1178,6 +1179,7 @@ function majBudgetVin() {
  */
 const AUTRES_NOMS = {
   'Sleight of Hand': 'Deft',
+  'Sky Piercer': 'Skypiercing',
   'Critical Damage': 'Headshot Damage',
   'Magic Damage Reduction': 'Magical Damage Reduction',
   'Energy Recovery Speed Increase': 'Increased Stamina Recovery Speed',
@@ -1195,6 +1197,34 @@ const AUTRES_NOMS = {
  * citent. On ne touche donc qu'a l'etiquette : les cibles, les preferences
  * et les codes d'import continuent de parler la meme langue qu'avant. */
 function libelleAffixe(nom) { return AUTRES_NOMS[nom] || nom; }
+
+/* LES AFFIXES QUI N'EXISTENT PAS SUR L'EQUIPEMENT.
+ *
+ * Notre table vient du codec, qui contient 44 entrees. Le filtre du jeu,
+ * lui, n'en propose que 32 — et les 12 en trop sont exactement ceux
+ * qu'AUCUNE gemme ne donne et qu'AUCUN objet ne porte en inne. Verifie sur
+ * les 1947 pieces du catalogue : zero. Ils ne peuvent donc apparaitre dans
+ * aucun build, jamais.
+ *
+ * Les laisser dans la liste coutait cher : douze tuiles a regler pour rien,
+ * douze cibles impossibles a poser par erreur, et douze affixes testes en
+ * vain par l'inventaire complet — un tiers de ses sept secondes.
+ *
+ * On ne les efface pas des donnees : le codec peut y faire reference. On
+ * les deduit a l'ouverture, et ils ne sortent plus de la. Se fier a la
+ * DONNEE plutot qu'a une liste ecrite a la main garantit que la regle
+ * suivra une mise a jour du jeu toute seule. */
+let _affixesReels = null;
+function affixeReel(nom) {
+  if (!_affixesReels) {
+    _affixesReels = new Set();
+    for (const g of D.gemmes || []) for (const a of g.a || []) _affixesReels.add(a);
+    for (const pool of Object.values(D.objets || {})) {
+      for (const it of pool) if (it.i) _affixesReels.add(it.i);
+    }
+  }
+  return _affixesReels.has(nom);
+}
 
 const _texteAffixe = new Map();
 function texteCherchable(nom) {
@@ -1220,7 +1250,11 @@ function dessinerAffixes() {
   if (!conteneur) return;
   const filtre = ($('recherche').value || '').toLowerCase();
   conteneur.innerHTML = '';
-  for (const nom of Object.keys(D.affixes).sort()) {
+  // Les affixes qui n'existent sur aucune piece passent en dernier : on les
+  // garde sous les yeux, sans qu'ils s'intercalent entre ceux qui servent.
+  const ordre = Object.keys(D.affixes).sort((x, y) =>
+    (affixeReel(y) ? 1 : 0) - (affixeReel(x) ? 1 : 0) || x.localeCompare(y));
+  for (const nom of ordre) {
     // LA RECHERCHE PORTE AUSSI SUR L'EFFET, PAS SEULEMENT SUR LE NOM.
     // Personne ne devine que la vitesse de déplacement s'appelle « Swift »
     // ou « Focused » : chercher « speed » doit les trouver. On balaie donc
@@ -1282,13 +1316,17 @@ function dessinerAffixes() {
 function tuileAffixe(nom) {
   const info = D.affixes[nom];
   const el = document.createElement('div');
-  el.className = 'gAff affixe';
+  const reel = affixeReel(nom);
+  el.className = 'gAff affixe' + (reel ? '' : ' horsEquip');
   el.dataset.affixe = nom;
   // L'autre nom du jeu en tete : c'est ce que cherchera le joueur qui l'a
   // On affiche le nom du jeu ; l'infobulle rappelle l'AUTRE, celui de nos
   // tables, pour qui l'aurait croise dans un vieux build ou un export.
-  el.title = (AUTRES_NOMS[nom] ? t('affixes.aussi', { nom }) + '\n\n' : '')
-    + (info.desc || '')
+  const bouts = [];
+  if (!reel) bouts.push(t('affixes.horsEquip'));
+  if (AUTRES_NOMS[nom]) bouts.push(t('affixes.aussi', { nom }));
+  if (info.desc) bouts.push(info.desc);
+  el.title = bouts.join('\n\n')
     + (info.eff ? '\n\n' + info.eff.map((e, i) => `${i + 1}. ${e}`).join('\n') : '');
   // DEUX LIGNES, PAS UNE. Sur une seule, le nom devait céder sa place aux
   // huit boutons et « Energy Recovery Speed Increase » finissait en
@@ -1367,7 +1405,10 @@ function tuileAffixe(nom) {
     b.title = palier ? t('grille.palier', { n: valeur }) : '';
     // Recliquer le niveau déjà posé le retire : c'est le geste attendu, et
     // ça évite d'aller chercher le tiret à l'autre bout de la rangée.
-    b.onclick = () => poser(cibles.get(nom) === valeur ? null : valeur);
+    // Un affixe qu'aucune piece ne porte ne peut pas etre vise : le bouton
+    // resterait un piege, il est donc inerte.
+    b.disabled = !reel;
+    if (reel) b.onclick = () => poser(cibles.get(nom) === valeur ? null : valeur);
     rangee.appendChild(b);
   };
   bouton('—', null, false);
@@ -1387,7 +1428,9 @@ function dessinerGrilleAffixes() {
   const corps = $('grilleCorps');
   if (!corps) return;
   corps.innerHTML = '';
-  for (const nom of Object.keys(D.affixes).sort()) {
+  const ordre = Object.keys(D.affixes).sort((x, y) =>
+    (affixeReel(y) ? 1 : 0) - (affixeReel(x) ? 1 : 0) || x.localeCompare(y));
+  for (const nom of ordre) {
     if (!passeFiltrePref(nom)) continue;
     corps.appendChild(tuileAffixe(nom));
   }
@@ -1731,7 +1774,7 @@ function lancerAnalyseComplete(res) {
     (res.couvert[n] || 0) + (vp.get(n) || 0));
 
   const aTester = Object.keys(D.affixes)
-    .filter((n) => actuelDe(n) < plafond(n))
+    .filter((n) => affixeReel(n) && actuelDe(n) < plafond(n))
     .sort((a, b) => (cibles.has(b) ? 1 : 0) - (cibles.has(a) ? 1 : 0)
                  || a.localeCompare(b));
   // Les lignes deja posees par les deux voies rapides sont des ESTIMATIONS :

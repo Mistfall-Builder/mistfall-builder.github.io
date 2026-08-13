@@ -469,6 +469,10 @@ table.cmp .ec.nul{color:var(--terne)}
    grille garde ses positions d'une frappe a l'autre, donc l'oeil retrouve
    ou il en etait. */
 .gAff.terne{opacity:.24}
+/* Un affixe qui n'existe sur aucune piece reste visible mais se distingue :
+   il est la pour memoire, pas pour etre regle. */
+.gAff.horsEquip{opacity:.42;border-style:dashed}
+.gAff.horsEquip .gNiv button{cursor:default}
 .gAff.brille{border-color:var(--accent);
   box-shadow:0 0 0 1px var(--accent),0 0 22px -6px var(--accent)}
 .gAff .vin{flex:0 0 auto;width:56px;padding:3px 4px;font-size:11px}
@@ -1331,15 +1335,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=85"></script>
-<script src="config.js?v=85"></script>
-<script src="comptes.js?v=85"></script>
-<script src="donnees.js?v=85"></script>
-<script src="skills.js?v=85"></script>
-<script src="talents.js?v=85"></script>
-<script src="builds_reference.js?v=85"></script>
-<script src="guides_classes.js?v=85"></script>
-<script src="fiche.js?v=85"></script>
-<script src="app.js?v=85"></script>
+<script src="i18n.js?v=88"></script>
+<script src="config.js?v=88"></script>
+<script src="comptes.js?v=88"></script>
+<script src="donnees.js?v=88"></script>
+<script src="skills.js?v=88"></script>
+<script src="talents.js?v=88"></script>
+<script src="builds_reference.js?v=88"></script>
+<script src="guides_classes.js?v=88"></script>
+<script src="fiche.js?v=88"></script>
+<script src="app.js?v=88"></script>
 </body>
 </html>
