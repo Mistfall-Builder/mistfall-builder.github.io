@@ -294,13 +294,32 @@
       corps: g.corps, public: !!g.public,
       maj: new Date().toISOString(),
     };
-    if (g.id) ligne.id = g.id;
-    return avecReprise(() => appeler(
-      '/rest/v1/guides?on_conflict=user_id,titre', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify([ligne]),
-      }, true));
+    /* PAS D'UPSERT ICI : IL NE PEUT PAS FONCTIONNER.
+     *
+     * `on_conflict=user_id,titre` demande à PostgreSQL un index unique portant
+     * exactement sur ces deux colonnes. Le seul index de la table est
+     * FONCTIONNEL — (user_id, lower(btrim(titre))) — et ne peut pas satisfaire
+     * cette spécification : la requête partait en 42P10 et aucun guide ne
+     * s'enregistrait. (`builds`, lui, a une vraie contrainte `unique (user_id,
+     * nom)`, d'où le fait que les builds passent.)
+     *
+     * On tranche donc côté client, sans migration à appliquer : modifier un
+     * guide qu'on connaît est un PATCH sur son identifiant, en créer un est un
+     * POST. L'index fonctionnel garde son rôle — refuser deux guides de même
+     * titre à casse près — et l'appelant traduit ce refus en message clair. */
+    if (g.id) {
+      return avecReprise(() => appeler(
+        `/rest/v1/guides?id=eq.${encodeURIComponent(g.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(ligne),
+        }, true));
+    }
+    return avecReprise(() => appeler('/rest/v1/guides', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify([ligne]),
+    }, true));
   }
 
   async function supprimerGuide(id) {

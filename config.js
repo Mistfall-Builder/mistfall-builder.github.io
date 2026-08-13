@@ -17,15 +17,18 @@ window.MISTFALL_CONFIG = {
   supabaseUrl: 'https://grnndksniashncksyzvv.supabase.co',
   supabaseAnonKey: 'sb_publishable_o-6QtPqCK624RcH96KsFxA_qHHdbgRx',
 
-  /* COMPTEUR DE VISITES — ÉTEINT.
+  /* COMPTEUR DE VISITES — ALLUMÉ.
    *
-   * Passé à true, le site incrémente un compteur quotidien : une ligne par
-   * JOUR, un entier, rien d'autre. Ni adresse IP, ni cookie, ni identifiant
-   * de navigateur, ni page consultée — on ne peut pas reconstituer un
-   * visiteur à partir de ça, même en le voulant.
+   * Le titre disait « éteint » au-dessus d'un `true` : la contradiction est
+   * levée dans le sens de ce que le site fait réellement.
    *
-   * Il reste éteint tant que personne ne l'allume : le site a été annoncé
-   * « sans pistage », et ce n'est pas à un fichier de configuration de
-   * revenir là-dessus tout seul. */
+   * Ce qu'il enregistre : une ligne par JOUR, un entier, rien d'autre. Ni
+   * cookie, ni identifiant de navigateur, ni page consultée — la table ne
+   * permet pas de reconstituer un visiteur, même en le voulant.
+   *
+   * Ce qu'il faut savoir quand même : la requête qui incrémente ce compteur
+   * porte l'adresse IP du visiteur, et Supabase la journalise de son côté.
+   * C'est vrai de n'importe quelle requête vers n'importe quel serveur, mais
+   * autant l'écrire que laisser croire à un anonymat de bout en bout. */
   compterVisites: true,
 };

@@ -64,7 +64,9 @@ body{margin:0;background:var(--fond);color:var(--texte);
    voile, un texte de 12 px sur une illustration contrastée devient illisible
    dès qu'on descend dans la page. */
 body::before{content:'';position:fixed;inset:0;z-index:-2;
-  background:url('fond/bg-05.jpg') center top / cover no-repeat;
+  /* WebP q62 : le filtre brightness(.42) juste en dessous absorbe les
+     artefacts, et le fichier passe de 486 a 72 Ko. */
+  background:url('fond/bg-05.webp') center top / cover no-repeat;
   filter:saturate(.55) brightness(.42)}
 body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
@@ -879,8 +881,67 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   .grilleBuilds{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
   .statsGrille{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
 }
-@media(max-width:1280px){#paperdoll{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* 1280 etait EXCLU de sa propre coupure : a 1280 px — la largeur de
+   portable la plus repandue — on tombait a 3 colonnes de 270 px, et a
+   1281 px on passait a 4 colonnes de 200 px, donc plus etroites. Le
+   seuil est remonte la ou 4 colonnes sont reellement confortables. */
+@media(max-width:1440px){#paperdoll{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:640px){#paperdoll{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* ------------------------------------------------------- petits ecrans --
+ *
+ * Il n'existait AUCUNE regle sous 1040 px pour l'en-tete. `.barre` etant un
+ * flex sans retour a la ligne, ses enfants imposaient 660 px de large : le
+ * navigateur elargissait la fenetre de mise en page a 660 et dezoomait toute
+ * la page a 375/660 = 57 %. Un texte declare a 13 px arrivait a 7,4 px, et
+ * la grille plein ecran des affixes debordait de 284 px avec son bouton de
+ * fermeture hors d'atteinte. Mesure a 375x812 : scrollWidth 660 pour un
+ * clientWidth de 375.
+ *
+ * On laisse donc l'en-tete revenir a la ligne, et on remonte les cibles
+ * tactiles a 32 px minimum — l'etoile des favoris en faisait 20x16. */
+@media(max-width:700px){
+  header{height:auto}
+  .barre{flex-wrap:wrap;height:auto;padding:8px 12px;gap:8px 10px}
+  .logo .sous{display:none}
+  .nav{margin-left:0}
+  .droite{margin-left:auto}
+
+  /* la modale des affixes : son en-tete enveloppe, son bouton doit rester pris */
+  .grilleBoite{width:100%;height:100%;border-radius:0}
+  .grilleTete{flex-wrap:wrap;gap:6px}
+  #grilleRecherche{flex:1 1 100%}
+  #grilleFermer{min-height:40px;padding:9px 14px}
+
+  /* 22 px de marge de chaque cote sur un ecran de 375 en laissent 331 aux
+     cartes : leur contenu debordait encore de 12 px, ce qui suffisait a
+     elargir la fenetre de mise en page. */
+  main{padding:16px 11px 40px}
+  .pleine{padding:0 11px 40px}
+
+  /* Le doigt n'a pas la precision du curseur : rien sous 32 px. Les boutons
+     de navigation et les drapeaux ont leurs propres regles, plus precises
+     que `button` : il faut les viser nommement. */
+  button{padding:11px 13px}
+  .nav button{padding:9px 12px}
+  .langues button{padding:8px 10px;font-size:16px}
+  /* `#listeAffixes .gNiv button` porte un id : sa specificite bat un simple
+     `.gNiv button`. On vise donc les deux, sinon les boutons de niveau — la
+     principale interaction de l'outil — restent a 26 px de haut. */
+  .gNiv button,#listeAffixes .gNiv button{padding:9px 0;font-size:12px}
+  .gPref{width:34px;min-width:34px;padding:9px 0;font-size:14px}
+  #listeAffixes .gPref{width:34px;min-width:34px;padding:9px 0;font-size:14px}
+  .cadenas{width:36px;height:36px;font-size:15px;opacity:.5}
+  .gAff .vin,#listeAffixes .vin{padding:8px 4px;font-size:12px}
+  input[type=checkbox]{width:20px;height:20px}
+
+  /* Le code d'import est LA chose qu'on emporte vers le jeu : sur telephone
+     il etait tronque a 26 caracteres sans defilement possible. Il passe sur
+     sa propre ligne, en plus gros, et se laisse faire defiler. */
+  #carteCode .rangee{flex-wrap:wrap}
+  #code{flex:1 1 100%;font-size:13px;text-overflow:clip;overflow-x:auto}
+  #copier{flex:1 1 100%}
+}
+
 .piece{background:var(--creux);border:1px solid var(--bord);border-radius:3px;
   padding:0 0 8px;min-height:172px;position:relative;overflow:hidden}
 /* Le cadenas, dans le coin de la piece. Discret ouvert, franc ferme :
@@ -947,7 +1008,11 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
 <header>
   <div class="barre">
     <a class="logo" href="#">
-      <img class="dragon" src="marque/dragon_petit.png" alt="" width="44" height="47">
+      <!-- C'etait l'element LCP du site : 191 Ko de PNG affiches en 44x47 px,
+           soit 3,9 s avant le plus grand rendu sur une 4G lente. Re-encode a
+           sa taille d'affichage x2 en WebP, il pese 10 Ko. -->
+      <img class="dragon" src="marque/dragon_petit.webp" alt="" width="44" height="47"
+           decoding="async">
       <span class="mot">Mistfall<em>Builder</em>
         <span class="sous" data-i18n="entete.sous">Compose ton stuff, récupère le code d'import</span></span>
     </a>
@@ -1209,7 +1274,8 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
 
 <section id="pageCommunaute" class="page" hidden>
   <div class="banniere">
-    <img src="marque/logo_petit.png" alt="Mistfall Hunter Builder" width="320">
+    <img src="marque/logo_petit.webp" alt="Mistfall Hunter Builder" width="320"
+         loading="lazy" decoding="async">
   </div>
 
   <!-- Trois sections, un seul onglet. Deux onglets qui ouvraient sur du
@@ -1345,15 +1411,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=94"></script>
-<script src="config.js?v=94"></script>
-<script src="comptes.js?v=94"></script>
-<script src="donnees.js?v=94"></script>
-<script src="skills.js?v=94"></script>
-<script src="talents.js?v=94"></script>
-<script src="builds_reference.js?v=94"></script>
-<script src="guides_classes.js?v=94"></script>
-<script src="fiche.js?v=94"></script>
-<script src="app.js?v=94"></script>
+<script src="i18n.js?v=95"></script>
+<script src="config.js?v=95"></script>
+<script src="comptes.js?v=95"></script>
+<script src="donnees.js?v=95"></script>
+<script src="skills.js?v=95"></script>
+<script src="talents.js?v=95"></script>
+<script src="builds_reference.js?v=95"></script>
+<script src="guides_classes.js?v=95"></script>
+<script src="fiche.js?v=95"></script>
+<script src="app.js?v=95"></script>
 </body>
 </html>

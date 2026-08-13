@@ -377,6 +377,21 @@ function figeesDe(verrous) {
   return f;
 }
 
+/* CE QUE LE STUFF DOIT FOURNIR : la cible MOINS le vin.
+ *
+ * La règle vaut partout, et c'était le problème : `construire` l'appliquait,
+ * les deux gestionnaires de clic — appliquer une suggestion, poser une pièce
+ * interchangeable — reposaient les gemmes sur les cibles pleines. Le moteur
+ * dépensait alors des gemmes sur des niveaux déjà payés par le vin, et la
+ * revérification qui suit déclarait perdue une cible que l'outil venait
+ * lui-même de valider. Une seule fonction, donc, plutôt que trois copies. */
+function ciblesPourStuff(cibleMap, vinPoints) {
+  const vp = vinPoints || new Map();
+  return Object.fromEntries([...cibleMap.entries()]
+    .map(([n, l]) => [n, l - (vp.get(n) || 0)])
+    .filter(([, l]) => l > 0));
+}
+
 /* `figees` fige les gemmes d'un emplacement : { slot: [gemme|null, …] }.
    C'est ce qui rend un verrou honnête — verrouiller une pièce sans ses
    gemmes la laisserait se faire re-sertir au tour suivant, et le joueur
@@ -517,11 +532,22 @@ function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tour
   const bloque = verrous || {};
   const figees = {};
   for (const [sl, v] of Object.entries(bloque)) figees[sl] = v.gemmes || [];
-  const tient = (items) => {
-    const a = assembler(items, want, false, figees);
+  /* ON JUGE AVEC LA POSE QUI FERA FOI.
+   *
+   * Cette fonction validait chaque baisse de rareté avec la pose GLOUTONNE,
+   * alors que `construire` finalise avec la DP EXACTE. Une pièce que la DP
+   * saurait exploiter était donc refusée, et le set rendu n'était pas le
+   * moins cher — ce qui est pourtant toute la promesse de l'outil.
+   *
+   * Le glouton reste en pré-filtre : quand il suffit, il tranche, et la DP
+   * n'est payée que sur les candidates qu'il rejette — exactement les cas
+   * qu'on perdait jusqu'ici. */
+  const verifie = (items, exact) => {
+    const a = assembler(items, want, exact, figees);
     return cibleListe.every(([n, l]) =>
       (a.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
   };
+  const tient = (items) => verifie(items, false) || verifie(items, true);
   if (!tient(slotItems)) return slotItems;
 
   let courant = { ...slotItems };
@@ -698,6 +724,10 @@ function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
 
   const sortie = [];
   for (const slot of D.ordreSlots) {
+    // Une pièce verrouillée ne bouge pas : ne rien proposer dessus. Le contrat
+    // du cadenas était déjà tenu par le moteur mais pas par ces deux cartes,
+    // qui proposaient de remplacer la pièce qu'on venait de figer.
+    if (verrouilles.has(slot)) continue;
     const actuel = items[slot];
     if (!actuel) continue;
     const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
@@ -876,6 +906,10 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
 
   const sortie = [];
   for (const slot of D.ordreSlots) {
+    // Une pièce verrouillée ne bouge pas : ne rien proposer dessus. Le contrat
+    // du cadenas était déjà tenu par le moteur mais pas par ces deux cartes,
+    // qui proposaient de remplacer la pièce qu'on venait de figer.
+    if (verrouilles.has(slot)) continue;
     const actuel = items[slot];
     if (!actuel) continue;
     const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
@@ -1747,6 +1781,29 @@ let _nbBaisse = 0;
  * l'ouverture, par tranches, et les lignes apparaissent au fur et a mesure
  * plutot que de figer la page.
  */
+/* Les planchers de rarete regles par l'utilisateur, lus a un seul endroit.
+   Ils etaient recopies dans `dessinerMarge` et OUBLIES dans l'analyse
+   complete, qui passait `{}` : la carte proposait alors des gains que le
+   clic suivant ne pouvait pas tenir, puisque `calculer` applique bien les
+   planchers, lui. */
+/* Ce que coute un set, en crans de rarete cumules. Sert a verifier qu'une
+   ligne de marge ne se paie pas en montant en rarete. */
+function coutRarete(slotItems) {
+  return Object.values(slotItems || {})
+    .reduce((t, it) => t + ((it && it.g) || 0), 0);
+}
+
+function planchersActuels() {
+  const pl = {};
+  if ($('mixte').checked && $('plancherActif').checked) {
+    const gr = Number($('plancherGrade').value);
+    for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
+      pl[c.value] = gr;
+    }
+  }
+  return pl;
+}
+
 let _analyse = null;
 
 function arreterAnalyse() {
@@ -1770,6 +1827,8 @@ function lancerAnalyseComplete(res) {
   const mixte = $('mixte').checked;
   const vin = $('vin').checked;
   const cibleBase = [...cibles.entries()];
+  const planchers = planchersActuels();
+  const coutActuel = coutRarete(res.slotItems);
   const actuelDe = (n) => Math.min(plafond(n),
     (res.couvert[n] || 0) + (vp.get(n) || 0));
 
@@ -1798,8 +1857,16 @@ function lancerAnalyseComplete(res) {
         try {
           const r = construire(classe, arme,
             cibleBase.filter(([x]) => x !== nom).concat([[nom, niveau]]),
-            grade, vin, mixte, {}, vinManuel, verrousObjet());
-          return !!(r && r.suffisant);
+            grade, vin, mixte, planchers, vinManuel, verrousObjet());
+          if (!r || !r.suffisant) return false;
+          /* « SANS RIEN PERDRE » VEUT AUSSI DIRE SANS PAYER PLUS.
+           *
+           * En mode panache, `grade` est un PLANCHER : le moteur a le droit
+           * de monter en rarete pour y arriver. La carte promettait pourtant
+           * « l'inne d'une autre piece du meme cran », et validait des lignes
+           * qui exigeaient deux Legendaires de plus. On refuse donc tout
+           * resultat qui coute plus cher que le build actuel. */
+          return coutRarete(r.slotItems) <= coutActuel;
         } catch (e) { return false; }
       };
       /* ON CHERCHE LE MAXIMUM, PAS LE CRAN SUIVANT.
@@ -2029,11 +2096,7 @@ function dessinerMarge(res) {
   const parGemme = marge(res, vp);
   let parPiece = new Map();
   try {
-    const pl = {};
-    if ($('mixte').checked && $('plancherActif').checked) {
-      const gr = Number($('plancherGrade').value);
-      for (const c of document.querySelectorAll('#plancherSlots input:checked')) pl[c.value] = gr;
-    }
+    const pl = planchersActuels();
     parPiece = gainsParPiece(res, Number($('classe').value),
                              $('arme').value || null, pl, vp);
   } catch (e) { parPiece = new Map(); }
@@ -2193,7 +2256,7 @@ function ecrireBiblio(liste) {
     // Quota plein ou stockage refusé (navigation privée) : on le DIT, sinon
     // l'utilisateur croit son build enregistré alors qu'il est perdu.
     $('noteBuilds').innerHTML =
-      `<span class="ko">Enregistrement impossible : ${e.message}</span>`;
+      `<span class="ko">${tH('builds.stockageKo', { message: e.message })}</span>`;
     return false;
   }
 }
@@ -2225,7 +2288,7 @@ async function synchroniser(silencieux) {
   if (!comptesDispo() || !window.Comptes.connecte()) return;
   const dire = (html) => { if (!silencieux) $('noteBuilds').innerHTML = html; };
   try {
-    dire('<span class="pas">Synchronisation…</span>');
+    dire(`<span class="pas">${t('sync.encours')}</span>`);
     const distants = await window.Comptes.listerBuilds();
     const locaux = biblio();
     // FUSION, jamais remplacement : on ne perd ni ce qui est sur le serveur
@@ -2257,10 +2320,9 @@ async function synchroniser(silencieux) {
     ecrireBiblio(fusion);
     dessinerBuilds();
     await window.Comptes.envoyerBuilds(fusion);
-    dire(`<span class="pas">Synchronisé : ${fusion.length} build(s), `
-         + `${recus} récupéré(s) du compte.</span>`);
+    dire(`<span class="pas">${tH('sync.ok', { n: fusion.length, r: recus })}</span>`);
   } catch (e) {
-    dire(`<span class="ko">Synchronisation impossible : ${e.message}</span>`);
+    dire(`<span class="ko">${tH('sync.ko', { message: e.message })}</span>`);
   }
 }
 
@@ -2305,16 +2367,16 @@ async function ajouterAmi() {
     }
     const liste = amis();
     if (liste.some((a) => a.pseudo.toLowerCase() === trouve.pseudo.toLowerCase())) {
-      note.innerHTML = `<span class="pas">${t('ami.deja', { nom: trouve.pseudo })}</span>`;
+      note.innerHTML = `<span class="pas">${tH('ami.deja', { nom: trouve.pseudo })}</span>`;
       return;
     }
     liste.push({ pseudo: trouve.pseudo });
     ecrireAmis(liste);
     champ.value = '';
-    note.innerHTML = `<span class="ok">${t('ami.ajoute', { nom: trouve.pseudo })}</span>`;
+    note.innerHTML = `<span class="ok">${tH('ami.ajoute', { nom: trouve.pseudo })}</span>`;
     dessinerAmis();
   } catch (e) {
-    note.innerHTML = `<span class="ko">${e.message}</span>`;
+    note.innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
   }
 }
 
@@ -2328,7 +2390,8 @@ async function dessinerAmis() {
   for (const a of liste) {
     const bloc = document.createElement('div');
     bloc.className = 'amiBloc';
-    bloc.innerHTML = `<div class="amiTete"><b>${a.pseudo}</b>
+    // Un pseudo vient du serveur : il est choisi par autrui, donc échappé.
+    bloc.innerHTML = `<div class="amiTete"><b>${echapper(a.pseudo)}</b>
       <button class="amiSuppr" title="${t('ami.retirer')}">×</button></div>
       <div class="amiListe"></div>`;
     bloc.querySelector('.amiSuppr').onclick = () => {
@@ -2340,7 +2403,7 @@ async function dessinerAmis() {
       const d = await window.Comptes.parPseudo(a.pseudo);
       const dedans = bloc.querySelector('.amiListe');
       if (!d || !d.builds.length) {
-        dedans.innerHTML = `<span class="pas">${t('ami.rien', { nom: a.pseudo })}</span>`;
+        dedans.innerHTML = `<span class="pas">${tH('ami.rien', { nom: a.pseudo })}</span>`;
         continue;
       }
       for (const b of d.builds) dedans.appendChild(carteBuildDistant(b, a.pseudo));
@@ -2354,8 +2417,9 @@ function carteBuildDistant(b, auteur) {
   const el = document.createElement('div');
   el.className = 'buildDistant';
   const cl = D.classes[String(b.etat && b.etat.c)] || '?';
-  el.innerHTML = `<div class="bd"><b>${b.nom}</b>
-      <small>${cl}${auteur ? ' · ' + t('gal.par') + ' ' + auteur : ''}</small></div>
+  // Nom et auteur viennent d'un compte tiers : tout est échappé, comme la galerie.
+  el.innerHTML = `<div class="bd"><b>${echapper(b.nom)}</b>
+      <small>${cl}${auteur ? ' · ' + t('gal.par') + ' ' + echapper(auteur) : ''}</small></div>
     <button class="bdCharger">${t('gal.charger')}</button>
     <button class="bdCopier">${t('gal.copier')}</button>`;
   el.querySelector('.bdCharger').onclick = () => {
@@ -2372,7 +2436,7 @@ function carteBuildDistant(b, auteur) {
         vote.querySelector('.n').textContent = r.total;
         vote.dataset.mien = r.jaiVote ? '1' : '0';
       } catch (e) {
-        $('noteGalerie').innerHTML = `<span class="ko">${e.message}</span>`;
+        $('noteGalerie').innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
       }
       vote.disabled = false;
     };
@@ -2384,7 +2448,7 @@ function carteBuildDistant(b, auteur) {
     if (!ecrireBiblio(liste)) return;
     dessinerBuilds();
     $('noteBuilds').innerHTML =
-      `<span class="pas">${t('partage.copieOk', { nom })}</span>`;
+      `<span class="pas">${tH('partage.copieOk', { nom })}</span>`;
   };
   return el;
 }
@@ -2407,14 +2471,16 @@ function carteBuildGalerie(b) {
   const cl = D.classes[String(e.c)] || '?';
   const ra = e.g ? (D.raretes[String(e.g)] || '') : t('perso.auto');
   const cibles = (e.t || []).slice().sort((x, y) => y[1] - x[1]);
+  // `etat` est du jsonb libre côté base et l'import avale n'importe quel JSON :
+  // le nom d'affixe et son niveau sont donc du texte d'attaquant, pas du nôtre.
   const puces = cibles.slice(0, 6)
-    .map(([n, l]) => `<span class="puce">${n} ${l}</span>`).join('');
+    .map(([n, l]) => `<span class="puce">${echapper(n)} ${echapper(l)}</span>`).join('');
   const reste = cibles.length > 6 ? `<span class="puce">+${cibles.length - 6}</span>` : '';
   const quand = b.maj ? new Date(b.maj).toLocaleDateString() : '';
   el.innerHTML = `<h4>${echapper(b.nom)}</h4>
     <div class="meta">
       <span class="auteur">${b.auteur ? echapper(b.auteur) : t('gal.anonyme')}</span>
-      <span>${cl}</span><span>${e.a || ''}</span><span>${ra}</span>
+      <span>${cl}</span><span>${echapper(e.a || '')}</span><span>${ra}</span>
       ${quand ? `<span>${quand}</span>` : ''}
     </div>
     <div class="puces">${puces}${reste}</div>
@@ -2444,7 +2510,7 @@ function carteBuildGalerie(b) {
     if (!ecrireBiblio(liste)) return;
     dessinerBuilds();
     $('noteGalerie').innerHTML =
-      `<span class="pas">${t('partage.copieOk', { nom })}</span>`;
+      `<span class="pas">${tH('partage.copieOk', { nom })}</span>`;
   };
   return el;
 }
@@ -2519,7 +2585,7 @@ async function chargerGalerie(page) {
     note.innerHTML = `<span class="pas">${combien
       ? t('gal.videFiltre', { n: combien }) : t('gal.vide')}</span>`;
   } catch (e) {
-    note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
+    note.innerHTML = `<span class="ko">${tH('partage.ko', { message: e.message })}</span>`;
   }
 }
 
@@ -2547,17 +2613,17 @@ function restituer(b) {
       // Code devenu illisible (données du jeu changées) : on retombe sur le
       // calcul plutôt que de ne rien afficher, mais on le DIT.
       $('noteBuilds').innerHTML =
-        `<span class="avert">Code du build illisible (${e.message}), `
-        + t('builds.codeKo', { message: e.message }) + '</span>';
+        `<span class="avert">${tH('builds.codeKo', { message: e.message })}</span>`;
     }
   } else if (b && b.nom) {
     // BUILD D'AVANT LA CORRECTION. Il ne contient que des objectifs, pas de
     // stuff. Le recomposer donnera autre chose que ce qui avait été vu, et
     // c'est exactement ce qui donnait « du jaune partout » sans explication.
+    // La clé porte la phrase ENTIÈRE dans les trois langues : le préfixe
+    // français la redisait, si bien qu'un anglophone lisait le français
+    // puis sa traduction. `t` échappe déjà ses variables.
     $('noteBuilds').innerHTML =
-      `<span class="avert">« ${b.nom} » a été enregistré avant que les builds `
-      + 'gardent leur stuff : il n\'y a que les affixes, le stuff est donc '
-      + t('builds.vieux', { nom: b.nom }) + '</span>';
+      `<span class="avert">${tH('builds.vieux', { nom: b.nom })}</span>`;
   }
   calculer();
 }
@@ -2670,8 +2736,11 @@ function dessinerBuilds() {
     const titre = fige
       ? t('builds.charger')
       : t('builds.chargerVieux');
+    // Un nom de build n'est pas forcément le tien : « Copier » depuis la galerie
+    // conserve le nom choisi par l'auteur, et l'import de fichier avale du JSON
+    // arbitraire. La bibliothèque locale échappe donc comme la galerie.
     ligne.innerHTML = `<button class="ouvrir" title="${titre}">
-        <b>${b.nom}${fige ? '' : ' <i>⚠</i>'}</b>
+        <b>${echapper(b.nom)}${fige ? '' : ' <i>⚠</i>'}</b>
         <small>${cl} · ${ra} · ${t('builds.affixes', { n: (b.etat.t || []).length })}</small>
       </button>
       <label class="ami" title="${avecCompte
@@ -2697,7 +2766,7 @@ function dessinerBuilds() {
           $('noteBuilds').innerHTML = `<span class="pas">`
             + t(c.checked ? cleOui : cleNon, { nom: b.nom }) + '</span>';
         }).catch((e) => {
-          $('noteBuilds').innerHTML = `<span class="ko">${e.message}</span>`;
+          $('noteBuilds').innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
         });
       };
     };
@@ -2708,7 +2777,7 @@ function dessinerBuilds() {
     brancher('.ami input', 'ami', 'ami.marque', 'ami.marque');
     ligne.querySelector('.ouvrir').onclick = () => {
       appliquerEtat(b.etat);
-      $('noteBuilds').innerHTML = `<span class="pas">${t('builds.chargeOk', { nom: b.nom })}</span>`;
+      $('noteBuilds').innerHTML = `<span class="pas">${tH('builds.chargeOk', { nom: b.nom })}</span>`;
       restituer(b);
     };
     // Un clic met ce build en A, un clic sur un SECOND le met en B : c'est
@@ -2773,7 +2842,7 @@ function enregistrerBuild() {
   if (comptesDispo() && window.Comptes.connecte()) {
     window.Comptes.envoyerBuilds([entree]).catch((e) => {
       $('noteBuilds').innerHTML =
-        `<span class="ko">Enregistré ici, mais pas sur le compte : ${e.message}</span>`;
+        `<span class="ko">${tH('sync.partiel', { message: e.message })}</span>`;
     });
   }
 }
@@ -2866,15 +2935,18 @@ function dessinerSuggestions(res, classe) {
       <button class="appl">Appliquer</button>`;
     div.querySelector('.appl').onclick = () => {
       const neufs = { ...res.slotItems, [e.slot]: e.apres };
-      const a = assembler(neufs, Object.fromEntries(cibles), true);
+      const a = assembler(neufs, ciblesPourStuff(cibles, res.vinPoints), true,
+                          figeesDe(verrousObjet()));
       const majeur = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
                        sources: a.sources, vin: res.vin,
                        vinPoints: res.vinPoints, suffisant: true };
       dernier = majeur;
       afficher(majeur, classe);
-      $('etat').innerHTML = '<span class="ok">Suggestion appliquée</span>'
-        + `<span class="pas"> — ${e.avant.n} remplacé par ${e.apres.n}. `
-        + t('etat.suggAppNote', { avant: avant, apres: apres }) + '</span>';
+      // `avant` et `apres` nus n'existaient pas dans cette portée : l'affectation
+      // levait une ReferenceError à chaque clic. Les deux clés i18n portent déjà
+      // la phrase entière dans les trois langues — le français en dur la redisait.
+      $('etat').innerHTML = `<span class="ok">${t('etat.suggApp')}</span>`
+        + `<span class="pas"> ${tH('etat.suggAppNote', { avant: e.avant.n, apres: e.apres.n })}</span>`;
     };
     boite.appendChild(div);
   });
@@ -2925,8 +2997,9 @@ function dessinerAlternatives(res, classe) {
       if (!b.actuel) {
         el.onclick = () => {
           const neufs = { ...res.slotItems, [e.slot]: b.item };
-          const a = assembler(neufs, Object.fromEntries(cibles), true);
           const vp = res.vinPoints || new Map();
+          const a = assembler(neufs, ciblesPourStuff(cibles, vp), true,
+                              figeesDe(verrousObjet()));
           // On REVÉRIFIE après coup : c'est le seul moment où l'on connaît
           // l'effet combiné de tous les échanges déjà faits.
           const manques = [...cibles.entries()].filter(([n, l]) =>
@@ -3000,7 +3073,7 @@ function calculer() {
         `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
         + (issue ? `<br>${issue}` : `<br><span class="pas">${t('etat.rien')}</span>`);
     } catch (err) {
-      $('etat').innerHTML = `<span class="ko">${t('etat.erreur', { message: err.message })}</span>`;
+      $('etat').innerHTML = `<span class="ko">${tH('etat.erreur', { message: err.message })}</span>`;
     }
   }, 10);
 }
@@ -3046,7 +3119,7 @@ function chercherUneIssue(classe, arme, grade, mixte, planchers) {
         calculer();
       };
     }, 0);
-    return `<span class="ok">${t('etat.issue', { comment: e.texte })}</span> (${detail}). `
+    return `<span class="ok">${tH('etat.issue', { comment: e.texte })}</span> (${detail}). `
       + '<button id="appliquerIssue" style="padding:3px 9px;font-size:12px">'
       + `${t('etat.appliquer')}</button>`;
   }
@@ -3059,7 +3132,7 @@ function importer() {
   try {
     afficherCode(code.trim());
   } catch (err) {
-    $('etat').innerHTML = `<span class="ko">${t('etat.codeIllisible', { message: err.message })}</span>`;
+    $('etat').innerHTML = `<span class="ko">${tH('etat.codeIllisible', { message: err.message })}</span>`;
   }
 }
 
@@ -3122,9 +3195,11 @@ function afficherCode(code, vinPoints) {
     for (const it of Object.values(slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
     const detail = Object.entries(raretes).sort()
       .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
+    // `perdus` n'a jamais existé : cette branche levait une ReferenceError dès
+    // qu'un code portait une pièce hors catalogue. La clé i18n dit déjà la
+    // phrase entière dans les trois langues, le préfixe français faisait double.
     const tete = hors
-      ? `<span class="avert">${hors} pièce(s) inconnue(s) du catalogue `
-        + t('etat.horsCatalogue', { n: perdus }) + '</span>'
+      ? `<span class="avert">${t('etat.horsCatalogue', { n: hors })}</span>`
       : `<span class="ok">${t('etat.charge')}</span>`;
     $('etat').innerHTML = `${tete}<br>${detail} — <span class="pas">`
       + t('etat.chargeNote') + '</span>';
@@ -3844,7 +3919,7 @@ function dessinerBuildsClasses() {
         if (!ecrireBiblio(l)) return;
         dessinerBuilds();
         $('noteGalerie').innerHTML =
-          `<span class="pas">${t('partage.copieOk', { nom: n2 })}</span>`;
+          `<span class="pas">${tH('partage.copieOk', { nom: n2 })}</span>`;
       };
       grille.appendChild(carte);
     }
@@ -3945,7 +4020,7 @@ async function chargerGuides(page) {
     note.innerHTML = r.lignes.length ? ''
       : `<span class="pas">${t('guide.vide')}</span>`;
   } catch (e) {
-    note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
+    note.innerHTML = `<span class="ko">${tH('partage.ko', { message: e.message })}</span>`;
   }
 }
 
@@ -3974,7 +4049,7 @@ function carteGuide(g) {
         : `<span class="pas">${t('guide.introuvable')}</span>`;
     } catch (e) {
       charge = false;
-      corps.innerHTML = `<span class="ko">${e.message}</span>`;
+      corps.innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
     }
   });
   return el;
@@ -4015,7 +4090,7 @@ async function chargerMesGuides() {
       boite.appendChild(el);
     }
   } catch (e) {
-    $('noteGuide').innerHTML = `<span class="ko">${e.message}</span>`;
+    $('noteGuide').innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
   }
 }
 
@@ -4040,7 +4115,12 @@ async function enregistrerGuide() {
     chargerMesGuides();
     chargerGuides(0);
   } catch (e) {
-    note.innerHTML = `<span class="ko">${t('partage.ko', { message: e.message })}</span>`;
+    // L'index unique de la table refuse deux guides de même titre pour un
+    // même auteur : c'est une règle, pas une panne. On le dit comme telle
+    // plutôt que de recracher l'erreur Postgres.
+    note.innerHTML = /duplicate|unique|23505/i.test(e.message)
+      ? `<span class="ko">${t('guide.titrePris')}</span>`
+      : `<span class="ko">${tH('partage.ko', { message: e.message })}</span>`;
   }
 }
 
@@ -4431,7 +4511,7 @@ function demarrer(donnees) {
       } catch (e) {
         note.innerHTML = /duplicate|unique/i.test(e.message)
           ? `<span class="ko">${t('compte.pseudoPris')}</span>`
-          : `<span class="ko">${e.message}</span>`;
+          : `<span class="ko">${echapper(e.message)}</span>`;
       }
     };
   }
@@ -4441,7 +4521,7 @@ function demarrer(donnees) {
     const mdp = $('compteMdp').value || '';
     const note = $('noteCompte');
     if (!email || !mdp) {
-      note.innerHTML = '<span class="ko">Adresse et mot de passe requis.</span>';
+      note.innerHTML = `<span class="ko">${t('compte.champs')}</span>`;
       return;
     }
     note.innerHTML = '<span class="pas">…</span>';
@@ -4459,7 +4539,7 @@ function demarrer(donnees) {
         await synchroniser(false);
       }
     } catch (e) {
-      note.innerHTML = `<span class="ko">${e.message}</span>`;
+      note.innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
     }
   };
   if ($('compteConnexion')) {
@@ -4480,13 +4560,12 @@ function demarrer(donnees) {
   $('nomBuild').onkeydown = (ev) => { if (ev.key === 'Enter') enregistrerBuild(); };
   $('lienBuild').onclick = () => {
     if (!cibles.size) {
-      $('noteBuilds').innerHTML = '<span class="ko">Choisis au moins un affixe.</span>';
+      $('noteBuilds').innerHTML = `<span class="ko">${t('etat.choisir')}</span>`;
       return;
     }
     const lien = location.origin + location.pathname + '#b=' + versLien(etatActuel());
     history.replaceState(null, '', '#b=' + versLien(etatActuel()));
-    $('noteBuilds').innerHTML =
-      `<span class="pas">Lien dans la barre d'adresse — copie-la pour partager ce build.</span>`;
+    $('noteBuilds').innerHTML = `<span class="pas">${t('builds.lienBarre')}</span>`;
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(lien).then(() => {
         $('noteBuilds').innerHTML =
@@ -4509,7 +4588,7 @@ function demarrer(donnees) {
     a.click();
     URL.revokeObjectURL(a.href);
     $('noteBuilds').innerHTML =
-      `<span class="pas">${liste.length} build(s) exporté(s).</span>`;
+      `<span class="pas">${t('builds.exporte', { n: liste.length })}</span>`;
   };
   $('importerBuilds').onclick = () => $('fichierBuilds').click();
   $('fichierBuilds').onchange = (ev) => {
@@ -4531,12 +4610,12 @@ function demarrer(donnees) {
         }
         if (ecrireBiblio(liste)) {
           dessinerBuilds();
-          $('noteBuilds').innerHTML =
-            `<span class="pas">${ajoutes} ajouté(s), ${venus.length - ajoutes} remplacé(s).</span>`;
+          $('noteBuilds').innerHTML = `<span class="pas">${
+            t('builds.importe', { a: ajoutes, r: venus.length - ajoutes })}</span>`;
         }
       } catch (e) {
         $('noteBuilds').innerHTML =
-          `<span class="ko">Fichier illisible : ${e.message}</span>`;
+          `<span class="ko">${tH('builds.fichierKo', { message: e.message })}</span>`;
       }
       ev.target.value = '';
     };
@@ -4579,6 +4658,6 @@ if (window.D_MISTFALL) {
   // Repli pour un vrai serveur web, si donnees.js n'a pas été engendré.
   fetch('donnees.json').then((r) => r.json()).then(demarrer).catch((e) => {
     $('etat').innerHTML =
-      `<span class="ko">Données introuvables : ${e.message}</span>`;
+      `<span class="ko">Data not found: ${echapper(e.message)}</span>`;
   });
 }

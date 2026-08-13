@@ -184,7 +184,7 @@
       'ami.deja': '« {nom} » est déjà dans ta liste.',
       'ami.retirer': 'Retirer cet ami',
       'ami.rien': "{nom} n'a partagé aucun build.",
-      'ami.marque': 'Partager avec mes amis',
+      'ami.marque': 'Visible par qui connaît mon pseudonyme',
       'ami.marqueNon': 'Connecte-toi pour partager un build',
       'gal.titre': 'Builds publics',
       'gal.vide': "Personne n'a encore publié de build.",
@@ -322,6 +322,7 @@
       'guide.titreCourt': 'Titre trop court (3 caractères au moins).',
       'guide.corpsCourt': 'Guide trop court (20 caractères au moins).',
       'guide.enregistre': 'Guide enregistré.',
+      'guide.titrePris': 'Tu as déjà un guide sous ce titre. Change le titre, ou modifie le guide existant depuis « Mes guides ».',
 
       'var.titre': 'Mélanges possibles',
       'var.dabord': '— calcule un build d\'abord —',
@@ -574,7 +575,7 @@
       'ami.deja': '"{nom}" is already in your list.',
       'ami.retirer': 'Remove this friend',
       'ami.rien': '{nom} has not shared any build.',
-      'ami.marque': 'Share with my friends',
+      'ami.marque': 'Visible to anyone who knows my username',
       'ami.marqueNon': 'Sign in to share a build',
       'gal.titre': 'Public builds',
       'gal.vide': 'Nobody has published a build yet.',
@@ -712,6 +713,7 @@
       'guide.titreCourt': 'Title too short (at least 3 characters).',
       'guide.corpsCourt': 'Guide too short (at least 20 characters).',
       'guide.enregistre': 'Guide saved.',
+      'guide.titrePris': 'You already have a guide with this title. Pick another title, or edit the existing one from "My guides".',
 
       'var.titre': 'Possible mixes',
       'var.dabord': '— build something first —',
@@ -964,7 +966,7 @@
       'ami.deja': '«{nom}» уже в твоём списке.',
       'ami.retirer': 'Убрать друга',
       'ami.rien': '{nom} не поделился ни одной сборкой.',
-      'ami.marque': 'Поделиться с друзьями',
+      'ami.marque': 'Виден любому, кто знает мой псевдоним',
       'ami.marqueNon': 'Войди, чтобы поделиться сборкой',
       'gal.titre': 'Публичные сборки',
       'gal.vide': 'Пока никто не опубликовал сборку.',
@@ -1102,6 +1104,7 @@
       'guide.titreCourt': 'Слишком короткое название (минимум 3 символа).',
       'guide.corpsCourt': 'Слишком короткий гайд (минимум 20 символов).',
       'guide.enregistre': 'Гайд сохранён.',
+      'guide.titrePris': 'У тебя уже есть гайд с таким названием. Выбери другое название или отредактируй существующий в «Мои гайды».',
 
       'var.titre': 'Возможные сочетания',
       'var.dabord': '— сначала собери сборку —',
@@ -1220,6 +1223,26 @@
     return s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
   }
 
+  /* LA MÊME PHRASE, MAIS DESTINÉE À innerHTML.
+   *
+   * `t` substitue ses variables telles quelles : c'est ce qu'il faut pour
+   * textContent, title ou placeholder, où le navigateur ne lit pas de balises.
+   * Injectée dans innerHTML, la même chaîne devient une porte d'entrée, car
+   * plusieurs variables ne nous appartiennent pas — un pseudo, un nom de build
+   * copié depuis la galerie, un message d'erreur renvoyé par le serveur.
+   *
+   * `tH` échappe les VARIABLES et laisse la phrase traduite intacte : les
+   * traductions sont écrites par nous, les variables non. */
+  function tH(cle, vars) {
+    if (!vars) return t(cle);
+    const propres = {};
+    for (const [k, v] of Object.entries(vars)) {
+      propres[k] = String(v == null ? '' : v).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    return t(cle, propres);
+  }
+
   function appliquer() {
     document.documentElement.lang = langue;
     for (const el of document.querySelectorAll('[data-i18n]')) {
@@ -1235,6 +1258,7 @@
 
   window.I18N = {
     t,
+    tH,
     appliquer,
     langues: Object.keys(TEXTES),
     drapeau: (l) => DRAPEAUX[l] || '🏳',
@@ -1251,4 +1275,5 @@
     },
   };
   window.t = t;
+  window.tH = tH;
 }());
