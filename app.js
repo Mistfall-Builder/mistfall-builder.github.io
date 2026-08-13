@@ -2185,9 +2185,15 @@ function dessinerMarge(res) {
   // ne la lit. Les plus gros gains sont en tête.
   for (const m of liste) boite.appendChild(ligneMarge(m));
   majCompteMarge();
-  // Carte deja ouverte : on enchaine sur l'inventaire complet sans attendre
-  // qu'on la referme et la rouvre.
-  if (carte.open) lancerAnalyseComplete(res);
+  /* ON NE RELANCE PLUS LE BALAYAGE TOUT SEUL.
+   *
+   * La carte enchainait sur l'inventaire complet des qu'elle etait ouverte.
+   * Comme son etat etait retenu d'une visite a l'autre, l'avoir ouverte une
+   * fois suffisait a payer plusieurs secondes de moteur a CHAQUE recalcul —
+   * et le scenario « je monte mes cibles cran par cran » en enchaine des
+   * dizaines. Le balayage redevient ce qu'il n'aurait jamais du cesser
+   * d'etre : quelque chose qu'on demande. */
+  if (carte.open) carte.open = false;
 }
 
 /* ------------------------------------------------------------ mes builds --
@@ -2334,9 +2340,15 @@ function poserPliAuto(id, ouvert) {
   d.open = ouvert;
 }
 
+/* La seule carte dont l'ouverture COUTE : la retenir ouverte relancerait un
+   balayage complet du moteur a chaque recalcul, soit plusieurs secondes de
+   page figee par clic. Elle se redemande, a chaque fois. */
+const PLI_JAMAIS_RETENU = new Set(['carteMarge']);
+
 function brancherPlis() {
   const plis = lirePlis();
   for (const d of document.querySelectorAll('details.carte.pliable[id]')) {
+    if (PLI_JAMAIS_RETENU.has(d.id)) continue;
     // Les cartes qui apparaissent et disparaissent selon le build (les
     // suggestions, les pièces interchangeables) gardent leur propre
     // logique : leur état ne veut rien dire d'une visite à l'autre.
