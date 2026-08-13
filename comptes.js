@@ -45,27 +45,31 @@
     return s && s.user && s.user.email ? s.user.email : null;
   }
 
+  /* CE FICHIER PARLAIT FRANCAIS A TOUT LE MONDE.
+     Il ne contenait aucun appel a `t()`, si bien qu'un joueur anglophone qui
+     se trompait de mot de passe lisait « Adresse ou mot de passe incorrect. »
+     i18n.js est charge avant lui, donc `window.t` existe au moment ou ces
+     messages sont construits — mais jamais avant, d'ou le repli. */
+  const tr = (cle) => (window.t ? window.t(cle) : cle);
+
   /* Un message lisible plutôt que le JSON brut de l'API : « Invalid login
-     credentials » ne dit rien à qui vient de se tromper de mot de passe. */
+     credentials » ne dit rien à qui vient de se tromper de mot de passe.
+     La table porte des CLES, pas des phrases : elle est construite au
+     chargement, alors que la langue peut changer a tout moment ensuite. */
   const TRADUCTIONS = [
-    [/invalid login credentials/i, 'Adresse ou mot de passe incorrect.'],
-    [/email not confirmed/i,
-     "Adresse pas encore confirmée — ouvre le lien reçu par e-mail."],
-    [/user already registered/i,
-     'Cette adresse a déjà un compte. Utilise « Se connecter ».'],
-    [/password should be at least (\d+)/i,
-     'Mot de passe trop court (6 caractères minimum).'],
-    [/rate limit|too many requests/i,
-     'Trop de tentatives — attends une minute.'],
-    [/failed to fetch|networkerror/i,
-     'Serveur injoignable. Vérifie ta connexion.'],
+    [/invalid login credentials/i, 'compteErr.identifiants'],
+    [/email not confirmed/i, 'compteErr.nonConfirme'],
+    [/user already registered/i, 'compteErr.dejaPris'],
+    [/password should be at least (\d+)/i, 'compteErr.mdpCourt'],
+    [/rate limit|too many requests/i, 'compteErr.tropDeTentatives'],
+    [/failed to fetch|networkerror/i, 'compteErr.injoignable'],
   ];
 
   function lisible(message) {
-    for (const [motif, texte] of TRADUCTIONS) {
-      if (motif.test(message || '')) return texte;
+    for (const [motif, cle] of TRADUCTIONS) {
+      if (motif.test(message || '')) return tr(cle);
     }
-    return message || 'Erreur inconnue.';
+    return message || tr('compteErr.inconnue');
   }
 
   async function appeler(chemin, options, avecJeton) {
@@ -74,7 +78,7 @@
       (options && options.headers) || {});
     if (avecJeton) {
       const s = connecte();
-      if (!s) throw new Error('Pas connecté.');
+      if (!s) throw new Error(tr('compteErr.pasConnecte'));
       entetes.Authorization = `Bearer ${s.access_token}`;
     }
     let reponse;
@@ -117,7 +121,7 @@
       return await action();
     } catch (e) {
       if (!/HTTP 401|jwt|expired/i.test(e.message)) throw e;
-      if (!(await rafraichir())) throw new Error('Session expirée, reconnecte-toi.');
+      if (!(await rafraichir())) throw new Error(tr('compteErr.sessionExpiree'));
       return action();
     }
   }
@@ -133,8 +137,7 @@
       poserSession(r);
       return { connecte: true };
     }
-    return { connecte: false, message:
-      "Compte créé. Ouvre le lien de confirmation reçu par e-mail, puis connecte-toi." };
+    return { connecte: false, message: tr('compte.creeConfirme') };
   }
 
   async function connecter(email, motDePasse) {
@@ -400,8 +403,7 @@
       const brutMsg = (p.get('error_description') || p.get('error') || '')
         .replace(/\+/g, ' ');
       return { erreur: /expired|invalid/i.test(brutMsg)
-        ? "Le lien de confirmation a expiré ou a déjà servi. "
-          + "Refais une demande de connexion."
+        ? tr('compteErr.lienExpire')
         : lisible(brutMsg) };
     }
 

@@ -1854,72 +1854,94 @@ function lancerAnalyseComplete(res) {
     .map((e) => [e.dataset.affixe, e]));
   let i = 0;
 
+  /* LA DICHOTOMIE D'UN AFFIXE SURVIT D'UNE TRANCHE A L'AUTRE.
+   *
+   * Le budget etait de 90 ms alors qu'une tache devient « longue » — donc
+   * bloquante pour le navigateur — au-dela de 50 : aucune tranche ne pouvait
+   * passer sous le seuil. Pire, il n'etait teste qu'entre deux AFFIXES, alors
+   * qu'un affixe demande jusqu'a trois appels au moteur : une tranche pouvait
+   * donc deborder largement au-dela de son budget.
+   *
+   * On garde donc l'etat de la recherche en cours et on rend la main entre
+   * deux essais. Le plancher reste UN appel a `construire` : c'est la plus
+   * petite unite indivisible, et descendre en dessous demanderait de sortir
+   * le moteur du fil principal. */
+  const BUDGET = 12;        // ms : une trame a 60 Hz
+  let etat = null;          // dichotomie en cours : { nom, a, p, bas, haut, vise }
+
+  const essaye = (nom, niveau) => {
+    try {
+      const r = construire(classe, arme,
+        cibleBase.filter(([x]) => x !== nom).concat([[nom, niveau]]),
+        grade, vin, mixte, planchers, vinManuel, verrousObjet());
+      if (!r || !r.suffisant) return false;
+      /* « SANS RIEN PERDRE » VEUT AUSSI DIRE SANS PAYER PLUS.
+       *
+       * En mode panache, `grade` est un PLANCHER : le moteur a le droit de
+       * monter en rarete pour y arriver. La carte promettait pourtant
+       * « l'inne d'une autre piece du meme cran », et validait des lignes qui
+       * exigeaient deux Legendaires de plus. On refuse donc tout resultat qui
+       * coute plus cher que le build actuel. */
+      return coutRarete(r.slotItems) <= coutActuel;
+    } catch (e) { return false; }
+  };
+
+  const poser = (e) => {
+    let vise = e.vise;
+    if (!vise && e.bas > e.a) vise = e.bas;
+    const existante = dejaLa.get(e.nom);
+    if (!vise) {
+      // Le moteur dement l'estimation : la ligne s'en va.
+      if (existante) { existante.remove(); dejaLa.delete(e.nom); }
+      return;
+    }
+    if (existante) {
+      // La ligne rapide existe deja ; on ne la remplace que si le moteur va
+      // PLUS HAUT qu'elle ne l'annoncait.
+      const dit = Number(existante.dataset.niveau || 0);
+      if (dit >= vise) return;
+      existante.remove(); dejaLa.delete(e.nom);
+    }
+    const ligne = ligneMarge({ nom: e.nom, actuel: e.a, atteignable: vise,
+                               gain: vise - e.a, palier: e.p, via: 'moteur' });
+    boite.appendChild(ligne);
+    dejaLa.set(e.nom, ligne);
+  };
+
   const tranche = () => {
     if (jeton.stop) return;
     const t0 = performance.now();
-    // On s'arrete au bout de 90 ms pour rendre la main : la page reste
-    // reactive pendant que la recherche continue.
-    while (i < aTester.length && performance.now() - t0 < 90) {
-      const nom = aTester[i]; i += 1;
-      const a = actuelDe(nom);
-      const essaye = (niveau) => {
-        try {
-          const r = construire(classe, arme,
-            cibleBase.filter(([x]) => x !== nom).concat([[nom, niveau]]),
-            grade, vin, mixte, planchers, vinManuel, verrousObjet());
-          if (!r || !r.suffisant) return false;
-          /* « SANS RIEN PERDRE » VEUT AUSSI DIRE SANS PAYER PLUS.
-           *
-           * En mode panache, `grade` est un PLANCHER : le moteur a le droit
-           * de monter en rarete pour y arriver. La carte promettait pourtant
-           * « l'inne d'une autre piece du meme cran », et validait des lignes
-           * qui exigeaient deux Legendaires de plus. On refuse donc tout
-           * resultat qui coute plus cher que le build actuel. */
-          return coutRarete(r.slotItems) <= coutActuel;
-        } catch (e) { return false; }
-      };
-      /* ON CHERCHE LE MAXIMUM, PAS LE CRAN SUIVANT.
-       *
-       * Annoncer « 0 → 1 » quand le build encaisse 0 → 5 d'un coup oblige a
-       * cliquer cinq fois pour decouvrir ce qu'on pouvait savoir tout de
-       * suite. Tester le palier puis retomber sur +1 ne suffisait pas non
-       * plus : quand le palier ne passe pas, +4 passe peut-etre.
-       *
-       * On cherche donc le plus haut niveau qui tient, par dichotomie. Une
-       * cible plus basse est toujours plus facile qu'une cible plus haute,
-       * donc la reponse est monotone et la dichotomie est valide : trois
-       * essais suffisent la ou en essayer sept coutait le double. */
-      const p = palier(nom);
-      const cap = plafond(nom);
-      let bas = a;
-      let haut = cap;
-      let vise = 0;
-      while (bas < haut) {
-        const milieu = Math.ceil((bas + haut) / 2);
-        if (essaye(milieu)) { vise = milieu; bas = milieu; } else { haut = milieu - 1; }
+    while (performance.now() - t0 < BUDGET) {
+      if (!etat) {
+        if (i >= aTester.length) break;
+        const nom = aTester[i]; i += 1;
+        /* ON CHERCHE LE MAXIMUM, PAS LE CRAN SUIVANT.
+         *
+         * Annoncer « 0 → 1 » quand le build encaisse 0 → 5 d'un coup oblige a
+         * cliquer cinq fois pour decouvrir ce qu'on pouvait savoir tout de
+         * suite. Tester le palier puis retomber sur +1 ne suffisait pas non
+         * plus : quand le palier ne passe pas, +4 passe peut-etre.
+         *
+         * On cherche donc le plus haut niveau qui tient, par dichotomie. Une
+         * cible plus basse est toujours plus facile qu'une cible plus haute,
+         * donc la reponse est monotone et la dichotomie est valide : trois
+         * essais suffisent la ou en essayer sept coutait le double. */
+        etat = { nom, a: actuelDe(nom), p: palier(nom),
+                 bas: actuelDe(nom), haut: plafond(nom), vise: 0 };
       }
-      if (!vise && bas > a) vise = bas;
-      const existante = dejaLa.get(nom);
-      if (!vise) {
-        // Le moteur dement l'estimation : la ligne s'en va.
-        if (existante) { existante.remove(); dejaLa.delete(nom); }
-        continue;
+      if (etat.bas < etat.haut) {
+        // UN essai par tour de boucle : c'est la granularite du budget.
+        const milieu = Math.ceil((etat.bas + etat.haut) / 2);
+        if (essaye(etat.nom, milieu)) { etat.vise = milieu; etat.bas = milieu; }
+        else { etat.haut = milieu - 1; }
+      } else {
+        poser(etat);
+        etat = null;
       }
-      if (existante) {
-        // La ligne rapide existe deja ; on ne la remplace que si le moteur
-        // va PLUS HAUT qu'elle ne l'annonçait.
-        const dit = Number(existante.dataset.niveau || 0);
-        if (dit >= vise) continue;
-        existante.remove(); dejaLa.delete(nom);
-      }
-      const ligne = ligneMarge({ nom, actuel: a, atteignable: vise,
-                                 gain: vise - a, palier: p, via: 'moteur' });
-      boite.appendChild(ligne);
-      dejaLa.set(nom, ligne);
     }
     if (note) {
       note.className = 'pas';
-      if (i < aTester.length) {
+      if (i < aTester.length || etat) {
         note.textContent = t('marge.recherche', { fait: i, total: aTester.length });
       } else if (boite.querySelector('.lm')) {
         note.textContent = t('marge.aideCourt2');
@@ -1945,7 +1967,7 @@ function lancerAnalyseComplete(res) {
     }
     _nbMarge = boite.querySelectorAll('.lm').length;
     majCompteMarge();
-    if (i < aTester.length) setTimeout(tranche, 0);
+    if (i < aTester.length || etat) setTimeout(tranche, 0);
     else if (_analyse === jeton) _analyse = null;
   };
   if (note) { note.className = 'pas';
