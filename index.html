@@ -242,8 +242,11 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
 #ficheProvenance .n{text-align:right;font-variant-numeric:tabular-nums}
 
 /* ------------------------------------------------------------ marge libre -- */
+/* 190px suffisait en français ; « breakpoint » est deux fois plus long que
+   « palier » et rognait le nom de l'affixe jusqu'à une seule lettre. La
+   tuile est dimensionnée sur la langue la plus large, pas sur la nôtre. */
 .grilleMarge{display:grid;gap:6px;
-  grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+  grid-template-columns:repeat(auto-fill,minmax(248px,1fr))}
 .lm{display:flex;align-items:center;gap:8px;padding:6px 9px;
   border:1px solid var(--bord);border-radius:3px;
   background:rgba(255,255,255,.02);width:100%;text-align:left;
@@ -254,6 +257,10 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
 .lm .fleche{font-size:12px;color:var(--terne);font-variant-numeric:tabular-nums}
 .lm .cible{color:var(--accent);font-weight:600}
 .lm.pal{border-color:var(--avert)}
+/* Le nom de l'affixe est l'information ; les pastilles sont du décor. On
+   les empêche de s'étirer, et le nom garde un plancher lisible. */
+.lm .marquePal,.lm .moyen,.lm .fleche{flex:0 0 auto}
+.lm .nomA{min-width:4.5em}
 .lm .marquePal{font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;
   color:var(--avert);border:1px solid var(--avert);border-radius:2px;
   padding:0 4px}
@@ -1335,15 +1342,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=92"></script>
-<script src="config.js?v=92"></script>
-<script src="comptes.js?v=92"></script>
-<script src="donnees.js?v=92"></script>
-<script src="skills.js?v=92"></script>
-<script src="talents.js?v=92"></script>
-<script src="builds_reference.js?v=92"></script>
-<script src="guides_classes.js?v=92"></script>
-<script src="fiche.js?v=92"></script>
-<script src="app.js?v=92"></script>
+<script src="i18n.js?v=93"></script>
+<script src="config.js?v=93"></script>
+<script src="comptes.js?v=93"></script>
+<script src="donnees.js?v=93"></script>
+<script src="skills.js?v=93"></script>
+<script src="talents.js?v=93"></script>
+<script src="builds_reference.js?v=93"></script>
+<script src="guides_classes.js?v=93"></script>
+<script src="fiche.js?v=93"></script>
+<script src="app.js?v=93"></script>
 </body>
 </html>
