@@ -4309,62 +4309,97 @@ const CARTE_TYPES = ['sortie', 'faille', 'marchand', 'passage', 'ferry'];
 let _carteActive = 'Brandrgarde';
 let _carteFiltre = new Set(CARTE_TYPES);
 
-/* Barycentre et dispersion d'une region, calcules depuis ses points. */
-function regionsDe(pts) {
-  const par = new Map();
-  for (const [, region, x, y] of pts) {
-    if (!par.has(region)) par.set(region, []);
-    par.get(region).push([x, y]);
+/* DES TERRITOIRES, PAS DES BULLES.
+ *
+ * La premiere version posait une ellipse autour des points de chaque region :
+ * ça se chevauchait, ça laissait du vide entre les zones, et le resultat
+ * ressemblait a un nuage de points plutot qu'a une carte.
+ *
+ * On PARTAGE le terrain a la place. Chaque parcelle revient a la region dont
+ * le point connu est le plus proche — un decoupage de Voronoi, calcule sur
+ * les memes coordonnees reelles. Les territoires sont contigus, sans trou ni
+ * recouvrement, et leur forme decoule de la repartition reelle des points.
+ *
+ * Ça reste une approximation, pour la meme raison qu'avant : on connait des
+ * points, pas des frontieres. Mais une approximation qui ressemble a une
+ * carte se lit, la ou huit ellipses superposees ne se lisent pas.
+ */
+const CARTE_GRILLE = 110;   // parcelles par cote
+
+function territoires(pts, echelle) {
+  const noms = [...new Set(pts.map((p) => p[1]))];
+  const idx = new Map(noms.map((n, i) => [n, i]));
+  const pas = echelle / CARTE_GRILLE;
+  const grille = new Int16Array(CARTE_GRILLE * CARTE_GRILLE);
+  for (let gy = 0; gy < CARTE_GRILLE; gy += 1) {
+    const cy = (gy + 0.5) * pas;
+    for (let gx = 0; gx < CARTE_GRILLE; gx += 1) {
+      const cx = (gx + 0.5) * pas;
+      let meilleur = 0;
+      let dist = Infinity;
+      for (const [, region, x, y] of pts) {
+        const d2 = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+        if (d2 < dist) { dist = d2; meilleur = idx.get(region); }
+      }
+      grille[gy * CARTE_GRILLE + gx] = meilleur;
+    }
   }
-  const out = [];
-  for (const [nom, liste] of par) {
-    const n = liste.length;
-    const cx = liste.reduce((s, p) => s + p[0], 0) / n;
-    const cy = liste.reduce((s, p) => s + p[1], 0) / n;
-    const ec = (i) => Math.sqrt(
-      liste.reduce((s, p) => s + (p[i] - (i ? cy : cx)) ** 2, 0) / n);
-    // Un rayon plancher : une region a deux points ne doit pas devenir un trait.
-    out.push({ nom, cx, cy, n,
-               rx: Math.max(520, ec(0) * 1.7 + 260),
-               ry: Math.max(520, ec(1) * 1.7 + 260) });
+  // Chaque region devient une suite de bandes horizontales : quelques
+  // centaines de rectangles au total, au lieu de 12 100 parcelles.
+  const zones = noms.map((n) => ({ nom: n, bandes: [], cx: 0, cy: 0, aire: 0 }));
+  for (let gy = 0; gy < CARTE_GRILLE; gy += 1) {
+    let debut = 0;
+    for (let gx = 1; gx <= CARTE_GRILLE; gx += 1) {
+      const courant = grille[gy * CARTE_GRILLE + debut];
+      const ici = gx < CARTE_GRILLE ? grille[gy * CARTE_GRILLE + gx] : -2;
+      if (ici === courant) continue;
+      zones[courant].bandes.push([debut * pas, gy * pas, (gx - debut) * pas, pas]);
+      debut = gx;
+    }
   }
-  return out;
+  // L'etiquette se pose au centre de gravite du TERRITOIRE, pas des points :
+  // c'est la qu'elle tombe dans la zone, meme si celle-ci est allongee.
+  for (const z of zones) {
+    let sx = 0; let sy = 0; let a = 0;
+    for (const [x, y, w, h] of z.bandes) {
+      const aire = w * h;
+      sx += (x + w / 2) * aire; sy += (y + h / 2) * aire; a += aire;
+    }
+    if (a) { z.cx = sx / a; z.cy = sy / a; z.aire = a; }
+  }
+  return zones.filter((z) => z.aire > 0);
 }
 
 function dessinerCarte(zonesVisees, zonesDeduites) {
   const boite = $('carteZone');
   const C = self.D_CARTES;
   if (!boite || !C) return;
-  const pts = (C.cartes[_carteActive] || [])
-    .filter((p) => _carteFiltre.has(p[0]));
-  const regions = regionsDe(C.cartes[_carteActive] || []);
+  const tous = C.cartes[_carteActive] || [];
+  const pts = tous.filter((p) => _carteFiltre.has(p[0]));
+  const zones = territoires(tous, C.echelle);
   const vises = new Set(zonesVisees || []);
-  // Une region DEDUITE se voit autrement qu'une region citee par une source.
   const deduites = new Set(zonesDeduites || []);
 
-  const zones = regions.map((r) => {
-    const ici = vises.has(r.nom);
-    const ded = !ici && deduites.has(r.nom);
-    return `<g class="cz${ici ? ' czIci' : ''}${ded ? ' czDeduit' : ''}">
-        <ellipse cx="${r.cx.toFixed(0)}" cy="${r.cy.toFixed(0)}"
-                 rx="${r.rx.toFixed(0)}" ry="${r.ry.toFixed(0)}"></ellipse>
-        <text x="${r.cx.toFixed(0)}" y="${r.cy.toFixed(0)}"
-              text-anchor="middle" dominant-baseline="middle">${echapper(r.nom)}</text>
-      </g>`;
+  const terrains = zones.map((z, i) => {
+    const ici = vises.has(z.nom);
+    const ded = !ici && deduites.has(z.nom);
+    const rects = z.bandes.map(([x, y, w, h]) =>
+      `<rect x="${x.toFixed(0)}" y="${y.toFixed(0)}" width="${Math.ceil(w)}" height="${Math.ceil(h)}"></rect>`).join('');
+    return `<g class="cz czT${i % 8}${ici ? ' czIci' : ''}${ded ? ' czDeduit' : ''}"><title>${echapper(z.nom)}</title>${rects}</g>`;
   }).join('');
+
+  const noms = zones.map((z) =>
+    `<text class="czNom" x="${z.cx.toFixed(0)}" y="${z.cy.toFixed(0)}" text-anchor="middle" dominant-baseline="middle">${echapper(z.nom)}</text>`).join('');
 
   const marques = pts.map(([type, region, x, y]) => {
     const ici = vises.has(region) || deduites.has(region);
-    const titre = `${t('carte.' + type)} — ${region}`;
-    return `<circle class="cp cp-${type}${ici ? ' cpIci' : ''}"
-              cx="${x}" cy="${y}" r="78"><title>${echapper(titre)}</title></circle>`;
+    return `<circle class="cp cp-${type}${ici ? ' cpIci' : ''}" cx="${x}" cy="${y}" r="82"><title>${echapper(t('carte.' + type) + ' — ' + region)}</title></circle>`;
   }).join('');
 
   boite.innerHTML = `<svg viewBox="0 0 ${C.echelle} ${C.echelle}"
       preserveAspectRatio="xMidYMid meet" role="img"
       aria-label="${echapper(_carteActive)}">
-      <rect class="cFond" x="0" y="0" width="${C.echelle}" height="${C.echelle}"></rect>
-      ${zones}${marques}
+      <g class="cTerrains">${terrains}</g>${noms}${marques}
     </svg>`;
 }
 
