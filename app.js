@@ -433,23 +433,41 @@ function scoreObjet(it, want) {
   return score;
 }
 
-/* CE QUE DONNE UNE PIÈCE, RÉSUMÉ EN DEUX AXES.
+/* CE QUE DONNE UNE PIÈCE, RÉSUMÉ EN UN OU DEUX AXES.
  *
- * Sur Ring et Necklace, plusieurs pièces du même palier ne se distinguent
- * QUE par leur stat brute — jamais par leurs affixes ni leurs trous (vérifié
- * sur les 60 pools Ring/Necklace du jeu, 0 exception). Auditée sur toute la
- * base : cette stat suit systématiquement deux axes, jamais plus —
- *   - le stat principal : Attaque, ou Vie ;
- *   - l'élément : Physique, ou Magique.
- * Un palier bas (2) n'a pas encore la déclinaison élémentaire — l'objet ne
- * porte alors qu'un seul de ces deux stats, sans camp. `saveurDe` rend alors
- * `null` : ni « attaque-physique » ni « attaque-magique », et le choix de
- * l'utilisateur ne matche donc rien à ce palier-là (voir poolSlot). */
+ * Auditée sur TOUTE la base d'objets, pas seulement Ring/Necklace : quatre
+ * emplacements ont plusieurs pièces du même palier qui ne se distinguent que
+ * par leur stat brute — jamais par leurs affixes ni leurs trous. Mais pas de
+ * la même façon partout :
+ *
+ *   - Ring, Necklace : DEUX axes varient — le stat principal (Attaque ou
+ *     Vie) ET l'élément (Physique ou Magique). Quatre déclinaisons.
+ *   - Gauntlets, Boots : UN seul axe varie, l'élément. Leur stat, lui, ne
+ *     se choisit pas : Gauntlets porte toujours Attaque, Boots porte
+ *     toujours Attaque ET Vie ensemble. Deux déclinaisons.
+ *   - Helmet, Clothes, Pants : aucune variance, une seule combinaison
+ *     existe. Rien à proposer, ils ne portent pas ce réglage.
+ *
+ * `saveurDe` (les deux axes) sert Ring/Necklace ; `elementDe` (l'axe seul)
+ * sert Gauntlets/Boots. Un palier bas (2) n'a pas encore la déclinaison
+ * élémentaire : les deux rendent alors `null`, et le choix de l'utilisateur
+ * ne matche rien à ce palier-là (voir poolSlot, qui revient au pool complet
+ * plutôt que de bloquer une recherche sur un choix sans objet ici). */
 const SAVEUR_STAT = { attack: 'atk', maxHealth: 'hp' };
 const SAVEUR_ELEM = {
   physicalIncrease: 'phys', physicalReduction: 'phys',
   magicalIncrease: 'mag', magicalReduction: 'mag',
 };
+const SLOTS_SAVEUR_COMPLET = ['Ring', 'Necklace'];
+const SLOTS_SAVEUR_ELEMENT = ['Gauntlets', 'Boots'];
+const SLOTS_SAVEUR = [...SLOTS_SAVEUR_COMPLET, ...SLOTS_SAVEUR_ELEMENT];
+
+function elementDe(it) {
+  const at = (it && it.at) || {};
+  for (const cle of Object.keys(at)) if (SAVEUR_ELEM[cle]) return SAVEUR_ELEM[cle];
+  return null;
+}
+
 function saveurDe(it) {
   const at = (it && it.at) || {};
   let stat = null, elem = null;
@@ -458,6 +476,16 @@ function saveurDe(it) {
     if (SAVEUR_ELEM[cle]) elem = SAVEUR_ELEM[cle];
   }
   return stat && elem ? `${stat}-${elem}` : null;
+}
+
+/* Le bon descripteur pour le bon emplacement — voir le commentaire plus
+ * haut. Renvoie `null` pour un emplacement sans variance (rien ne matche
+ * jamais, donc le filtre de poolSlot retombe toujours sur le pool complet,
+ * ce qui est exactement le comportement souhaité). */
+function descripteurSaveur(slot, it) {
+  if (SLOTS_SAVEUR_ELEMENT.includes(slot)) return elementDe(it);
+  if (SLOTS_SAVEUR_COMPLET.includes(slot)) return saveurDe(it);
+  return null;
 }
 
 /* LE POOL D'UN EMPLACEMENT, AVEC SA RARETE IMPOSEE.
@@ -481,7 +509,7 @@ function poolSlot(classe, slot, arme, grade, mixte, raretes, saveurs) {
                        : poolDe(classe, slot, arme, grade, mixte);
   const voulue = saveurs && saveurs[slot];
   if (!voulue) return pool;
-  const filtre = pool.filter((it) => saveurDe(it) === voulue);
+  const filtre = pool.filter((it) => descripteurSaveur(slot, it) === voulue);
   return filtre.length ? filtre : pool;
 }
 
@@ -1836,6 +1864,7 @@ function afficher(res, classe) {
     const it = res.slotItems[slot];
     const carte = document.createElement('div');
     carte.className = 'piece';
+    carte.dataset.slot = slot;
     if (!it) {
       carte.innerHTML = `<div class="slot">${D.nomsSlots[slot] || slot}</div>
                          <div class="vide">—</div>`;
@@ -1860,9 +1889,14 @@ function afficher(res, classe) {
     // afficher() lui-même ne calcule rien, pour rester rapide.
     const zoneAlt = SLOTS_ALT_PAPERDOLL.includes(slot)
       ? `<div class="altPieceSlot" data-slot="${echapper(slot)}"></div>` : '';
+    // LE MÊME MOT QUE LE SÉLECTEUR AU-DESSUS DES AFFIXES : dire quelle
+    // déclinaison la pièce porte réellement, sans ouvrir de menu — qu'elle
+    // vienne d'un choix explicite ou de l'auto.
+    const badgeSaveur = libelleSaveur(slot, it);
     carte.innerHTML = `<div class="slot">${D.nomsSlots[slot] || slot}</div>
       ${vignette(it.ic, couleur)}
       <div class="nom" style="color:${couleur}">${it.n}</div>
+      ${badgeSaveur ? `<div class="saveurTag">${badgeSaveur}</div>` : ''}
       <div class="inne${it.i ? '' : ' sans'}">${it.i ? t('equip.inne') + ' ' + it.i : t('equip.aucunInne')}</div>
       ${zoneAlt}
       ${gems}
@@ -5152,19 +5186,32 @@ function poserBrews() {
     `${b.nom} — ${t('vin.regle', { n: b.total, p: b.parAffixe })}`]), _brew);
 }
 
-/* CHOISIR LE RING ET LE NECKLACE, SANS OBLIGATION.
+/* CHOISIR RING, NECKLACE, GAUNTLETS ET BOOTS, SANS OBLIGATION.
  *
  * « Auto » (par défaut) laisse le moteur choisir comme aujourd'hui — rien ne
  * change pour qui n'y touche pas. Un choix ne fait que PRÉFÉRER cette
  * déclinaison pendant la recherche ; il n'empêche jamais la pièce d'être
- * changée après coup sur le paperdoll (la flèche déroulante continue de
- * montrer TOUTES les options, saveur comprise — voir alternatives()). */
+ * changée après coup sur le paperdoll (la flèche déroulante de Ring/Necklace
+ * continue de montrer TOUTES les options, saveur comprise — voir
+ * alternatives()).
+ *
+ * Deux jeux d'options, pas un seul : Ring/Necklace varient sur stat ET
+ * élément (quatre choix), Gauntlets/Boots ne varient que sur l'élément
+ * (deux choix) — voir le commentaire au-dessus de `saveurDe`. */
 const SAVEURS_PIECE = [
   ['atk-phys', 'saveur.atkPhys'],
   ['atk-mag', 'saveur.atkMag'],
   ['hp-phys', 'saveur.hpPhys'],
   ['hp-mag', 'saveur.hpMag'],
 ];
+const SAVEURS_ELEMENT = [
+  ['phys', 'saveur.phys'],
+  ['mag', 'saveur.mag'],
+];
+
+function optionsSaveur(slot) {
+  return SLOTS_SAVEUR_ELEMENT.includes(slot) ? SAVEURS_ELEMENT : SAVEURS_PIECE;
+}
 
 function poserSaveurs() {
   const boite = $('saveurSlots');
@@ -5172,7 +5219,7 @@ function poserSaveurs() {
   const avant = {};
   for (const sel of boite.querySelectorAll('select')) avant[sel.dataset.slot] = sel.value;
   boite.innerHTML = '';
-  for (const slot of SLOTS_ALT_PAPERDOLL) {
+  for (const slot of SLOTS_SAVEUR) {
     const l = document.createElement('label');
     const nom = document.createElement('span');
     nom.textContent = D.nomsSlots[slot] || slot;
@@ -5182,7 +5229,7 @@ function poserSaveurs() {
     l.appendChild(sel);
     boite.appendChild(l);
     remplirSelect(sel,
-      [['', t('perso.auto')]].concat(SAVEURS_PIECE.map(([cle, libelle]) => [cle, t(libelle)])),
+      [['', t('perso.auto')]].concat(optionsSaveur(slot).map(([cle, libelle]) => [cle, t(libelle)])),
       avant[slot] || '');
     sel.onchange = () => { if (cibles.size) calculer(); };
   }
@@ -5194,6 +5241,18 @@ function saveursActuelles() {
     if (sel.value) s[sel.dataset.slot] = sel.value;
   }
   return s;
+}
+
+/* LE BADGE SUR LE PAPERDOLL : LE MÊME MOT QUE LE SÉLECTEUR AURAIT MONTRÉ.
+ * Dit quelle déclinaison la pièce EN JEU porte réellement, qu'elle vienne
+ * d'un choix explicite ou de l'auto — sans avoir à ouvrir un menu pour le
+ * savoir. `null` pour un emplacement sans variance (Weapon excepté, voir
+ * plus haut) ou une pièce trop basse pour porter la déclinaison élémentaire. */
+function libelleSaveur(slot, it) {
+  if (!SLOTS_SAVEUR.includes(slot)) return null;
+  const cle = descripteurSaveur(slot, it);
+  const entree = optionsSaveur(slot).find(([c]) => c === cle);
+  return entree ? t(entree[1]) : null;
 }
 
 function poserFiltresRessources() {
