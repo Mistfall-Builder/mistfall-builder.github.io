@@ -5231,7 +5231,13 @@ function poserSaveurs() {
     remplirSelect(sel,
       [['', t('perso.auto')]].concat(optionsSaveur(slot).map(([cle, libelle]) => [cle, t(libelle)])),
       avant[slot] || '');
-    sel.onchange = () => { if (cibles.size) calculer(); };
+    // PAS DE RECALCUL AUTOMATIQUE. Comme les niveaux d'affixe visés (les
+    // boutons de la grille ne relancent rien non plus) : ce menu note une
+    // intention, elle ne prend effet qu'au prochain clic sur « Calculer ».
+    // Le déclencher ici rejouait toute la cascade qui suit un calcul —
+    // suggestions, pièces interchangeables, fiche de personnage, coût par
+    // palier — à chaque changement d'option, plusieurs secondes perçues
+    // comme un blocage pour un simple choix dans un menu déroulant.
   }
 }
 

@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=120">
+<link rel="stylesheet" href="icones_affixes.css?v=121">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1213,13 +1213,20 @@ td.cout{width:64px}
    carte au lieu de flotter par-dessus les voisines — pas de positionnement
    à gérer, pas de clic-en-dehors à intercepter. */
 .altPieceSlot{padding:0 8px;margin:-2px 0 6px}
+/* EN GRIS TRAIT FIN, CA SE LISAIT COMME L'INNÉ — un fait affiché, pas un
+   bouton. Or c'est le seul endroit de la carte qui réagit au clic (à part
+   le cadenas). Couleur d'accent, fond teinté, bordure pleine : de quoi le
+   reconnaître comme une commande avant même de l'avoir lu. */
 .altPiece summary{list-style:none;cursor:pointer;font-size:10.5px;
-  color:var(--terne);text-align:center;padding:2px 4px;border-radius:3px;
-  border:1px dashed var(--bord)}
+  font-weight:700;color:var(--accent-clair);text-align:center;
+  padding:3px 4px;border-radius:3px;background:rgba(240,123,48,.1);
+  border:1px solid var(--accent-sombre)}
 .altPiece summary::-webkit-details-marker{display:none}
 .altPiece summary::after{content:' \25BE'}
-.altPiece summary:hover{color:var(--texte2);border-color:var(--accent-sombre)}
-.altPiece[open] summary{border-style:solid;color:var(--texte2)}
+.altPiece summary:hover{color:#fff;background:rgba(240,123,48,.18);
+  border-color:var(--accent)}
+.altPiece[open] summary{background:rgba(240,123,48,.18);color:#fff;
+  border-color:var(--accent)}
 .altPieceMenu{display:flex;flex-direction:column;gap:3px;margin-top:5px}
 /* PAS DE FLEX ICI. `align-items:flex-start` mettait chaque ligne en
    shrink-to-fit sur l'axe croisé : le texte long ("Attack 4 · Combat value
@@ -1708,15 +1715,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=120"></script>
-<script src="config.js?v=120"></script>
-<script src="comptes.js?v=120"></script>
-<script src="donnees.js?v=120"></script>
-<script src="skills.js?v=120"></script>
-<script src="talents.js?v=120"></script>
-<script src="builds_reference.js?v=120"></script>
-<script src="guides_classes.js?v=120"></script>
-<script src="fiche.js?v=120"></script>
-<script src="app.js?v=120"></script>
+<script src="i18n.js?v=121"></script>
+<script src="config.js?v=121"></script>
+<script src="comptes.js?v=121"></script>
+<script src="donnees.js?v=121"></script>
+<script src="skills.js?v=121"></script>
+<script src="talents.js?v=121"></script>
+<script src="builds_reference.js?v=121"></script>
+<script src="guides_classes.js?v=121"></script>
+<script src="fiche.js?v=121"></script>
+<script src="app.js?v=121"></script>
 </body>
 </html>
