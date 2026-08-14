@@ -702,6 +702,11 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
   }
   res.vin = vinNoms;
   res.vinPoints = vinPoints;
+  // Instantané pris UNE SEULE FOIS, à la sortie du moteur : la valeur de
+  // repli quand on remet une ligne du tableau sur « auto » après l'avoir
+  // touchée à la main. Voir appliquerVin — on ne relance jamais le moteur
+  // pour ça, on revient juste à ce qu'il avait décidé ici.
+  res.vinAuto = new Map(vinPoints);
   return res;
 }
 
@@ -1062,53 +1067,65 @@ function selectVin(nom, classe = 'vin') {
  * DANS le tableau des affixes obtenus, à l'endroit exact où on constate le
  * manque.
  *
- * Ce que ce geste ne fait PAS, et c'est le point : il ne relance aucune
- * recherche de stuff. L'équipement, les gemmes, le paperdoll et le code
- * d'import restent identiques au caractère près. On re-répartit les points
- * dans le budget de la boisson, et on repeint les seules colonnes qui en
- * dépendent — vin et total.
+ * Ce que ce geste ne fait PAS, et c'est le point : il ne relance NI une
+ * recherche de stuff NI même un recalcul du vin des autres lignes. Poser un
+ * chiffre sur une ligne n'écrit QUE cette ligne — l'ancienne version
+ * repassait par l'algorithme de répartition (budget total, plafond par
+ * affixe) à chaque changement, et régler une seule ligne en faisait
+ * dégringoler d'autres qu'on n'avait pas touchées, jusqu'à deux cibles à
+ * 4 ✓ tombant à 2 ✗ pour un réglage qui ne les concernait pas. C'est un
+ * réglage purement visuel : équipement, gemmes, paperdoll et code d'import
+ * restent identiques au caractère près, et les lignes non touchées aussi.
+ *
+ * « auto » ramène la ligne à ce que CE build a calculé pour elle
+ * (res.vinAuto, un instantané pris une seule fois à la sortie du moteur) —
+ * pas à un nouveau calcul, à ce qu'il y avait déjà.
  *
  * La colonne « coût » fait exception : elle vient d'une recherche de build
  * par cible, donc la recalculer serait exactement ce qu'on refuse de faire.
  * Ses cases repassent au marqueur d'attente plutôt que d'afficher un chiffre
  * qui n'est plus vrai. */
+function repeindreLigneVin(res, nom) {
+  const table = $('tableauAffixes');
+  const tr = table && table.querySelector(`tr[data-a="${CSS.escape(nom)}"]`);
+  if (!tr) return;
+  const cellules = tr.querySelectorAll('td');
+  if (cellules.length < 5) return;
+  const eq = res.couvert[nom] || 0;
+  const accorde = (res.vinPoints && res.vinPoints.get(nom)) || 0;
+  const total = Math.min(plafond(nom), eq + accorde);
+  const vise = cibles.has(nom) ? cibles.get(nom) : null;
+  const tient = vise == null ? null : total >= vise;
+
+  tr.classList.toggle('ligneKo', tient === false);
+  const cellTotal = cellules[4];
+  cellTotal.className = 'n total ' + (tient == null ? '' : (tient ? 'ok' : 'ko'));
+  cellTotal.innerHTML = `${total}<span class="marque">${
+    tient == null ? '' : (tient ? '✓' : '✗')}</span>`;
+
+  const sel = cellules[3].querySelector('select');
+  if (!sel) return;
+  // LA VALEUR DU SÉLECTEUR DIT SI C'EST TOI OU LE MOTEUR QUI A DÉCIDÉ.
+  // Une ligne jamais touchée reste sur « auto », même quand le moteur lui a
+  // donné des points — sinon on ne distinguerait plus « ce que tu as
+  // corrigé » de « ce que le moteur a mis tout seul ».
+  sel.value = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
+  // LA COLONNE DISAIT UN NOMBRE, ELLE NE DOIT PAS DIRE MOINS.
+  // Remplacer le chiffre par un sélecteur sur « auto » aurait fait perdre
+  // l'information : on ne voyait plus combien de points partaient là. Le
+  // libellé de l'option automatique porte donc le compte actuellement
+  // servi sur cette ligne.
+  const opt = sel.querySelector('option[value=""]');
+  if (opt) opt.textContent = accorde ? `${t('affixes.auto')} +${accorde}` : t('affixes.auto');
+}
+
+/* Toutes les lignes d'un coup : seul moment où c'est légitime, juste après
+   avoir construit le tableau — chaque ligne lit sa propre valeur, aucune ne
+   dépend d'une autre. */
 function repeindreVin(res) {
   const table = $('tableauAffixes');
   if (!table) return;
-  for (const tr of table.querySelectorAll('tr[data-a]')) {
-    const nom = tr.dataset.a;
-    const cellules = tr.querySelectorAll('td');
-    if (cellules.length < 5) continue;
-    const eq = res.couvert[nom] || 0;
-    const accorde = (res.vinPoints && res.vinPoints.get(nom)) || 0;
-    const total = Math.min(plafond(nom), eq + accorde);
-    const vise = cibles.has(nom) ? cibles.get(nom) : null;
-    const tient = vise == null ? null : total >= vise;
-
-    tr.classList.toggle('ligneKo', tient === false);
-    const cellTotal = cellules[4];
-    cellTotal.className = 'n total ' + (tient == null ? '' : (tient ? 'ok' : 'ko'));
-    cellTotal.innerHTML = `${total}<span class="marque">${
-      tient == null ? '' : (tient ? '✓' : '✗')}</span>`;
-
-    // LA CONSIGNE ET CE QUI EST SERVI NE SONT PAS TOUJOURS LA MÊME CHOSE :
-    // au-delà du budget de la boisson, la demande est rognée. Le sélecteur
-    // montre ce qu'on a demandé ; l'infobulle dit ce qui est réellement
-    // versé quand les deux diffèrent, sinon on croirait à un bug.
-    const sel = cellules[3].querySelector('select');
-    if (!sel) continue;
-    const demande = vinManuel.has(nom) ? vinManuel.get(nom) : null;
-    sel.value = demande == null ? '' : String(demande);
-    // LA COLONNE DISAIT UN NOMBRE, ELLE NE DOIT PAS DIRE MOINS.
-    // Remplacer le chiffre par un sélecteur sur « auto » aurait fait perdre
-    // l'information : on ne voyait plus combien de points partaient là. Le
-    // libellé de l'option automatique porte donc le compte servi.
-    const opt = sel.querySelector('option[value=""]');
-    if (opt) opt.textContent = accorde ? `${t('affixes.auto')} +${accorde}` : t('affixes.auto');
-    sel.title = (demande != null && demande !== accorde)
-      ? t('vin.rogne', { demande, accorde })
-      : t('affixes.vinTitre', { max: reglesVin().max, bonus: reglesVin().bonus });
-  }
+  for (const tr of table.querySelectorAll('tr[data-a]')) repeindreLigneVin(res, tr.dataset.a);
 }
 
 /* Le dernier résultat affiché, pour que les deux sélecteurs de vin — celui
@@ -1120,35 +1137,24 @@ let _resAffiche = null;
 /* LE SEUL CHEMIN POUR CHANGER LE VIN. Les deux sélecteurs passent par ici,
    donc ils ne peuvent pas se contredire. */
 function appliquerVin(nom, valeur) {
-  /* CORRIGER, C'EST PARTIR DE CE QU'ON A.
-     La règle du vin est en tout ou rien : dès qu'un seul affixe porte une
-     consigne, la répartition entière passe en manuel et tous les autres
-     tombent à zéro. Poser « +2 » sur un affixe faisait donc dégringoler les
-     voisins — mesuré : deux cibles passaient de 4 ✓ à 2 ✗ d'un coup, sans
-     qu'on ait rien demandé pour elles. Ce n'est pas corriger, c'est tout
-     remettre à plat.
-     À la PREMIÈRE consigne, on recopie donc la répartition en cours dans
-     les consignes. Elle tient déjà dans le budget, donc rien ne bouge —
-     sauf l'affixe qu'on vient de régler, qui est précisément le geste
-     demandé. Ceux qui avaient déjà des consignes manuelles ne voient aucun
-     changement. */
-  if (!vinManuel.size) {
-    const actuelle = (_resAffiche && _resAffiche.vinPoints)
-      || repartitionVin([...cibles.entries()], null);
-    for (const [n, p] of actuelle) if (p > 0) vinManuel.set(n, p);
-  }
+  // Retenu pour le PROCHAIN build : si tu relances Calculer plus tard, ce
+  // réglage compte encore. Mais ça ne relance RIEN maintenant — c'est une
+  // note pour plus tard, pas une action.
   if (valeur === '') vinManuel.delete(nom);
   else vinManuel.set(nom, Number(valeur));
 
+  // LE RÉSULTAT AFFICHÉ NE BOUGE QUE SUR CETTE LIGNE.
   if (_resAffiche) {
-    _resAffiche.vinPoints = repartitionVin([...cibles.entries()], vinManuel);
-    repeindreVin(_resAffiche);
+    const auto = (_resAffiche.vinAuto && _resAffiche.vinAuto.get(nom)) || 0;
+    const pose = valeur === '' ? auto : Number(valeur);
+    if (pose > 0) _resAffiche.vinPoints.set(nom, pose);
+    else _resAffiche.vinPoints.delete(nom);
+    repeindreLigneVin(_resAffiche, nom);
     // Le coût par palier vient d'une recherche de build par cible : le
     // refaire ici serait exactement la relance qu'on veut éviter. On cesse
     // donc de l'affirmer plutôt que d'afficher un chiffre périmé.
-    for (const c of $('tableauAffixes').querySelectorAll('td.cout')) {
-      if (c.textContent.trim()) c.innerHTML = '<span class="pas">…</span>';
-    }
+    const ligne = $('tableauAffixes').querySelector(`tr[data-a="${CSS.escape(nom)}"] td.cout`);
+    if (ligne && ligne.textContent.trim()) ligne.innerHTML = '<span class="pas">…</span>';
   }
   majBudgetVin();
   majCompteursGrille();

@@ -56,7 +56,6 @@
       'vin.eteint': "Victory Wine non compté : le stuff seul doit atteindre les cibles.",
       'vin.manuel': 'Vin : {total}/{budget} points sur {n}/{max} affixes.',
       'vin.trop': 'Vin : {total}/{budget} points sur {n}/{max} affixes — la consigne dépasse les règles du jeu, elle a été rognée.',
-      'vin.rogne': 'Tu demandes {demande} point(s) ici, le budget de la boisson n’en laisse que {accorde}.',
 
       'calculer': 'Calculer le build',
       'etat.pret': 'Prêt.',
@@ -496,7 +495,6 @@
       'vin.eteint': 'Victory Wine not counted: the gear alone must reach the targets.',
       'vin.manuel': 'Wine: {total}/{budget} points across {n}/{max} affixes.',
       'vin.trop': 'Wine: {total}/{budget} points across {n}/{max} affixes — your request exceeds the game rules and was trimmed.',
-      'vin.rogne': 'You asked for {demande} point(s) here; the brew’s budget only leaves {accorde}.',
 
       'calculer': 'Build it',
       'etat.pret': 'Ready.',
@@ -936,7 +934,6 @@
       'vin.eteint': 'Victory Wine не учитывается: снаряжение само должно вытянуть цели.',
       'vin.manuel': 'Вино: {total}/{budget} очков на {n}/{max} аффиксов.',
       'vin.trop': 'Вино: {total}/{budget} очков на {n}/{max} аффиксов — запрос превышает правила игры и был урезан.',
-      'vin.rogne': 'Ты просишь здесь {demande} оч., бюджет напитка даёт лишь {accorde}.',
 
       'calculer': 'Собрать',
       'etat.pret': 'Готово.',
