@@ -433,6 +433,33 @@ function scoreObjet(it, want) {
   return score;
 }
 
+/* CE QUE DONNE UNE PIÈCE, RÉSUMÉ EN DEUX AXES.
+ *
+ * Sur Ring et Necklace, plusieurs pièces du même palier ne se distinguent
+ * QUE par leur stat brute — jamais par leurs affixes ni leurs trous (vérifié
+ * sur les 60 pools Ring/Necklace du jeu, 0 exception). Auditée sur toute la
+ * base : cette stat suit systématiquement deux axes, jamais plus —
+ *   - le stat principal : Attaque, ou Vie ;
+ *   - l'élément : Physique, ou Magique.
+ * Un palier bas (2) n'a pas encore la déclinaison élémentaire — l'objet ne
+ * porte alors qu'un seul de ces deux stats, sans camp. `saveurDe` rend alors
+ * `null` : ni « attaque-physique » ni « attaque-magique », et le choix de
+ * l'utilisateur ne matche donc rien à ce palier-là (voir poolSlot). */
+const SAVEUR_STAT = { attack: 'atk', maxHealth: 'hp' };
+const SAVEUR_ELEM = {
+  physicalIncrease: 'phys', physicalReduction: 'phys',
+  magicalIncrease: 'mag', magicalReduction: 'mag',
+};
+function saveurDe(it) {
+  const at = (it && it.at) || {};
+  let stat = null, elem = null;
+  for (const cle of Object.keys(at)) {
+    if (SAVEUR_STAT[cle]) stat = SAVEUR_STAT[cle];
+    if (SAVEUR_ELEM[cle]) elem = SAVEUR_ELEM[cle];
+  }
+  return stat && elem ? `${stat}-${elem}` : null;
+}
+
 /* LE POOL D'UN EMPLACEMENT, AVEC SA RARETE IMPOSEE.
  *
  * `raretes[slot]` n'est plus un plancher mais un choix EXACT : « des bottes
@@ -440,11 +467,22 @@ function scoreObjet(it, want) {
  * « tout en Excellent sauf l'arme en Epic et le plastron en Legendary »,
  * puisqu'il ne connaissait qu'un seul cran pour tous les emplacements coches
  * — et « monter en priorite » disait deja qu'on montait, ce qui rendait le
- * choix du cran redondant autant qu'ambigu. */
-function poolSlot(classe, slot, arme, grade, mixte, raretes) {
+ * choix du cran redondant autant qu'ambigu.
+ *
+ * `saveurs`, LUI, EST FACULTATIF ET NE FILTRE QUE LA RECHERCHE INITIALE.
+ * Passé uniquement par construire()/alleger() — jamais par alternatives(),
+ * suggestions() ou gainsParPiece(), qui continuent de tout montrer après
+ * coup. Si le palier réellement atteint n'offre pas la saveur demandée
+ * (voir saveurDe), on revient au pool complet plutôt que de bloquer une
+ * recherche sur un choix qui n'a pas de sens à ce cran-là. */
+function poolSlot(classe, slot, arme, grade, mixte, raretes, saveurs) {
   const impose = raretes && raretes[slot];
-  if (impose) return poolDe(classe, slot, arme, impose, false);
-  return poolDe(classe, slot, arme, grade, mixte);
+  const pool = impose ? poolDe(classe, slot, arme, impose, false)
+                       : poolDe(classe, slot, arme, grade, mixte);
+  const voulue = saveurs && saveurs[slot];
+  if (!voulue) return pool;
+  const filtre = pool.filter((it) => saveurDe(it) === voulue);
+  return filtre.length ? filtre : pool;
 }
 
 function poolDe(classe, slot, arme, grade, mixte) {
@@ -460,7 +498,7 @@ function poolDe(classe, slot, arme, grade, mixte) {
 }
 
 function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite,
-                           depart, verrous) {
+                           depart, verrous, saveurs) {
   const want = Object.fromEntries(cibleListe);
   // Les pièces verrouillees : leur objet est impose, leurs gemmes figees,
   // et la recherche n'a plus le droit d'y toucher.
@@ -475,7 +513,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
       options[slot] = [bloque[slot].item];
       continue;
     }
-    const pool = poolSlot(classe, slot, arme, grade, mixte, planchers);
+    const pool = poolSlot(classe, slot, arme, grade, mixte, planchers, saveurs);
     options[slot] = pool;
     const impose = depart && depart[slot];
     if (impose) { slotItems[slot] = impose; continue; }
@@ -540,7 +578,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
  * accepté que s'il garde TOUTES les cibles : la passe ne peut donc jamais
  * dégrader un build, seulement l'alléger. Mesuré : 8 Légendaires -> 2
  * Légendaires + 5 Épiques + 1 Excellent sur un build réel. */
-function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tours, verrous) {
+function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tours, verrous, saveurs) {
   const want = Object.fromEntries(cibleListe);
   const bloque = verrous || {};
   const figees = {};
@@ -575,7 +613,7 @@ function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tour
   let courant = { ...slotItems };
   const options = {};
   for (const slot of D.ordreSlots) {
-    options[slot] = poolSlot(classe, slot, arme, 1, true, planchers);
+    options[slot] = poolSlot(classe, slot, arme, 1, true, planchers, saveurs);
   }
   for (let t = 0; t < (tours || 4); t += 1) {
     let bouge = false;
@@ -606,7 +644,7 @@ function sommeRaretes(slotItems) {
 }
 
 function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi,
-                    verrous) {
+                    verrous, saveurs) {
   const affinite = D.affinites[String(classe)] || null;
   const vinPoints = vin ? repartitionVin(cibleListe, vinChoisi) : new Map();
   const vinNoms = new Set(vinPoints.keys());
@@ -632,9 +670,9 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
   const want = Object.fromEntries(cibleGear);
 
   const essai = (g, mx, dep) => {
-    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep, verrous);
+    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep, verrous, saveurs);
     if (!affinite) return a;
-    const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous);
+    const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous, saveurs);
     const na = [couvertureEffective(a.couvert, want, null), surplus(a.couvert, want)];
     const nb = [couvertureEffective(b.couvert, want, null), surplus(b.couvert, want)];
     return (nb[0] > na[0] || (nb[0] === na[0] && nb[1] >= na[1])) ? b : a;
@@ -688,7 +726,7 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
     // Le vin est DÉJÀ retiré de `cibleGear` : on passe une allocation vide,
     // sinon il serait compté deux fois et l'allègement descendrait trop bas.
     const legers = alleger(res.slotItems, classe, arme, cibleGear,
-                           planchers, new Map(), undefined, verrous);
+                           planchers, new Map(), undefined, verrous, saveurs);
     if (sommeRaretes(legers) < sommeRaretes(res.slotItems)) {
       const a = assembler(legers, want, true, figeesDe(verrous));
       const candidat = { slotItems: legers, sockets: a.sockets,
@@ -2117,6 +2155,7 @@ function lancerAnalyseComplete(res) {
   const vin = $('vin').checked;
   const cibleBase = [...cibles.entries()];
   const planchers = planchersActuels();
+  const saveurs = saveursActuelles();
   const coutActuel = coutRarete(res.slotItems);
   const actuelDe = (n) => Math.min(plafond(n),
     (res.couvert[n] || 0) + (vp.get(n) || 0));
@@ -2153,7 +2192,7 @@ function lancerAnalyseComplete(res) {
     try {
       const r = construire(classe, arme,
         cibleBase.filter(([x]) => x !== nom).concat([[nom, niveau]]),
-        grade, vin, mixte, planchers, vinManuel, verrousObjet());
+        grade, vin, mixte, planchers, vinManuel, verrousObjet(), saveurs);
       if (!r || !r.suffisant) return false;
       /* « SANS RIEN PERDRE » VEUT AUSSI DIRE SANS PAYER PLUS.
        *
@@ -2647,6 +2686,7 @@ function etatActuel() {
     v: $('vin').checked,
     m: $('mixte').checked,
     pr: planchersActuels(),
+    sv: saveursActuelles(),
     t: [...cibles.entries()],
     w: [...vinManuel.entries()],
     b: _brew,
@@ -2675,6 +2715,10 @@ function appliquerEtat(e) {
   const voulus = new Set(e.ps || []);
   for (const c of document.querySelectorAll('#plancherSlots input')) {
     c.checked = voulus.has(c.value);
+  }
+  const sv = e.sv || {};
+  for (const sel of document.querySelectorAll('#saveurSlots select')) {
+    sel.value = sv[sel.dataset.slot] || '';
   }
   cibles.clear();
   for (const [n, l] of e.t || []) cibles.set(n, l);
@@ -3529,12 +3573,13 @@ function calculer() {
   const grade = $('rarete').value ? Number($('rarete').value) : null;
   const mixte = $('mixte').checked;
   const planchers = planchersActuels();
+  const saveurs = saveursActuelles();
   $('etat').textContent = t('etat.calcul');
   const t0 = performance.now();
   setTimeout(() => {
     try {
       const res = construire(classe, arme, [...cibles.entries()], grade,
-                             $('vin').checked, mixte, planchers, vinManuel, verrousObjet());
+                             $('vin').checked, mixte, planchers, vinManuel, verrousObjet(), saveurs);
       dernier = res;
       afficher(res, classe);
       const raretes = {};
@@ -3555,7 +3600,7 @@ function calculer() {
       $('etat').innerHTML =
         `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
         + `<br><span class="pas">${t('etat.recherche')}</span>`;
-      const issue = chercherUneIssue(classe, arme, grade, mixte, planchers);
+      const issue = chercherUneIssue(classe, arme, grade, mixte, planchers, saveurs);
       $('etat').innerHTML =
         `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
         + (issue ? `<br>${issue}` : `<br><span class="pas">${t('etat.rien')}</span>`);
@@ -3568,7 +3613,7 @@ function calculer() {
 /* Quel réglage atteindrait les cibles ? On essaie, dans l'ordre du moins
    cher au plus cher, et on rend un bouton qui l'applique. Un message qui dit
    seulement « non » est un cul-de-sac ; celui-ci dit « oui, comme ça ». */
-function chercherUneIssue(classe, arme, grade, mixte, planchers) {
+function chercherUneIssue(classe, arme, grade, mixte, planchers, saveurs) {
   const liste = [...cibles.entries()];
   const vin = $('vin').checked;
   const essais = [];
@@ -3588,7 +3633,7 @@ function chercherUneIssue(classe, arme, grade, mixte, planchers) {
     let r;
     try {
       r = construire(classe, arme, liste, e.grade, vin, e.mixte,
-                     e.mixte ? planchers : {}, vinManuel, verrousObjet());
+                     e.mixte ? planchers : {}, vinManuel, verrousObjet(), saveurs);
     } catch (err) { continue; }
     if (!r.suffisant) continue;
     const raretes = {};
@@ -4655,6 +4700,7 @@ function lancerCoutPaliers(res, classe, arme) {
   const vin = $('vin').checked;
   const mixte = $('mixte').checked;
   const planchers = planchersActuels();
+  const saveurs = saveursActuelles();
   const aFaire = cibleBase.filter(([, niveau]) => niveau > 0);
   let i = 0;
 
@@ -4671,7 +4717,7 @@ function lancerCoutPaliers(res, classe, arme) {
         .filter(([, l]) => l > 0);
       const r = moins.length
         ? construire(classe, arme, moins, grade, vin, mixte, planchers,
-                     vinManuel, verrousObjet())
+                     vinManuel, verrousObjet(), saveurs)
         : null;
       const gain = r && r.suffisant ? base - sommeRaretes(r.slotItems) : null;
       if (cell) {
@@ -5106,6 +5152,50 @@ function poserBrews() {
     `${b.nom} — ${t('vin.regle', { n: b.total, p: b.parAffixe })}`]), _brew);
 }
 
+/* CHOISIR LE RING ET LE NECKLACE, SANS OBLIGATION.
+ *
+ * « Auto » (par défaut) laisse le moteur choisir comme aujourd'hui — rien ne
+ * change pour qui n'y touche pas. Un choix ne fait que PRÉFÉRER cette
+ * déclinaison pendant la recherche ; il n'empêche jamais la pièce d'être
+ * changée après coup sur le paperdoll (la flèche déroulante continue de
+ * montrer TOUTES les options, saveur comprise — voir alternatives()). */
+const SAVEURS_PIECE = [
+  ['atk-phys', 'saveur.atkPhys'],
+  ['atk-mag', 'saveur.atkMag'],
+  ['hp-phys', 'saveur.hpPhys'],
+  ['hp-mag', 'saveur.hpMag'],
+];
+
+function poserSaveurs() {
+  const boite = $('saveurSlots');
+  if (!boite || !D) return;
+  const avant = {};
+  for (const sel of boite.querySelectorAll('select')) avant[sel.dataset.slot] = sel.value;
+  boite.innerHTML = '';
+  for (const slot of SLOTS_ALT_PAPERDOLL) {
+    const l = document.createElement('label');
+    const nom = document.createElement('span');
+    nom.textContent = D.nomsSlots[slot] || slot;
+    const sel = document.createElement('select');
+    sel.dataset.slot = slot;
+    l.appendChild(nom);
+    l.appendChild(sel);
+    boite.appendChild(l);
+    remplirSelect(sel,
+      [['', t('perso.auto')]].concat(SAVEURS_PIECE.map(([cle, libelle]) => [cle, t(libelle)])),
+      avant[slot] || '');
+    sel.onchange = () => { if (cibles.size) calculer(); };
+  }
+}
+
+function saveursActuelles() {
+  const s = {};
+  for (const sel of document.querySelectorAll('#saveurSlots select')) {
+    if (sel.value) s[sel.dataset.slot] = sel.value;
+  }
+  return s;
+}
+
 function poserFiltresRessources() {
   if (!$('resCat') || !D) return;
   const cats = [...new Set(ressourcesUniques().map((o) => o.c))].sort();
@@ -5197,6 +5287,7 @@ window.surChangementDeLangue = function () {
   poserAideVin();
   if (typeof BREWS !== 'undefined') poserBrews();
   poserRaretesParPiece();
+  poserSaveurs();
   if (!D) return;
   remplirSelect($('rarete'),
     [['', t('perso.auto')]].concat(
@@ -5321,6 +5412,7 @@ function demarrer(donnees) {
     [['', t('perso.auto')]].concat(
       [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
   poserRaretesParPiece();
+  poserSaveurs();
   dessinerAffixes();
   majBudgetVin();
 
