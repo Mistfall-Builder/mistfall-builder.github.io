@@ -986,9 +986,42 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
    pièces moyennes, ou peu de pièces très rares — et ce n'est pas forcément
    celle que l'outil choisit qu'on a sous la main. */
 /* Combien de points de vin chaque affixe reçoit. Mêmes règles que l'outil de
-   bureau : au plus D.vin.max affixes, D.vin.bonus points chacun, et
-   D.vin.max × D.vin.bonus au total. Une consigne qui déborde est rognée —
+   bureau : au plus reglesVin().max affixes, reglesVin().bonus points chacun, et
+   reglesVin().max × reglesVin().bonus au total. Une consigne qui déborde est rognée —
    un build calculé sur un vin impossible serait faux. */
+/* LES QUATRE BREWS.
+ *
+ * Le jeu propose plusieurs boissons de Victory Wine, de plus en plus
+ * genereuses. Le site n'en connaissait qu'une — la meilleure, celle que joue
+ * l'auteur — et l'imposait a tout le monde : un joueur qui boit un Mortal
+ * Tonic se voyait proposer des builds appuyes sur des points qu'il n'a pas.
+ *
+ * `max`   = nombre d'affixes qui peuvent recevoir du vin
+ * `bonus` = points par affixe
+ * Le budget total est le produit des deux.
+ *
+ * VERIFIE : la derniere ligne seulement. Elle correspond au modele en place
+ * depuis le debut, valide en jeu par l'auteur, et reste le defaut — personne
+ * ne voit son build changer.
+ * A CONFIRMER : les trois premieres. Elles viennent d'une source unique
+ * (theorycrafter.gg) dont les chiffres ne concordent PAS avec les notres sur
+ * la derniere ligne : il annonce 8 affixes la ou nous en comptons 4. Une des
+ * deux lectures est fausse, donc ces trois lignes sont a verifier en jeu
+ * avant d'etre crues. */
+const BREWS = [
+  { id: 'mortal',  nom: 'Mortal Tonic', max: 2, bonus: 1, sur: false },
+  { id: 'hero',    nom: "Hero's Ale",   max: 4, bonus: 1, sur: false },
+  { id: 'warblood', nom: 'Warblood',    max: 6, bonus: 2, sur: false },
+  { id: 'gods',    nom: "Gods' Brew",   max: 4, bonus: 2, sur: true },
+];
+let _brew = 'gods';
+
+/* Les regles du vin en vigueur. Tout le moteur passe par ici, si bien que
+   changer de boisson ne demande aucune autre retouche. */
+function reglesVin() {
+  return BREWS.find((b) => b.id === _brew) || BREWS[BREWS.length - 1];
+}
+
 function repartitionVin(cibleListe, manuel) {
   // UNE CONSIGNE DE VIN VAUT SANS CIBLE. On visait autrefois les seuls
   // affixes ciblés, pour qu'une allocation oubliée ne mange pas une des
@@ -1000,16 +1033,16 @@ function repartitionVin(cibleListe, manuel) {
     ? [...manuel.entries()].filter(([, p]) => p > 0)
     : [];
   if (!utile.length) {
-    return new Map([...choisirVin(cibleListe)].map((n) => [n, D.vin.bonus]));
+    return new Map([...choisirVin(cibleListe)].map((n) => [n, reglesVin().bonus]));
   }
-  const budgetTotal = D.vin.max * D.vin.bonus;
+  const budgetTotal = reglesVin().max * reglesVin().bonus;
   const voulus = utile
-    .map(([n, p]) => [n, Math.max(0, Math.min(p, D.vin.bonus))])
+    .map(([n, p]) => [n, Math.max(0, Math.min(p, reglesVin().bonus))])
     .filter(([, p]) => p > 0)
     .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
   const sortie = new Map();
   let reste = budgetTotal;
-  for (const [n, p] of voulus.slice(0, D.vin.max)) {
+  for (const [n, p] of voulus.slice(0, reglesVin().max)) {
     if (reste <= 0) break;
     const donne = Math.min(p, reste);
     sortie.set(n, donne);
@@ -1023,7 +1056,7 @@ function choisirVin(cibleListe) {
     const sansGemme = (n) => ((affixVersGemmes.get(n) || []).length ? 1 : 0);
     return (sansGemme(a[0]) - sansGemme(b[0])) || (b[1] - a[1]);
   });
-  return new Set(ordre.slice(0, D.vin.max).map(([n]) => n));
+  return new Set(ordre.slice(0, reglesVin().max).map(([n]) => n));
 }
 
 /* --------------------------------------------------------------------- UI */
@@ -1167,7 +1200,7 @@ function majEtatVin(ligne) {
   if (!vin) return;
   const compte = $('vin').checked;
   vin.disabled = !compte;
-  vin.title = compte ? t('affixes.vinTitre', { max: D.vin.max, bonus: D.vin.bonus })
+  vin.title = compte ? t('affixes.vinTitre', { max: reglesVin().max, bonus: reglesVin().bonus })
                      : t('affixes.vinEteint');
 }
 
@@ -1185,7 +1218,7 @@ function majBudgetVin() {
   }
   const retenu = repartitionVin([...cibles.entries()], vinManuel);
   const total = [...retenu.values()].reduce((s, v) => s + v, 0);
-  const budget = D.vin.max * D.vin.bonus;
+  const budget = reglesVin().max * reglesVin().bonus;
   const demande = [...vinManuel.values()].reduce((s, v) => s + v, 0);
   // ZÉRO POINT N'OCCUPE PAS UNE PLACE. Régler un affixe sur « — » veut dire
   // « pas de vin ici », pas « une des quatre fioles part là-dessus ». Compter
@@ -1194,12 +1227,12 @@ function majBudgetVin() {
   // déborder en affichant lui-même qu'il ne débordait pas.
   const poses = [...vinManuel.values()].filter((v) => v > 0).length;
   const auto = !poses;
-  const trop = !auto && (demande > budget || poses > D.vin.max);
+  const trop = !auto && (demande > budget || poses > reglesVin().max);
   el.className = trop ? 'ko' : 'pas';
   el.textContent = auto
     ? t('vin.auto', { total, budget })
     : t(trop ? 'vin.trop' : 'vin.manuel',
-        { total, budget, n: retenu.size, max: D.vin.max });
+        { total, budget, n: retenu.size, max: reglesVin().max });
 }
 
 /* Le texte cherchable d'un affixe : son nom, sa description, et les libellés
@@ -1389,7 +1422,7 @@ function tuileAffixe(nom) {
   // niveau visé, la séparer sur deux écrans obligeait à faire l'aller-retour.
   const vin = el.querySelector('.vin');
   vin.innerHTML = `<option value="">${t('affixes.auto')}</option>`
-    + Array.from({ length: D.vin.bonus + 1 },
+    + Array.from({ length: reglesVin().bonus + 1 },
                  (_, i) => `<option value="${i}">${i ? '+' + i : '—'}</option>`).join('');
   vin.value = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
   vin.onchange = () => {
@@ -2395,6 +2428,7 @@ function etatActuel() {
     ps: [...document.querySelectorAll('#plancherSlots input:checked')].map((c) => c.value),
     t: [...cibles.entries()],
     w: [...vinManuel.entries()],
+    b: _brew,
   };
 }
 
@@ -2420,6 +2454,10 @@ function appliquerEtat(e) {
   for (const [n, l] of e.t || []) cibles.set(n, l);
   vinManuel.clear();
   for (const [n, p] of e.w || []) vinManuel.set(n, p);
+  // Un build d'avant le choix des boissons n'en porte pas : il garde la
+  // meilleure, celle sur laquelle il a ete calcule.
+  _brew = (e.b && BREWS.some((b) => b.id === e.b)) ? e.b : 'gods';
+  if ($('brew')) $('brew').value = _brew;
   dessinerAffixes();
   majBudgetVin();
 }
@@ -4773,6 +4811,12 @@ function dessinerRessources(page) {
   dessinerPages($('resPages'), resEtat, RES_PAR_PAGE, dessinerRessources);
 }
 
+function poserBrews() {
+  if (!$('brew')) return;
+  remplirSelect($('brew'), BREWS.map((b) => [b.id,
+    `${b.nom} — ${t('vin.regle', { n: b.max, p: b.bonus })}`]), _brew);
+}
+
 function poserFiltresRessources() {
   if (!$('resCat') || !D) return;
   const cats = [...new Set(ressourcesUniques().map((o) => o.c))].sort();
@@ -4862,6 +4906,7 @@ function poserLangues() {
 window.surChangementDeLangue = function () {
   poserLangues();
   poserAideVin();
+  if (typeof BREWS !== 'undefined') poserBrews();
   if (!D) return;
   remplirSelect($('rarete'),
     [['', t('perso.auto')]].concat(
@@ -5001,6 +5046,7 @@ function demarrer(donnees) {
   dessinerAffixes();
   majBudgetVin();
 
+  poserBrews();
   brancherPlis();
   /* L'INVENTAIRE COMPLET SE PAIE A L'OUVERTURE, PAS AVANT. Sept secondes de
    * calcul a chaque build seraient insupportables ; la carte etant repliee
@@ -5038,6 +5084,17 @@ function demarrer(donnees) {
   /* Remettre le vin a zero SANS perdre ses cibles. « Tout vider » effaçait
      les deux, si bien que corriger une repartition de vin obligeait a
      ressaisir tous ses affixes. */
+  if ($('brew')) {
+    $('brew').onchange = () => {
+      _brew = $('brew').value;
+      // Changer de boisson change le budget : une repartition manuelle faite
+      // pour une autre n'a plus de sens, le moteur la refait.
+      vinManuel.clear();
+      dessinerAffixes(); majBudgetVin();
+      if (cibles.size) calculer();
+    };
+  }
+
   $('viderVin').onclick = () => {
     if (!vinManuel.size) return;
     vinManuel.clear();

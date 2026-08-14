@@ -1069,6 +1069,7 @@ td.cout{width:64px}
 
 /* La legende du palier et du vin : elle etait enfermee dans des attributs
    title=, donc inexistante au doigt et invisible au survol rapide. */
+.brew{margin-top:5px;font-size:12px}
 .legende{margin-top:9px;font-size:11.5px;line-height:1.5;color:var(--terne)}
 .legende .pastillePalier{display:inline-block;width:4px;height:4px;
   border-radius:50%;background:var(--accent);vertical-align:middle;
@@ -1228,6 +1229,9 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <select id="rarete"></select>
         <label class="coche" id="labelVin"><input type="checkbox" id="vin" checked>
           <span data-i18n="perso.vin">Compter le Victory Wine</span></label>
+        <!-- Le jeu propose plusieurs boissons, de plus en plus genereuses.
+             Le defaut reste la meilleure : personne ne voit son build changer. -->
+        <select id="brew" class="brew"></select>
         <label class="coche"><input type="checkbox" id="mixte">
           <span data-i18n="perso.mixte">Panacher les raretés</span></label>
         <div id="blocPlancher" hidden>
@@ -1650,15 +1654,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=111"></script>
-<script src="config.js?v=111"></script>
-<script src="comptes.js?v=111"></script>
-<script src="donnees.js?v=111"></script>
-<script src="skills.js?v=111"></script>
-<script src="talents.js?v=111"></script>
-<script src="builds_reference.js?v=111"></script>
-<script src="guides_classes.js?v=111"></script>
-<script src="fiche.js?v=111"></script>
-<script src="app.js?v=111"></script>
+<script src="i18n.js?v=112"></script>
+<script src="config.js?v=112"></script>
+<script src="comptes.js?v=112"></script>
+<script src="donnees.js?v=112"></script>
+<script src="skills.js?v=112"></script>
+<script src="talents.js?v=112"></script>
+<script src="builds_reference.js?v=112"></script>
+<script src="guides_classes.js?v=112"></script>
+<script src="fiche.js?v=112"></script>
+<script src="app.js?v=112"></script>
 </body>
 </html>
