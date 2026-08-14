@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=117">
+<link rel="stylesheet" href="icones_affixes.css?v=118">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1198,6 +1198,36 @@ td.cout{width:64px}
 .piece .vide{color:#3d4245;font-style:italic;text-align:center;font-size:12px;
   padding-top:34px}
 
+/* La flèche déroulante sur Ring/Necklace : les autres pièces du même palier,
+   directement sur le paperdoll, sans aller chercher le bloc "Pièces
+   interchangeables" plus bas pour un simple changement d'anneau. Repliée,
+   elle ne prend qu'une ligne discrète ; dépliée, elle pousse le reste de la
+   carte au lieu de flotter par-dessus les voisines — pas de positionnement
+   à gérer, pas de clic-en-dehors à intercepter. */
+.altPieceSlot{padding:0 8px;margin:-2px 0 6px}
+.altPiece summary{list-style:none;cursor:pointer;font-size:10.5px;
+  color:var(--terne);text-align:center;padding:2px 4px;border-radius:3px;
+  border:1px dashed var(--bord)}
+.altPiece summary::-webkit-details-marker{display:none}
+.altPiece summary::after{content:' \25BE'}
+.altPiece summary:hover{color:var(--texte2);border-color:var(--accent-sombre)}
+.altPiece[open] summary{border-style:solid;color:var(--texte2)}
+.altPieceMenu{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+/* PAS DE FLEX ICI. `align-items:flex-start` mettait chaque ligne en
+   shrink-to-fit sur l'axe croisé : le texte long ("Attack 4 · Combat value
+   200") ne s'enroulait plus et débordait du bouton — mesuré sur mobile (375
+   px), 6 débordements. En flux bloc normal, une largeur fixée suffit à faire
+   revenir le texte à la ligne. */
+.altPieceOpt{display:block;width:100%;padding:4px 7px;border:1px solid var(--bord);
+  border-radius:3px;background:var(--panneau2);text-align:left;line-height:1.25;
+  font-size:11px;white-space:normal}
+.altPieceOpt .nomOpt{display:block;font-weight:600}
+.altPieceOpt .statOpt{display:block;font-size:10px;color:var(--terne)}
+.altPieceOpt:hover:not(:disabled){border-color:var(--accent-sombre);
+  background:#12181b;cursor:pointer}
+.altPieceOpt:disabled{border-color:var(--accent);background:#1d1208;
+  opacity:.85;cursor:default}
+
 footer{border-top:1px solid var(--bord);margin-top:8px;padding:16px 22px;
   color:var(--terne);font-size:12px;text-align:center}
 footer em{color:var(--doux);font-style:normal}
@@ -1661,15 +1691,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=117"></script>
-<script src="config.js?v=117"></script>
-<script src="comptes.js?v=117"></script>
-<script src="donnees.js?v=117"></script>
-<script src="skills.js?v=117"></script>
-<script src="talents.js?v=117"></script>
-<script src="builds_reference.js?v=117"></script>
-<script src="guides_classes.js?v=117"></script>
-<script src="fiche.js?v=117"></script>
-<script src="app.js?v=117"></script>
+<script src="i18n.js?v=118"></script>
+<script src="config.js?v=118"></script>
+<script src="comptes.js?v=118"></script>
+<script src="donnees.js?v=118"></script>
+<script src="skills.js?v=118"></script>
+<script src="talents.js?v=118"></script>
+<script src="builds_reference.js?v=118"></script>
+<script src="guides_classes.js?v=118"></script>
+<script src="fiche.js?v=118"></script>
+<script src="app.js?v=118"></script>
 </body>
 </html>

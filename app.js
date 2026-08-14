@@ -1814,10 +1814,19 @@ function afficher(res, classe) {
     carte.style.setProperty('--tinte', couleur);
     carte.style.borderColor = couleur + '66';
     carte.title = infobulle(it);
+    // LA FLÈCHE N'EST POSÉE QUE POUR LES SLOTS OÙ ELLE SERT.
+    // Rings et Necklace sont l'endroit où plusieurs pièces du même palier ne
+    // se distinguent que par une stat brute (dégâts / résistance / armure) —
+    // pas par leurs affixes. Le conteneur reste vide tant que
+    // brancherAltPaperdoll() n'a pas confirmé qu'il existe une autre option ;
+    // afficher() lui-même ne calcule rien, pour rester rapide.
+    const zoneAlt = SLOTS_ALT_PAPERDOLL.includes(slot)
+      ? `<div class="altPieceSlot" data-slot="${echapper(slot)}"></div>` : '';
     carte.innerHTML = `<div class="slot">${D.nomsSlots[slot] || slot}</div>
       ${vignette(it.ic, couleur)}
       <div class="nom" style="color:${couleur}">${it.n}</div>
       <div class="inne${it.i ? '' : ' sans'}">${it.i ? t('equip.inne') + ' ' + it.i : t('equip.aucunInne')}</div>
+      ${zoneAlt}
       ${gems}
       <button class="cadenas" type="button"></button>`;
     // LE CADENAS. Il fige CETTE pièce avec les gemmes qu'elle porte à cet
@@ -1838,6 +1847,13 @@ function afficher(res, classe) {
       else verrouilles.set(slot, { item: it, gemmes: gemmesIci });
       majCadenas();
       majNoteVerrous();
+      // LE CADENAS FIGE, LA FLÈCHE PROPOSE : les deux ne peuvent pas dire le
+      // contraire. Sans ce recalcul, verrouiller Ring laissait sa flèche
+      // continuer d'offrir des échanges — le clic bloqué par le moteur, la
+      // pièce n'aurait juste plus bougé sans que ce soit expliqué.
+      if (SLOTS_ALT_PAPERDOLL.includes(slot)) {
+        setTimeout(() => dessinerAlternatives(res, classe), 0);
+      }
     };
     majCadenas();
     pd.appendChild(carte);
@@ -3382,6 +3398,78 @@ function dessinerSuggestions(res, classe) {
 /* Les pièces interchangeables, à l'écran. Une ligne par emplacement, la
    pièce en place marquée, les autres cliquables. Rien n'est appliqué sans
    clic — comme les suggestions. */
+/* POSER UNE AUTRE PIÈCE SUR UN SLOT, EN REVÉRIFIANT.
+   Seul chemin qui échange une pièce : le panneau "Pièces interchangeables"
+   et la flèche sur le paperdoll (Ring/Necklace) passent tous les deux par
+   ici, donc ils se comportent exactement pareil. */
+function echangerPiece(res, classe, slot, item) {
+  const neufs = { ...res.slotItems, [slot]: item };
+  const vp = res.vinPoints || new Map();
+  const a = assembler(neufs, ciblesPourStuff(cibles, vp), true, figeesDe(verrousObjet()));
+  // On REVÉRIFIE après coup : c'est le seul moment où l'on connaît l'effet
+  // combiné de tous les échanges déjà faits.
+  const manques = [...cibles.entries()].filter(([n, l]) =>
+    Math.min(plafond(n), (a.couvert[n] || 0) + (vp.get(n) || 0)) < l);
+  const maj = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
+                sources: a.sources, vin: res.vin,
+                vinPoints: vp, suffisant: !manques.length };
+  dernier = maj;
+  afficher(maj, classe);
+  $('etat').innerHTML = manques.length
+    ? `<span class="ko">${t('alt.perdu')}</span><span class="pas"> — `
+      + manques.map(([n, l]) => `${n} ${l}`).join(', ') + '.</span>'
+    : `<span class="ok">${t('alt.pose')}</span>`
+      + `<span class="pas"> — ${item.n}.</span>`;
+  // Le panneau et la flèche du paperdoll pointaient tous les deux vers
+  // l'ANCIEN état : sans ce recalcul, un second échange écraserait le
+  // premier au lieu de partir de son résultat.
+  setTimeout(() => dessinerAlternatives(maj, classe), 0);
+}
+
+/* Les slots dont le paperdoll porte une petite flèche déroulante : ce sont
+   les emplacements où plusieurs pièces du même palier ne se distinguent que
+   par une stat brute (dégâts / résistance / armure...), pas par leurs
+   affixes — l'endroit où le choix visuel compte vraiment. */
+const SLOTS_ALT_PAPERDOLL = ['Ring', 'Necklace'];
+
+/* La flèche sur la pièce elle-même : mêmes données que le panneau plus bas,
+   affichées là où on les cherche en premier. */
+function brancherAltPaperdoll(liste, res, classe) {
+  for (const slot of SLOTS_ALT_PAPERDOLL) {
+    const zone = document.querySelector(
+      `#paperdoll .altPieceSlot[data-slot="${CSS.escape(slot)}"]`);
+    if (!zone) continue;
+    zone.innerHTML = '';
+    const entree = liste.find((e) => e.slot === slot);
+    if (!entree) continue;
+    const couleur = D.couleurs[String(entree.bonnes[0].item.g)] || '#9fb2c4';
+    const det = document.createElement('details');
+    det.className = 'altPiece';
+    det.innerHTML = `<summary>${t('alt.autresChoix', { n: entree.bonnes.length - 1 })}</summary>`;
+    const menu = document.createElement('div');
+    menu.className = 'altPieceMenu';
+    for (const b of entree.bonnes) {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'altPieceOpt' + (b.actuel ? ' actuel' : '');
+      opt.style.color = couleur;
+      const stat = statsLisibles(b.item.at);
+      opt.innerHTML = `<span class="nomOpt">${echapper(b.item.n)}</span>`
+        + (stat ? `<span class="statOpt">${echapper(stat)}</span>` : '');
+      if (b.actuel) {
+        opt.disabled = true;
+        opt.title = t('alt.actuel');
+      } else {
+        opt.title = t('alt.poser');
+        opt.onclick = () => { det.open = false; echangerPiece(res, classe, slot, b.item); };
+      }
+      menu.appendChild(opt);
+    }
+    det.appendChild(menu);
+    zone.appendChild(det);
+  }
+}
+
 function dessinerAlternatives(res, classe) {
   const carte = $('blocAlternatives');
   const boite = $('listeAlternatives');
@@ -3393,6 +3481,7 @@ function dessinerAlternatives(res, classe) {
     liste = alternatives(res, classe, $('arme').value || null,
                          [...cibles.entries()], pl, res.vinPoints || new Map());
   } catch (e) { liste = []; }
+  brancherAltPaperdoll(liste, res, classe);
   carte.hidden = !liste.length;
   if (!liste.length) return;
   // PAS DE PRODUIT DES POSSIBILITÉS. Multiplier les compteurs donnerait un
@@ -3416,28 +3505,7 @@ function dessinerAlternatives(res, classe) {
       el.style.color = couleur;
       el.innerHTML = `${echapper(b.item.n)}<small>${signature(b.item)}</small>`;
       el.title = b.actuel ? t('alt.actuel') : t('alt.poser');
-      if (!b.actuel) {
-        el.onclick = () => {
-          const neufs = { ...res.slotItems, [e.slot]: b.item };
-          const vp = res.vinPoints || new Map();
-          const a = assembler(neufs, ciblesPourStuff(cibles, vp), true,
-                              figeesDe(verrousObjet()));
-          // On REVÉRIFIE après coup : c'est le seul moment où l'on connaît
-          // l'effet combiné de tous les échanges déjà faits.
-          const manques = [...cibles.entries()].filter(([n, l]) =>
-            Math.min(plafond(n), (a.couvert[n] || 0) + (vp.get(n) || 0)) < l);
-          const maj = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
-                        sources: a.sources, vin: res.vin,
-                        vinPoints: vp, suffisant: !manques.length };
-          dernier = maj;
-          afficher(maj, classe);
-          $('etat').innerHTML = manques.length
-            ? `<span class="ko">${t('alt.perdu')}</span><span class="pas"> — `
-              + manques.map(([n, l]) => `${n} ${l}`).join(', ') + '.</span>'
-            : `<span class="ok">${t('alt.pose')}</span>`
-              + `<span class="pas"> — ${b.item.n}.</span>`;
-        };
-      }
+      if (!b.actuel) el.onclick = () => echangerPiece(res, classe, e.slot, b.item);
       rangee.appendChild(el);
     }
     bloc.appendChild(rangee);
