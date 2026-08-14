@@ -5035,6 +5035,15 @@ function demarrer(donnees) {
   };
   if ($('arme')) $('arme').addEventListener('change', () => libererVerrous());
   $('recherche').oninput = dessinerAffixes;
+  /* Remettre le vin a zero SANS perdre ses cibles. « Tout vider » effaçait
+     les deux, si bien que corriger une repartition de vin obligeait a
+     ressaisir tous ses affixes. */
+  $('viderVin').onclick = () => {
+    if (!vinManuel.size) return;
+    vinManuel.clear();
+    dessinerAffixes(); majBudgetVin();
+    if (cibles.size) calculer();
+  };
   $('vider').onclick = () => {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
     cacherBandeauDemo();
