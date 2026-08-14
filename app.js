@@ -1040,6 +1040,138 @@ function reglesVin() {
   return { nom: b.nom, total: b.total, bonus: b.parAffixe, max: b.total };
 }
 
+/* LE MÊME SÉLECTEUR DE VIN, OÙ QU'IL SOIT.
+   Un seul endroit décrit les options : sinon la colonne de gauche et le
+   tableau des résultats divergent au premier changement de boisson. */
+function selectVin(nom, classe = 'vin') {
+  const choisi = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
+  const opt = (valeur, libelle) =>
+    `<option value="${valeur}"${valeur === choisi ? ' selected' : ''}>${libelle}</option>`;
+  return `<select class="${classe}" data-a="${echapper(nom)}">`
+    + opt('', t('affixes.auto'))
+    + Array.from({ length: reglesVin().bonus + 1 },
+                 (_, i) => opt(String(i), i ? '+' + i : '—')).join('')
+    + '</select>';
+}
+
+/* CORRIGER SON VIN SANS RIEN RELANCER.
+ *
+ * Le vin se réglait dans la colonne de gauche, donc loin des chiffres qu'il
+ * fait bouger : pour corriger un point il fallait remonter, changer, et
+ * relancer un build complet pour voir le résultat. Le réglage est maintenant
+ * DANS le tableau des affixes obtenus, à l'endroit exact où on constate le
+ * manque.
+ *
+ * Ce que ce geste ne fait PAS, et c'est le point : il ne relance aucune
+ * recherche de stuff. L'équipement, les gemmes, le paperdoll et le code
+ * d'import restent identiques au caractère près. On re-répartit les points
+ * dans le budget de la boisson, et on repeint les seules colonnes qui en
+ * dépendent — vin et total.
+ *
+ * La colonne « coût » fait exception : elle vient d'une recherche de build
+ * par cible, donc la recalculer serait exactement ce qu'on refuse de faire.
+ * Ses cases repassent au marqueur d'attente plutôt que d'afficher un chiffre
+ * qui n'est plus vrai. */
+function repeindreVin(res) {
+  const table = $('tableauAffixes');
+  if (!table) return;
+  for (const tr of table.querySelectorAll('tr[data-a]')) {
+    const nom = tr.dataset.a;
+    const cellules = tr.querySelectorAll('td');
+    if (cellules.length < 5) continue;
+    const eq = res.couvert[nom] || 0;
+    const accorde = (res.vinPoints && res.vinPoints.get(nom)) || 0;
+    const total = Math.min(plafond(nom), eq + accorde);
+    const vise = cibles.has(nom) ? cibles.get(nom) : null;
+    const tient = vise == null ? null : total >= vise;
+
+    tr.classList.toggle('ligneKo', tient === false);
+    const cellTotal = cellules[4];
+    cellTotal.className = 'n total ' + (tient == null ? '' : (tient ? 'ok' : 'ko'));
+    cellTotal.innerHTML = `${total}<span class="marque">${
+      tient == null ? '' : (tient ? '✓' : '✗')}</span>`;
+
+    // LA CONSIGNE ET CE QUI EST SERVI NE SONT PAS TOUJOURS LA MÊME CHOSE :
+    // au-delà du budget de la boisson, la demande est rognée. Le sélecteur
+    // montre ce qu'on a demandé ; l'infobulle dit ce qui est réellement
+    // versé quand les deux diffèrent, sinon on croirait à un bug.
+    const sel = cellules[3].querySelector('select');
+    if (!sel) continue;
+    const demande = vinManuel.has(nom) ? vinManuel.get(nom) : null;
+    sel.value = demande == null ? '' : String(demande);
+    // LA COLONNE DISAIT UN NOMBRE, ELLE NE DOIT PAS DIRE MOINS.
+    // Remplacer le chiffre par un sélecteur sur « auto » aurait fait perdre
+    // l'information : on ne voyait plus combien de points partaient là. Le
+    // libellé de l'option automatique porte donc le compte servi.
+    const opt = sel.querySelector('option[value=""]');
+    if (opt) opt.textContent = accorde ? `${t('affixes.auto')} +${accorde}` : t('affixes.auto');
+    sel.title = (demande != null && demande !== accorde)
+      ? t('vin.rogne', { demande, accorde })
+      : t('affixes.vinTitre', { max: reglesVin().max, bonus: reglesVin().bonus });
+  }
+}
+
+/* Le dernier résultat affiché, pour que les deux sélecteurs de vin — celui
+   du tableau et celui de la colonne de gauche — repeignent les mêmes
+   chiffres. Sans lui, changer le vin à gauche laissait le tableau afficher
+   l'ancienne répartition jusqu'au prochain build. */
+let _resAffiche = null;
+
+/* LE SEUL CHEMIN POUR CHANGER LE VIN. Les deux sélecteurs passent par ici,
+   donc ils ne peuvent pas se contredire. */
+function appliquerVin(nom, valeur) {
+  /* CORRIGER, C'EST PARTIR DE CE QU'ON A.
+     La règle du vin est en tout ou rien : dès qu'un seul affixe porte une
+     consigne, la répartition entière passe en manuel et tous les autres
+     tombent à zéro. Poser « +2 » sur un affixe faisait donc dégringoler les
+     voisins — mesuré : deux cibles passaient de 4 ✓ à 2 ✗ d'un coup, sans
+     qu'on ait rien demandé pour elles. Ce n'est pas corriger, c'est tout
+     remettre à plat.
+     À la PREMIÈRE consigne, on recopie donc la répartition en cours dans
+     les consignes. Elle tient déjà dans le budget, donc rien ne bouge —
+     sauf l'affixe qu'on vient de régler, qui est précisément le geste
+     demandé. Ceux qui avaient déjà des consignes manuelles ne voient aucun
+     changement. */
+  if (!vinManuel.size) {
+    const actuelle = (_resAffiche && _resAffiche.vinPoints)
+      || repartitionVin([...cibles.entries()], null);
+    for (const [n, p] of actuelle) if (p > 0) vinManuel.set(n, p);
+  }
+  if (valeur === '') vinManuel.delete(nom);
+  else vinManuel.set(nom, Number(valeur));
+
+  if (_resAffiche) {
+    _resAffiche.vinPoints = repartitionVin([...cibles.entries()], vinManuel);
+    repeindreVin(_resAffiche);
+    // Le coût par palier vient d'une recherche de build par cible : le
+    // refaire ici serait exactement la relance qu'on veut éviter. On cesse
+    // donc de l'affirmer plutôt que d'afficher un chiffre périmé.
+    for (const c of $('tableauAffixes').querySelectorAll('td.cout')) {
+      if (c.textContent.trim()) c.innerHTML = '<span class="pas">…</span>';
+    }
+  }
+  majBudgetVin();
+  majCompteursGrille();
+
+  // L'autre sélecteur du même affixe suit, sans redessiner quoi que ce soit.
+  for (const jumeau of document.querySelectorAll(
+      `[data-affixe="${CSS.escape(nom)}"] .vin, .vinCase select[data-a="${CSS.escape(nom)}"]`)) {
+    if (jumeau.value !== valeur) jumeau.value = valeur;
+  }
+}
+
+/* Rend les sélecteurs du tableau vivants. */
+function brancherVinTableau() {
+  const table = $('tableauAffixes');
+  if (!table) return;
+  const compte = $('vin').checked;
+  for (const sel of table.querySelectorAll('.vinCase select')) {
+    sel.disabled = !compte;
+    if (!compte) sel.title = t('affixes.vinEteint');
+    sel.onchange = () => appliquerVin(sel.dataset.a, sel.value);
+  }
+}
+
 function repartitionVin(cibleListe, manuel) {
   // UNE CONSIGNE DE VIN VAUT SANS CIBLE. On visait autrefois les seuls
   // affixes ciblés, pour qu'une allocation oubliée ne mange pas une des
@@ -1470,24 +1602,17 @@ function tuileAffixe(nom) {
   el.innerHTML = `<div class="gTete">
       <button class="gPref pref"></button>
       ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
-      <select class="vin"></select>
+      ${selectVin(nom)}
     </div>
     <div class="gNiv"></div>`;
   const rangee = el.querySelector('.gNiv');
 
   // Le Victory Wine se règle ici aussi : c'est la même consigne que le
   // niveau visé, la séparer sur deux écrans obligeait à faire l'aller-retour.
+  // Le tableau des résultats porte le même sélecteur, construit par la même
+  // fonction ; les deux restent d'accord sans qu'on ait à les synchroniser.
   const vin = el.querySelector('.vin');
-  vin.innerHTML = `<option value="">${t('affixes.auto')}</option>`
-    + Array.from({ length: reglesVin().bonus + 1 },
-                 (_, i) => `<option value="${i}">${i ? '+' + i : '—'}</option>`).join('');
-  vin.value = vinManuel.has(nom) ? String(vinManuel.get(nom)) : '';
-  vin.onchange = () => {
-    if (vin.value === '') vinManuel.delete(nom);
-    else vinManuel.set(nom, Number(vin.value));
-    majBudgetVin();
-    majCompteursGrille();
-  };
+  vin.onchange = () => appliquerVin(nom, vin.value);
   majEtatVin(el);
 
   // L'étoile est aussi ici : sans elle, on ne pourrait marquer ses favoris
@@ -1737,12 +1862,12 @@ function afficher(res, classe) {
     // Le ✓ / ✗ se lit avant le nombre : on sait si ça passe sans comparer
     // deux chiffres de colonnes différentes.
     const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
-    return `<tr${cls === 'ko' ? ' class="ligneKo"' : ''}>
+    return `<tr data-a="${echapper(nom)}"${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
               ${pastille(nom)}${libelleAffixe(nom)}</span></td>
             <td class="n appoint">${vise == null ? '—' : vise}</td>
             <td class="n appoint">${eq}</td>
-            <td class="n appoint">${v || ''}</td>
+            <td class="n vinCase">${selectVin(nom)}</td>
             <td class="n total ${cls}">${total}<span class="marque">${marque}</span></td>
             ${$('mixte').checked ? `<td class="n cout" data-cout="${echapper(nom)}">${
               vise == null ? '' : '<span class="pas">…</span>'}</td>` : ''}</tr>`;
@@ -1769,6 +1894,11 @@ function afficher(res, classe) {
               t('cout.uniquement')}</div>`)
       + (bonus ? `<div style="margin-top:6px" class="pas">${t('table.prime')} ${bonus}</div>` : '')
     : `<span class="pas">${t('table.aucun')}</span>`;
+  // Les sélecteurs de vin du tableau deviennent vivants ici : c'est le seul
+  // moment où ils existent dans le document.
+  _resAffiche = res;
+  brancherVinTableau();
+  repeindreVin(res);
 
   // En différé : chercher les suggestions coûte presque autant qu'un build,
   // et le faire ici retarderait l'affichage de tout le reste pour rien.

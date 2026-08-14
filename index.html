@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=115">
+<link rel="stylesheet" href="icones_affixes.css?v=116">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -747,6 +747,20 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 /* L'icône du jeu sert de pochoir : le fond porte la couleur de la catégorie,
    le masque y découpe le dessin. Les images sont en blanc sur transparent,
    donc le masque tombe juste sans retouche. */
+/* Le vin se corrige dans le tableau des résultats, à l'endroit où on
+   constate le manque. Le sélecteur reste discret : c'est une colonne de
+   chiffres, pas un formulaire. */
+.vinCase{padding:2px 4px}
+.vinCase select{width:100%;min-width:52px;background:transparent;color:inherit;
+  border:1px solid transparent;border-radius:3px;font:inherit;font-size:12px;
+  text-align:center;text-align-last:center;padding:1px 2px;cursor:pointer}
+.vinCase select:hover:not(:disabled){border-color:var(--bord);
+  background:rgba(255,255,255,.04)}
+.vinCase select:focus{outline:none;border-color:var(--accent)}
+.vinCase select:disabled{cursor:default;color:var(--terne)}
+.vinCase select option{background:var(--fond2,#15130f);color:var(--texte,#e8dcc4)}
+/* Au doigt, un sélecteur de 20 px de haut se rate. */
+@media(max-width:700px){.vinCase select{min-height:34px;font-size:13px}}
 .pastille .icA{width:17px;height:17px;display:block;background:currentColor;
   -webkit-mask:var(--ic) center/contain no-repeat;
   mask:var(--ic) center/contain no-repeat}
@@ -1647,15 +1661,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=115"></script>
-<script src="config.js?v=115"></script>
-<script src="comptes.js?v=115"></script>
-<script src="donnees.js?v=115"></script>
-<script src="skills.js?v=115"></script>
-<script src="talents.js?v=115"></script>
-<script src="builds_reference.js?v=115"></script>
-<script src="guides_classes.js?v=115"></script>
-<script src="fiche.js?v=115"></script>
-<script src="app.js?v=115"></script>
+<script src="i18n.js?v=116"></script>
+<script src="config.js?v=116"></script>
+<script src="comptes.js?v=116"></script>
+<script src="donnees.js?v=116"></script>
+<script src="skills.js?v=116"></script>
+<script src="talents.js?v=116"></script>
+<script src="builds_reference.js?v=116"></script>
+<script src="guides_classes.js?v=116"></script>
+<script src="fiche.js?v=116"></script>
+<script src="app.js?v=116"></script>
 </body>
 </html>
