@@ -1653,7 +1653,9 @@ function afficher(res, classe) {
             <td class="n appoint">${vise == null ? '—' : vise}</td>
             <td class="n appoint">${eq}</td>
             <td class="n appoint">${v || ''}</td>
-            <td class="n total ${cls}">${total}<span class="marque">${marque}</span></td></tr>`;
+            <td class="n total ${cls}">${total}<span class="marque">${marque}</span></td>
+            ${$('mixte').checked ? `<td class="n cout" data-cout="${echapper(nom)}">${
+              vise == null ? '' : '<span class="pas">…</span>'}</td>` : ''}</tr>`;
   }).join('');
   const bonus = Object.entries(res.couvert)
     .filter(([n]) => !cibles.has(n) && !vinSeul.includes(n))
@@ -1662,7 +1664,19 @@ function afficher(res, classe) {
   $('tableauAffixes').innerHTML = lignes
     ? `<table><tr><th>${t('table.affixe')}</th><th>${t('table.vise')}</th>`
       + `<th>${t('table.equip')}</th><th>${t('table.vin')}</th>`
-      + `<th>${t('table.total')}</th></tr>${lignes}</table>`
+      + `<th>${t('table.total')}</th>`
+      + ($('mixte').checked
+          ? `<th title="${echapper(t('cout.quoi'))}">${t('table.cout')}</th>` : '')
+      + `</tr>${lignes}</table>`
+      /* EN RARETE UNIQUE, LA COLONNE N'AURAIT RIEN A DIRE.
+         Les huit pieces partagent un seul cran : descendre une cible d'un
+         niveau ne fait pas tomber tout le build d'un rang, donc chaque ligne
+         afficherait « gratuit » et on croirait a une panne. Mesure : 0 pour
+         les quatre cibles en rarete unique, 1 / 2 / 0 sur les memes cibles en
+         panache. On explique l'absence plutot que d'afficher du vide. */
+      + ($('mixte').checked ? ''
+          : `<div class="pas" style="margin-top:7px;font-size:11.5px">${
+              t('cout.uniquement')}</div>`)
       + (bonus ? `<div style="margin-top:6px" class="pas">${t('table.prime')} ${bonus}</div>` : '')
     : `<span class="pas">${t('table.aucun')}</span>`;
 
@@ -1670,7 +1684,8 @@ function afficher(res, classe) {
   // et le faire ici retarderait l'affichage de tout le reste pour rien.
   setTimeout(() => { dessinerSuggestions(res, classe);
                      dessinerAlternatives(res, classe);
-                     dessinerFiche(res, classe); }, 0);
+                     dessinerFiche(res, classe);
+                     lancerCoutPaliers(res, classe, $('arme').value || null); }, 0);
 
   const libres = res.sockets.filter((s) => !s.gem).length;
   const compte = {};
@@ -2077,6 +2092,7 @@ function pourquoiRien(res, classe, arme) {
 function dessinerMarge(res) {
   // Un nouveau build rend l'analyse precedente caduque.
   arreterAnalyse();
+  arreterCout();
   const carte = $('carteMarge');
   const boite = $('listeMarge');
   const mot = $('margeMot');
@@ -4294,6 +4310,88 @@ async function enregistrerGuide() {
       ? `<span class="ko">${t('guide.titrePris')}</span>`
       : `<span class="ko">${tH('partage.ko', { message: e.message })}</span>`;
   }
+}
+
+/* ------------------------------------------------- CE QUE COUTE UN PALIER
+ *
+ * Le site marque les paliers d'un point orange depuis toujours, sans jamais
+ * dire ce qu'ils coutent. Le joueur pose cinq cibles, lit « 8 x Epic », et
+ * ignore laquelle des cinq a fait monter tout le build d'un cran. Pour le
+ * savoir il devait baisser une cible a la main, recalculer, comparer,
+ * remonter, recommencer — cinq fois. Personne ne le faisait.
+ *
+ * LE CALCUL : un appel de plus au moteur par cible, ce seul affixe descendu
+ * d'un cran. L'ecart de rarete entre les deux builds EST le prix du dernier
+ * pas. Ce n'est pas une estimation, c'est une soustraction.
+ *
+ * CHAQUE LIGNE SE LIT PRISE SEULE. Si Valor coute 5 crans et Aegis 1,
+ * baisser les deux n'en economise pas forcement 6 : ils partagent peut-etre
+ * la meme piece. Meme regle que dans la Marge de manoeuvre, meme mention a
+ * l'ecran.
+ *
+ * ET ÇA SE PAIE. Un calcul coute 16 ms en rarete unique — invisible — mais
+ * jusqu'a 1,4 s en panache, ou cinq cibles feraient sept secondes de page
+ * figee. On decoupe donc comme le balayage de la Marge : une cible par
+ * tranche, la main rendue entre chaque.
+ */
+let _cout = null;
+
+function arreterCout() {
+  if (_cout) { _cout.stop = true; _cout = null; }
+}
+
+function lancerCoutPaliers(res, classe, arme) {
+  arreterCout();
+  const table = $('tableauAffixes');
+  if (!table || !res || !res.slotItems || !cibles.size) return;
+  // Sans panachage il n'y a rien a mesurer : voir le commentaire du tableau.
+  if (!$('mixte').checked) return;
+  const jeton = { stop: false };
+  _cout = jeton;
+
+  const base = sommeRaretes(res.slotItems);
+  const cibleBase = [...cibles.entries()];
+  const grade = $('rarete').value ? Number($('rarete').value) : null;
+  const vin = $('vin').checked;
+  const mixte = $('mixte').checked;
+  const planchers = planchersActuels();
+  const aFaire = cibleBase.filter(([, niveau]) => niveau > 0);
+  let i = 0;
+
+  const tranche = () => {
+    if (jeton.stop) return;
+    if (i >= aFaire.length) { if (_cout === jeton) _cout = null; return; }
+    const [nom, niveau] = aFaire[i]; i += 1;
+    const cell = table.querySelector(`[data-cout="${CSS.escape(nom)}"]`);
+    try {
+      // Le meme build, cet affixe seul descendu d'un cran. En dessous de 1,
+      // la cible disparait : c'est bien « ne pas la demander du tout ».
+      const moins = cibleBase
+        .map(([x, l]) => (x === nom ? [x, l - 1] : [x, l]))
+        .filter(([, l]) => l > 0);
+      const r = moins.length
+        ? construire(classe, arme, moins, grade, vin, mixte, planchers,
+                     vinManuel, verrousObjet())
+        : null;
+      const gain = r && r.suffisant ? base - sommeRaretes(r.slotItems) : null;
+      if (cell) {
+        if (gain === null) {
+          cell.innerHTML = `<span class="pas">—</span>`;
+        } else if (gain <= 0) {
+          // Gratuit : le stuff l'apporte de toute façon.
+          cell.innerHTML = `<span class="coutNul">${t('cout.gratuit')}</span>`;
+        } else {
+          const fort = gain >= 3 ? ' coutFort' : '';
+          cell.innerHTML = `<b class="coutN${fort}">${gain}</b>`;
+          cell.title = t('cout.detail', { n: gain, nom: libelleAffixe(nom), niveau });
+        }
+      }
+    } catch (e) {
+      if (cell) cell.innerHTML = `<span class="pas">—</span>`;
+    }
+    setTimeout(tranche, 0);
+  };
+  setTimeout(tranche, 0);
 }
 
 /* ------------------------------------------------------------ LA CARTE ---
