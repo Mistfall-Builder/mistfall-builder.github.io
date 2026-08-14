@@ -1116,19 +1116,40 @@ function majArmes() {
   remplirSelect($('arme'), (D.armes[c] || []).map((a) => [a, a]));
 }
 
-/* Les affixes n'ont pas d'icône dans le jeu (ce sont des modificateurs de
-   stats, pas des objets). Comme l'outil de bureau, on dessine un symbole par
-   catégorie plutôt que d'inventer des images à la provenance douteuse. */
+/* LA VRAIE ICÔNE DU JEU, PAS UN DESSIN.
+   On croyait longtemps que les affixes n'avaient pas d'image et on en
+   dessinait une par catégorie. C'était faux : le jeu les range sous
+   T_UI_Icon_EquipSkill_*, une par affixe, et les 43 fichiers sont dans les
+   données. Ce sont ces images qu'on sert.
+
+   Elles sont en blanc sur transparent. Plutôt que de les poser telles
+   quelles, on s'en sert de MASQUE et on peint dessous la couleur de la
+   catégorie : le dessin du jeu est intact, et la couleur qui distinguait
+   offense de défense d'un coup d'œil n'est pas perdue.
+
+   `ic` n'est pas un nom de fichier mais la clé du jeu : l'image elle-même
+   est inlinée dans icones_affixes.css, sous la classe `ia-<clé>`. Un masque
+   qui pointe un fichier est refusé en file:// (contrôle d'origine) et il ne
+   resterait qu'un carré plein — le data-URI, lui, passe partout.
+
+   Le dessin par catégorie reste en secours, pour un affixe qui arriverait
+   sans image. */
 const SYMBOLE = {
   offense: '<path d="M4 20 16 8M11 4l9 9M12.5 19.5 16 16"/>',
   defense: '<path d="M12 3 20 6v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3Z"/>',
   mobility: '<path d="M3 12h11M9 7l5 5-5 5M17 5v14"/>',
   support: '<path d="m12 3 2.6 5.6 6 .8-4.4 4.2 1.1 6L12 16.8 6.7 19.6l1.1-6L3.4 9.4l6-.8L12 3Z"/>',
 };
-function pastille(cat) {
-  return `<span class="pastille c-${cat || 'support'}" title="${cat || ''}">
+function pastille(nom) {
+  const info = (D.affixes || {})[nom] || {};
+  const cat = info.cat || 'support';
+  if (info.ic) {
+    return `<span class="pastille c-${cat}" title="${echapper(cat)}"
+      ><i class="icA ia-${echapper(info.ic)}"></i></span>`;
+  }
+  return `<span class="pastille c-${cat}" title="${echapper(cat)}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-         stroke-linecap="round" stroke-linejoin="round">${SYMBOLE[cat] || SYMBOLE.support}</svg>
+         stroke-linecap="round" stroke-linejoin="round">${SYMBOLE[cat]}</svg>
   </span>`;
 }
 
@@ -1448,7 +1469,7 @@ function tuileAffixe(nom) {
   // « max 7 » à côté prendrait la place du nom pour ne rien apprendre.
   el.innerHTML = `<div class="gTete">
       <button class="gPref pref"></button>
-      ${pastille(info.cat)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
+      ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
       <select class="vin"></select>
     </div>
     <div class="gNiv"></div>`;
@@ -1718,7 +1739,7 @@ function afficher(res, classe) {
     const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
     return `<tr${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
-              ${pastille(cat)}${libelleAffixe(nom)}</span></td>
+              ${pastille(nom)}${libelleAffixe(nom)}</span></td>
             <td class="n appoint">${vise == null ? '—' : vise}</td>
             <td class="n appoint">${eq}</td>
             <td class="n appoint">${v || ''}</td>
@@ -2100,7 +2121,7 @@ function ligneMarge(m) {
     : t('marge.poser', { nom: m.nom, n: m.atteignable });
   const moyen = m.via === 'piece' ? 'marge.viaPiece'
               : (m.via === 'moteur' ? 'marge.viaMoteur' : 'marge.viaGemme');
-  b.innerHTML = `${pastille((D.affixes[m.nom] || {}).cat)}
+  b.innerHTML = `${pastille(m.nom)}
     <span class="nomA">${libelleAffixe(m.nom)}</span>
     ${franchit ? `<span class="marquePal"
       title="${t('palier.quoi', { n: m.palier })}">${t('sugg.palier')}</span>` : ''}
@@ -2202,7 +2223,7 @@ function dessinerMarge(res) {
       const b = document.createElement('button');
       b.className = 'lm baisse';
       b.title = t('marge.poser', { nom: x.nom, n: x.a });
-      b.innerHTML = `${pastille((D.affixes[x.nom] || {}).cat)}
+      b.innerHTML = `${pastille(x.nom)}
         <span class="nomA">${libelleAffixe(x.nom)}</span>
         <span class="fleche">${x.vise} → <span class="cible">${x.a}</span></span>`;
       b.onclick = () => {
@@ -3609,7 +3630,7 @@ function dessinerFiche(res, classeId) {
     .filter((a) => Object.keys(a.apports).length)
     .sort((a, b) => a.nom.localeCompare(b.nom))
     .map((a) => `<tr><td><span class="avecPastille">${
-        pastille((D.affixes[a.nom] || {}).cat)}${a.nom}
+        pastille(a.nom)}${a.nom}
         <b class="niv">${a.niveau}</b></span></td>
       <td colspan="4">${echapper(a.phrase)}</td></tr>`).join('');
   const muets = f.detailAffixes.filter((a) => !Object.keys(a.apports).length);
@@ -4026,7 +4047,7 @@ function dessinerComparaison() {
     const d = b - a;
     const signe = d === 0 ? 'nul' : (d > 0 ? 'plus' : 'moins');
     return `<tr><td><span class="avecPastille">${
-      pastille((D.affixes[n] || {}).cat)}${libelleAffixe(n)}</span></td>
+      pastille(n)}${libelleAffixe(n)}</span></td>
       <td class="n">${a || '—'}</td><td class="n">${b || '—'}</td>
       <td class="n ec ${signe}">${d === 0 ? '=' : (d > 0 ? '+' : '−') + Math.abs(d)}</td></tr>`;
   }).join('');
