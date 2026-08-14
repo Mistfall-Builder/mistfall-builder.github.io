@@ -986,40 +986,45 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
    pièces moyennes, ou peu de pièces très rares — et ce n'est pas forcément
    celle que l'outil choisit qu'on a sous la main. */
 /* Combien de points de vin chaque affixe reçoit. Mêmes règles que l'outil de
-   bureau : au plus reglesVin().max affixes, reglesVin().bonus points chacun, et
-   reglesVin().max × reglesVin().bonus au total. Une consigne qui déborde est rognée —
+   bureau : un budget de reglesVin().total points, au plus reglesVin().bonus
+   sur un meme affixe. Une consigne qui déborde est rognée —
    un build calculé sur un vin impossible serait faux. */
 /* LES QUATRE BREWS.
  *
- * Le jeu propose plusieurs boissons de Victory Wine, de plus en plus
- * genereuses. Le site n'en connaissait qu'une — la meilleure, celle que joue
- * l'auteur — et l'imposait a tout le monde : un joueur qui boit un Mortal
- * Tonic se voyait proposer des builds appuyes sur des points qu'il n'a pas.
+ * Ce qui distingue une boisson d'une autre, c'est son BUDGET TOTAL — 2, 4, 6
+ * ou 8 points, de la plus mediocre a la meilleure. Le plafond par affixe, lui,
+ * ne bouge pas : deux points, jamais plus.
  *
- * `max`   = nombre d'affixes qui peuvent recevoir du vin
- * `bonus` = points par affixe
- * Le budget total est le produit des deux.
+ * Le nombre d'affixes servis en decoule donc, il ne se decrete pas : huit
+ * points a deux par affixe, ça fait quatre affixes. C'est exactement le
+ * modele en place depuis le debut du projet, valide en jeu — Gods' Brew
+ * reste le defaut et rien ne change pour qui ne touche pas au selecteur.
  *
- * VERIFIE : la derniere ligne seulement. Elle correspond au modele en place
- * depuis le debut, valide en jeu par l'auteur, et reste le defaut — personne
- * ne voit son build changer.
- * A CONFIRMER : les trois premieres. Elles viennent d'une source unique
- * (theorycrafter.gg) dont les chiffres ne concordent PAS avec les notres sur
- * la derniere ligne : il annonce 8 affixes la ou nous en comptons 4. Une des
- * deux lectures est fausse, donc ces trois lignes sont a verifier en jeu
- * avant d'etre crues. */
+ * (Une premiere version de ce bloc reprenait les chiffres de theorycrafter.gg,
+ * qui annonce des nombres d'affixes par boisson — 2, 4, 6, 8 affixes — au lieu
+ * de budgets. C'etait faux : la boisson donne des POINTS.)
+ *
+ * RESTE UNE QUESTION OUVERTE, signalee plutot qu'arbitree : peut-on etaler
+ * huit points a raison d'UN point sur huit affixes differents ? Le code
+ * l'interdit aujourd'hui — il plafonne a `total / 2` affixes — parce que
+ * c'est le comportement en place et qu'il n'a jamais pose probleme. Si le jeu
+ * l'autorise, il suffit de changer `max` ci-dessous.
+ */
 const BREWS = [
-  { id: 'mortal',  nom: 'Mortal Tonic', max: 2, bonus: 1, sur: false },
-  { id: 'hero',    nom: "Hero's Ale",   max: 4, bonus: 1, sur: false },
-  { id: 'warblood', nom: 'Warblood',    max: 6, bonus: 2, sur: false },
-  { id: 'gods',    nom: "Gods' Brew",   max: 4, bonus: 2, sur: true },
+  { id: 'mortal',   nom: 'Mortal Tonic', total: 2, parAffixe: 1 },
+  { id: 'hero',     nom: "Hero's Ale",   total: 4, parAffixe: 1 },
+  { id: 'warblood', nom: 'Warblood',     total: 6, parAffixe: 2 },
+  { id: 'gods',     nom: "Gods' Brew",   total: 8, parAffixe: 2 },
 ];
 let _brew = 'gods';
 
 /* Les regles du vin en vigueur. Tout le moteur passe par ici, si bien que
-   changer de boisson ne demande aucune autre retouche. */
+   changer de boisson ne demande aucune autre retouche.
+   `max` est le nombre d'affixes SERVIS AU PLUS : en etalant un point par
+   affixe, un budget de huit en touche huit. */
 function reglesVin() {
-  return BREWS.find((b) => b.id === _brew) || BREWS[BREWS.length - 1];
+  const b = BREWS.find((x) => x.id === _brew) || BREWS[BREWS.length - 1];
+  return { nom: b.nom, total: b.total, bonus: b.parAffixe, max: b.total };
 }
 
 function repartitionVin(cibleListe, manuel) {
@@ -1033,9 +1038,24 @@ function repartitionVin(cibleListe, manuel) {
     ? [...manuel.entries()].filter(([, p]) => p > 0)
     : [];
   if (!utile.length) {
-    return new Map([...choisirVin(cibleListe)].map((n) => [n, reglesVin().bonus]));
+    /* REPARTITION AUTOMATIQUE, SOUS CONTRAINTE DE BUDGET.
+       Elle versait `bonus` points a chaque affixe retenu sans jamais compter
+       le total : correct tant qu'il n'existait qu'une boisson, faux des qu'il
+       y en a quatre — Warblood aurait servi deux points a six affixes, soit
+       douze pour un budget de six. On sert donc au plus fort d'abord, et on
+       s'arrete quand la carafe est vide. */
+    const r = reglesVin();
+    const auto = new Map();
+    let reste = r.total;
+    for (const n of choisirVin(cibleListe)) {
+      if (reste <= 0) break;
+      const donne = Math.min(r.bonus, reste);
+      auto.set(n, donne);
+      reste -= donne;
+    }
+    return auto;
   }
-  const budgetTotal = reglesVin().max * reglesVin().bonus;
+  const budgetTotal = reglesVin().total;
   const voulus = utile
     .map(([n, p]) => [n, Math.max(0, Math.min(p, reglesVin().bonus))])
     .filter(([, p]) => p > 0)
@@ -1218,7 +1238,10 @@ function majBudgetVin() {
   }
   const retenu = repartitionVin([...cibles.entries()], vinManuel);
   const total = [...retenu.values()].reduce((s, v) => s + v, 0);
-  const budget = reglesVin().max * reglesVin().bonus;
+  // Le budget EST le total de la boisson. Le calculer par max x bonus
+  // donnait 16 pour Gods' Brew depuis que `max` compte les affixes
+  // servis (huit a un point) et non les places a deux points.
+  const budget = reglesVin().total;
   const demande = [...vinManuel.values()].reduce((s, v) => s + v, 0);
   // ZÉRO POINT N'OCCUPE PAS UNE PLACE. Régler un affixe sur « — » veut dire
   // « pas de vin ici », pas « une des quatre fioles part là-dessus ». Compter
@@ -4814,7 +4837,7 @@ function dessinerRessources(page) {
 function poserBrews() {
   if (!$('brew')) return;
   remplirSelect($('brew'), BREWS.map((b) => [b.id,
-    `${b.nom} — ${t('vin.regle', { n: b.max, p: b.bonus })}`]), _brew);
+    `${b.nom} — ${t('vin.regle', { n: b.total, p: b.parAffixe })}`]), _brew);
 }
 
 function poserFiltresRessources() {
