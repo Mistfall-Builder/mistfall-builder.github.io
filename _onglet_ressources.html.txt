@@ -1,0 +1,30 @@
+<!-- LES RESSOURCES.
+     Ce qui se ramasse sur le terrain : materiaux, consommables, munitions,
+     boissons. Ni coffres a butin ni cles — ils encombraient sans repondre a
+     la question qu'on pose ici, qui est « ou est-ce que je trouve ça ». -->
+<section id="pageObjets" class="page" hidden>
+  <div class="objBarre">
+    <input type="search" id="resRecherche" name="recherche-ressource" autocomplete="off"
+           data-form-type="other" data-i18n-ph="res.chercher" placeholder="nom de ressource…">
+    <select id="resCat"></select>
+    <select id="resTier"></select>
+    <label class="coche" id="resSuLabel"><input type="checkbox" id="resSu">
+      <span data-i18n="res.seulementSus">Seulement ceux qu'on sait où trouver</span></label>
+    <span class="objCompte" id="resCompte"></span>
+  </div>
+  <div class="objNote" id="resNote"></div>
+
+  <!-- La carte : dessinee depuis les coordonnees de l'atlas, pas recopiee. -->
+  <div class="carteBloc" id="carteBloc">
+    <div class="carteTete">
+      <div class="sousOnglets" id="carteOnglets"></div>
+      <div class="carteLegende" id="carteLegende"></div>
+    </div>
+    <div class="carteZone" id="carteZone"></div>
+    <p class="carteNote" id="carteNote"></p>
+  </div>
+
+  <div class="objGrille resGrille" id="resGrille"></div>
+  <div class="pages" id="resPages"></div>
+</section>
+

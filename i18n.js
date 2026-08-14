@@ -32,7 +32,7 @@
         + "rareté. Décoché, la colonne « Vin » est ignorée et le stuff seul "
         + "doit atteindre chaque niveau visé.",
       'perso.mixte': 'Panacher les raretés',
-      'perso.plancher': 'Monter en priorité :',
+      'perso.parPiece': 'Rareté par pièce',
 
       'affixes.titre': 'Affixes visés',
       'affixes.filtrer': 'filtrer la liste…',
@@ -471,7 +471,7 @@
         + 'Unchecked, the “Wine” column is ignored and the gear alone must '
         + 'reach every level you asked for.',
       'perso.mixte': 'Mix rarities',
-      'perso.plancher': 'Upgrade first:',
+      'perso.parPiece': 'Rarity per piece',
 
       'affixes.titre': 'Target affixes',
       'affixes.filtrer': 'filter the list…',
@@ -910,7 +910,7 @@
         + 'по редкости. Если снято, столбец «Вино» не учитывается и '
         + 'снаряжение само должно вытянуть каждый нужный уровень.',
       'perso.mixte': 'Смешивать редкости',
-      'perso.plancher': 'Повысить в первую очередь:',
+      'perso.parPiece': 'Редкость по предметам',
 
       'affixes.titre': 'Нужные аффиксы',
       'affixes.filtrer': 'фильтр списка…',

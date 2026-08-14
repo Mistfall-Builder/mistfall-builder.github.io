@@ -433,6 +433,20 @@ function scoreObjet(it, want) {
   return score;
 }
 
+/* LE POOL D'UN EMPLACEMENT, AVEC SA RARETE IMPOSEE.
+ *
+ * `raretes[slot]` n'est plus un plancher mais un choix EXACT : « des bottes
+ * bleues », pas « au moins bleues ». Le plancher ne savait pas exprimer
+ * « tout en Excellent sauf l'arme en Epic et le plastron en Legendary »,
+ * puisqu'il ne connaissait qu'un seul cran pour tous les emplacements coches
+ * — et « monter en priorite » disait deja qu'on montait, ce qui rendait le
+ * choix du cran redondant autant qu'ambigu. */
+function poolSlot(classe, slot, arme, grade, mixte, raretes) {
+  const impose = raretes && raretes[slot];
+  if (impose) return poolDe(classe, slot, arme, impose, false);
+  return poolDe(classe, slot, arme, grade, mixte);
+}
+
 function poolDe(classe, slot, arme, grade, mixte) {
   const morceaux = [];
   for (let g = grade; g <= 6; g += 1) {
@@ -461,8 +475,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
       options[slot] = [bloque[slot].item];
       continue;
     }
-    const sol = Math.max(grade, planchers[slot] || 0);
-    const pool = poolDe(classe, slot, arme, sol, mixte);
+    const pool = poolSlot(classe, slot, arme, grade, mixte, planchers);
     options[slot] = pool;
     const impose = depart && depart[slot];
     if (impose) { slotItems[slot] = impose; continue; }
@@ -562,8 +575,7 @@ function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tour
   let courant = { ...slotItems };
   const options = {};
   for (const slot of D.ordreSlots) {
-    options[slot] = poolDe(classe, slot, arme,
-                           Math.max(1, planchers[slot] || 0), true);
+    options[slot] = poolSlot(classe, slot, arme, 1, true, planchers);
   }
   for (let t = 0; t < (tours || 4); t += 1) {
     let bouge = false;
@@ -574,9 +586,10 @@ function alleger(slotItems, classe, arme, cibleListe, planchers, vinPoints, tour
       if (bloque[slot]) continue;
       const actuel = courant[slot];
       if (!actuel) continue;
-      const sol = planchers[slot] || 0;
+      // Une rarete imposee ne s'allege pas : c'est un choix, pas un plancher.
+      if (planchers[slot]) continue;
       const cands = options[slot]
-        .filter((o) => o.g < actuel.g && o.g >= sol)
+        .filter((o) => o.g < actuel.g)
         .sort((a, b) => a.g - b.g);
       for (const alt of cands) {
         const essai = { ...courant, [slot]: alt };
@@ -739,7 +752,7 @@ function alternatives(res, classe, arme, cibleListe, planchers, vinPoints) {
     if (verrouilles.has(slot)) continue;
     const actuel = items[slot];
     if (!actuel) continue;
-    const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
+    const opts = poolSlot(classe, slot, arme, 1, true, planchers);
     const bonnes = [];
     const vus = new Set();
     for (const alt of opts) {
@@ -864,7 +877,7 @@ function gainsParPiece(res, classe, arme, planchers, vinPoints) {
     if (!actuel) continue;
     // Une piece verrouillee ne bouge pas : ne rien proposer dessus.
     if (verrouilles.has(slot)) continue;
-    const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
+    const opts = poolSlot(classe, slot, arme, 1, true, planchers);
     for (const alt of opts) {
       if (alt === actuel || alt.g !== actuel.g) continue;
       const cov = assembler({ ...items, [slot]: alt }, wantGear, false).couvert;
@@ -921,7 +934,7 @@ function suggestions(res, classe, arme, cibleListe, planchers, vinPoints) {
     if (verrouilles.has(slot)) continue;
     const actuel = items[slot];
     if (!actuel) continue;
-    const opts = poolDe(classe, slot, arme, Math.max(1, planchers[slot] || 0), true);
+    const opts = poolSlot(classe, slot, arme, 1, true, planchers);
     // LA RARETÉ NE SE TOUCHE JAMAIS. Le bouton « panacher » et les planchers
     // par emplacement existent pour ça : c'est l'utilisateur qui décide
     // quelle pièce monte. Une suggestion ne propose qu'une AUTRE pièce du
@@ -1882,13 +1895,27 @@ function coutRarete(slotItems) {
     .reduce((t, it) => t + ((it && it.g) || 0), 0);
 }
 
+/* CE QUE L'UTILISATEUR A DEMANDE, EMPLACEMENT PAR EMPLACEMENT.
+ *
+ * Deux niveaux de consigne, et le plus precis gagne :
+ *   - la rarete generale, quand elle n'est pas sur « Auto » ;
+ *   - le reglage d'un emplacement, qui la remplace pour lui seul.
+ *
+ * « Tout en Excellent sauf l'arme en Epic et le plastron en Legendary »
+ * s'ecrit donc exactement comme on le dit. La rarete generale ne peut plus
+ * etre un simple plancher : avec le panachage, l'allegement descendait sous
+ * elle et sortait du Rare sur trois pieces alors qu'on avait demande du bleu
+ * partout. Une consigne donnee est une consigne tenue.
+ *
+ * « Auto » laisse le moteur libre : c'est le defaut, et rien ne change pour
+ * qui n'y touche pas. */
 function planchersActuels() {
   const pl = {};
-  if ($('mixte').checked && $('plancherActif').checked) {
-    const gr = Number($('plancherGrade').value);
-    for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
-      pl[c.value] = gr;
-    }
+  if (!$('mixte') || !$('mixte').checked) return pl;
+  const general = $('rarete') && $('rarete').value ? Number($('rarete').value) : 0;
+  if (general) for (const slot of D.ordreSlots) pl[slot] = general;
+  for (const sel of document.querySelectorAll('#plancherSlots select')) {
+    if (sel.value) pl[sel.dataset.slot] = Number(sel.value);
   }
   return pl;
 }
@@ -2446,9 +2473,7 @@ function etatActuel() {
     g: $('rarete').value ? Number($('rarete').value) : null,
     v: $('vin').checked,
     m: $('mixte').checked,
-    pa: $('plancherActif').checked,
-    pg: Number($('plancherGrade').value),
-    ps: [...document.querySelectorAll('#plancherSlots input:checked')].map((c) => c.value),
+    pr: planchersActuels(),
     t: [...cibles.entries()],
     w: [...vinManuel.entries()],
     b: _brew,
@@ -2467,8 +2492,13 @@ function appliquerEtat(e) {
   $('vin').checked = e.v !== false;
   $('mixte').checked = !!e.m;
   $('blocPlancher').hidden = !$('mixte').checked;
-  $('plancherActif').checked = !!e.pa;
-  if (e.pg) $('plancherGrade').value = String(e.pg);
+  /* Les builds d'avant portaient un plancher unique (pa/pg/ps) : on le
+     convertit en raretes par piece, ce qui donne exactement le meme stuff. */
+  const pr = e.pr || (e.pa && e.pg
+    ? Object.fromEntries((e.ps || []).map((sl) => [sl, e.pg])) : {});
+  for (const sel of document.querySelectorAll('#plancherSlots select')) {
+    sel.value = pr[sel.dataset.slot] ? String(pr[sel.dataset.slot]) : '';
+  }
   const voulus = new Set(e.ps || []);
   for (const c of document.querySelectorAll('#plancherSlots input')) {
     c.checked = voulus.has(c.value);
@@ -3133,12 +3163,7 @@ function dessinerSuggestions(res, classe) {
   let liste = [];
   try {
     const pl = {};
-    if ($('mixte').checked && $('plancherActif').checked) {
-      const gr = Number($('plancherGrade').value);
-      for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
-        pl[c.value] = gr;
-      }
-    }
+    Object.assign(pl, planchersActuels());
     liste = suggestions(res, classe, $('arme').value || null,
                         [...cibles.entries()], pl,
                         res.vinPoints || new Map());
@@ -3207,12 +3232,7 @@ function dessinerAlternatives(res, classe) {
   let liste = [];
   try {
     const pl = {};
-    if ($('mixte').checked && $('plancherActif').checked) {
-      const gr = Number($('plancherGrade').value);
-      for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
-        pl[c.value] = gr;
-      }
-    }
+    Object.assign(pl, planchersActuels());
     liste = alternatives(res, classe, $('arme').value || null,
                          [...cibles.entries()], pl, res.vinPoints || new Map());
   } catch (e) { liste = []; }
@@ -3283,13 +3303,7 @@ function calculer() {
   const arme = $('arme').value || null;
   const grade = $('rarete').value ? Number($('rarete').value) : null;
   const mixte = $('mixte').checked;
-  const planchers = {};
-  if (mixte && $('plancherActif').checked) {
-    const g = Number($('plancherGrade').value);
-    for (const c of document.querySelectorAll('#plancherSlots input:checked')) {
-      planchers[c.value] = g;
-    }
-  }
+  const planchers = planchersActuels();
   $('etat').textContent = t('etat.calcul');
   const t0 = performance.now();
   setTimeout(() => {
@@ -4834,6 +4848,33 @@ function dessinerRessources(page) {
   dessinerPages($('resPages'), resEtat, RES_PAR_PAGE, dessinerRessources);
 }
 
+/* UNE RARETE PAR EMPLACEMENT.
+   Huit lignes, « auto » partout par defaut : l'utilisateur ne subit rien
+   tant qu'il ne demande rien. Les libelles suivent la langue, d'ou le
+   passage par cette fonction a chaque changement. */
+function poserRaretesParPiece() {
+  const boite = $('plancherSlots');
+  if (!boite || !D) return;
+  const avant = {};
+  for (const sel of boite.querySelectorAll('select')) avant[sel.dataset.slot] = sel.value;
+  boite.innerHTML = '';
+  for (const slot of D.ordreSlots) {
+    const l = document.createElement('label');
+    const nom = document.createElement('span');
+    nom.textContent = D.nomsSlots[slot] || slot;
+    const sel = document.createElement('select');
+    sel.dataset.slot = slot;
+    l.appendChild(nom);
+    l.appendChild(sel);
+    boite.appendChild(l);
+    remplirSelect(sel,
+      [['', t('perso.auto')]].concat(
+        [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])),
+      avant[slot] || '');
+    sel.onchange = () => { if (cibles.size) calculer(); };
+  }
+}
+
 function poserBrews() {
   if (!$('brew')) return;
   remplirSelect($('brew'), BREWS.map((b) => [b.id,
@@ -4930,6 +4971,7 @@ window.surChangementDeLangue = function () {
   poserLangues();
   poserAideVin();
   if (typeof BREWS !== 'undefined') poserBrews();
+  poserRaretesParPiece();
   if (!D) return;
   remplirSelect($('rarete'),
     [['', t('perso.auto')]].concat(
@@ -4943,7 +4985,8 @@ window.surChangementDeLangue = function () {
   // sans redessin ils restaient dans la langue du premier affichage.
   dessinerBuildsClasses();
   dessinerAccueil();
-  if (!$('pageObjets').hidden && self.D_RESSOURCES) {
+  // L'onglet Ressources est retire : sa page peut ne plus exister.
+  if ($('pageObjets') && !$('pageObjets').hidden && self.D_RESSOURCES) {
     poserFiltresRessources(); dessinerRessources();
   }
   dessinerGuidesClasses();
@@ -5052,20 +5095,7 @@ function demarrer(donnees) {
   remplirSelect($('rarete'),
     [['', t('perso.auto')]].concat(
       [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
-  // Une case par emplacement : plusieurs pièces peuvent monter ensemble.
-  const boite = $('plancherSlots');
-  for (const s of D.ordreSlots) {
-    const l = document.createElement('label');
-    l.className = 'coche mini';
-    const c = document.createElement('input');
-    c.type = 'checkbox';
-    c.value = s;
-    l.appendChild(c);
-    l.appendChild(document.createTextNode(D.nomsSlots[s] || s));
-    boite.appendChild(l);
-  }
-  remplirSelect($('plancherGrade'),
-    [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]]), 6);
+  poserRaretesParPiece();
   dessinerAffixes();
   majBudgetVin();
 
