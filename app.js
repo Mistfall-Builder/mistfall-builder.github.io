@@ -1881,10 +1881,10 @@ function afficher(res, classe) {
     carte.style.setProperty('--tinte', couleur);
     carte.style.borderColor = couleur + '66';
     carte.title = infobulle(it);
-    // LA FLÈCHE N'EST POSÉE QUE POUR LES SLOTS OÙ ELLE SERT.
-    // Rings et Necklace sont l'endroit où plusieurs pièces du même palier ne
-    // se distinguent que par une stat brute (dégâts / résistance / armure) —
-    // pas par leurs affixes. Le conteneur reste vide tant que
+    // LA FLÈCHE N'EST POSÉE QUE POUR LES SLOTS OÙ ELLE SERT (voir
+    // SLOTS_ALT_PAPERDOLL) : les emplacements où plusieurs pièces du même
+    // palier ne se distinguent que par une stat brute (dégâts / résistance /
+    // armure) — pas par leurs affixes. Le conteneur reste vide tant que
     // brancherAltPaperdoll() n'a pas confirmé qu'il existe une autre option ;
     // afficher() lui-même ne calcule rien, pour rester rapide.
     const zoneAlt = SLOTS_ALT_PAPERDOLL.includes(slot)
@@ -3507,8 +3507,12 @@ function echangerPiece(res, classe, slot, item) {
 /* Les slots dont le paperdoll porte une petite flèche déroulante : ce sont
    les emplacements où plusieurs pièces du même palier ne se distinguent que
    par une stat brute (dégâts / résistance / armure...), pas par leurs
-   affixes — l'endroit où le choix visuel compte vraiment. */
-const SLOTS_ALT_PAPERDOLL = ['Ring', 'Necklace'];
+   affixes — l'endroit où le choix visuel compte vraiment. Mêmes quatre
+   emplacements que SLOTS_SAVEUR (même propriété, deux réglages différents :
+   celui-ci montre les options APRÈS coup, l'autre en choisit une AVANT).
+   Une constante séparée plutôt qu'une seule : rien n'oblige les deux listes
+   à rester égales si un jour l'une évolue sans l'autre. */
+const SLOTS_ALT_PAPERDOLL = ['Ring', 'Necklace', 'Gauntlets', 'Boots'];
 
 /* La flèche sur la pièce elle-même : mêmes données que le panneau plus bas,
    affichées là où on les cherche en premier. */
