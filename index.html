@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=124">
+<link rel="stylesheet" href="icones_affixes.css?v=125">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -860,8 +860,13 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
    classe `.pret` est posee par le script EN MEME TEMPS que `disabled`, et
    c'est elle qui porte la couleur : certains moteurs ne recalculent pas
    le style sur un simple changement de propriete `disabled`. */
-#copier{flex:0 0 auto;padding:11px 26px;font-size:14px;letter-spacing:.4px;
-  background:var(--creux);border-color:var(--bord);color:var(--terne)}
+/* Même gabarit pour les deux boutons de la carte -- eux seuls diffèrent
+   par la couleur (l'un s'allume en orange une fois prêt, l'autre reste
+   gris), pas par la taille. Sans ce partage, #importer héritait du
+   bouton générique (8px/13px) à côté d'un #copier étiré à 11px/26px,
+   et la ligne n'avait pas la même hauteur d'un bouton à l'autre. */
+#copier, #importer{flex:0 0 auto;padding:11px 26px;font-size:14px;letter-spacing:.4px}
+#copier{background:var(--creux);border-color:var(--bord);color:var(--terne)}
 #copier.pret{background:var(--accent-sombre);border-color:var(--accent);
   color:var(--texte);font-weight:700}
 #copier.pret:hover{background:var(--accent);color:#140b04}
@@ -1159,7 +1164,7 @@ td.cout{width:64px}
      sa propre ligne, en plus gros, et se laisse faire defiler. */
   #carteCode .rangee{flex-wrap:wrap}
   #code{flex:1 1 100%;font-size:13px;text-overflow:clip;overflow-x:auto}
-  #copier{flex:1 1 100%}
+  #copier,#importer{flex:1 1 100%}
 }
 
 .piece{background:var(--creux);border:1px solid var(--bord);border-radius:3px;
@@ -1715,15 +1720,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=124"></script>
-<script src="config.js?v=124"></script>
-<script src="comptes.js?v=124"></script>
-<script src="donnees.js?v=124"></script>
-<script src="skills.js?v=124"></script>
-<script src="talents.js?v=124"></script>
-<script src="builds_reference.js?v=124"></script>
-<script src="guides_classes.js?v=124"></script>
-<script src="fiche.js?v=124"></script>
-<script src="app.js?v=124"></script>
+<script src="i18n.js?v=125"></script>
+<script src="config.js?v=125"></script>
+<script src="comptes.js?v=125"></script>
+<script src="donnees.js?v=125"></script>
+<script src="skills.js?v=125"></script>
+<script src="talents.js?v=125"></script>
+<script src="builds_reference.js?v=125"></script>
+<script src="guides_classes.js?v=125"></script>
+<script src="fiche.js?v=125"></script>
+<script src="app.js?v=125"></script>
 </body>
 </html>
