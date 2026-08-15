@@ -2069,10 +2069,13 @@ function afficher(res, classe) {
      deux qui etaient vides s'ouvrent — sauf si l'utilisateur les avait
      explicitement repliees, auquel cas son choix prime. */
   dessinerAccueil();
-  // Seul l'equipement s'ouvre tout seul : c'est ce qu'on vient chercher. Le
-  // code d'import et le tableau restent replies tant qu'on ne les demande
-  // pas, et ce choix-la est retenu.
+  // L'equipement ET le tableau des affixes obtenus s'ouvrent tout seuls :
+  // sans ca, un clic sur "Build it" pouvait ne rien montrer de neuf a
+  // l'ecran si tous les bandeaux etaient deja replies -- rien ne prouvait
+  // qu'un calcul avait eu lieu. Le code d'import, lui, reste replie tant
+  // qu'on ne le demande pas.
   poserPliAuto('carteEquip', true);
+  poserPliAuto('carteTableau', true);
 }
 
 function activerCopie(oui) {
@@ -5856,6 +5859,7 @@ function demarrer(donnees) {
   // et un bouton grisé.
   dessinerAccueil();
   poserPliAuto('carteEquip', false);
+  poserPliAuto('carteTableau', false);
   $('etat').textContent = t('etat.pret');
 }
 
