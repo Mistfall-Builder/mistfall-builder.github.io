@@ -18,7 +18,6 @@
     fr: {
       'meta.langue': 'Français',
       'entete.sous': "Compose ton stuff, récupère le code d'import",
-      'entete.importer': 'Importer un code',
       'entete.langue': 'Changer de langue',
 
       'perso.titre': 'Personnage',
@@ -166,7 +165,8 @@
 
       'code.titre': "Code d'import",
       'code.place': 'Calcule un build pour obtenir son code.',
-      'code.copier': 'Copier le code',
+      'code.copier': 'Exporter le code',
+      'code.importer': 'Importer le code',
       'code.copie': 'Copié. Colle-le dans Prepare → Manage/Import.',
       'code.copieKo': 'Copie impossible ici — le code est sélectionné, fais Ctrl+C.',
       'code.impossible': 'Code impossible : {message}',
@@ -466,7 +466,6 @@
     en: {
       'meta.langue': 'English',
       'entete.sous': 'Build your gear, get the in-game import code',
-      'entete.importer': 'Import a code',
       'entete.langue': 'Change language',
 
       'perso.titre': 'Character',
@@ -614,7 +613,8 @@
 
       'code.titre': 'Import code',
       'code.place': 'Build something to get its code.',
-      'code.copier': 'Copy the code',
+      'code.copier': 'Export build code',
+      'code.importer': 'Import build code',
       'code.copie': 'Copied. Paste it into Prepare → Manage/Import.',
       'code.copieKo': 'Copying is blocked here — the code is selected, press Ctrl+C.',
       'code.impossible': 'Code not possible: {message}',
@@ -914,7 +914,6 @@
     ru: {
       'meta.langue': 'Русский',
       'entete.sous': 'Собери снаряжение и получи код импорта',
-      'entete.importer': 'Импорт кода',
       'entete.langue': 'Сменить язык',
 
       'perso.titre': 'Персонаж',
@@ -1062,7 +1061,8 @@
 
       'code.titre': 'Код импорта',
       'code.place': 'Собери что-нибудь, чтобы получить код.',
-      'code.copier': 'Копировать код',
+      'code.copier': 'Экспортировать код',
+      'code.importer': 'Импортировать код',
       'code.copie': 'Скопировано. Вставь в Prepare → Manage/Import.',
       'code.copieKo': 'Копирование заблокировано — код выделен, нажми Ctrl+C.',
       'code.impossible': 'Код невозможен: {message}',
