@@ -3538,8 +3538,15 @@ function brancherAltPaperdoll(liste, res, classe) {
       opt.type = 'button';
       opt.className = 'altPieceOpt' + (b.actuel ? ' actuel' : '');
       opt.style.color = couleur;
+      // CE QUI CHANGE VRAIMENT, PAS SEULEMENT LA STAT BRUTE.
+      // Quatre pièces qui partagent le même nom, la même stat brute et
+      // aucun trou ne se distinguent QUE par leur inné (le cas courant à
+      // rareté basse, où les emplacements de gemme n'existent pas encore) —
+      // sans l'afficher, les quatre lignes de ce menu sont mot pour mot
+      // identiques et personne ne peut choisir en connaissance de cause.
       const stat = statsLisibles(b.item.at);
       opt.innerHTML = `<span class="nomOpt">${echapper(b.item.n)}</span>`
+        + `<span class="statOpt">${echapper(signature(b.item))}</span>`
         + (stat ? `<span class="statOpt">${echapper(stat)}</span>` : '');
       if (b.actuel) {
         opt.disabled = true;
