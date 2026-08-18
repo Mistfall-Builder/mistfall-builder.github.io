@@ -56,6 +56,80 @@ function libererVerrous(pourquoi) {
   if (n) n.textContent = pourquoi ? t(pourquoi) : '';
 }
 
+/* LA PIÈCE QUE LA RECHERCHE AUTOMATIQUE NE PEUT PAS TROUVER.
+ *
+ * Holy et Prismatic (paliers 7 et 8) n'ont AUCUN objet dans les données
+ * récupérées — ni le codec officiel, ni les captures communautaires : le
+ * jeu les propose, personne ne les a indexés. Le moteur ne peut donc rien
+ * chercher à ces paliers, quelle que soit la classe ou l'emplacement.
+ *
+ * La sortie n'est pas d'attendre une source qui n'existe pas : c'est de
+ * décrire la pièce qu'on a réellement sous les yeux (nom, inné, emplacements
+ * de gemme) et de la poser dans `verrouilles`, exactement comme le cadenas
+ * du paperdoll. `construireAuGrade` l'impose alors telle quelle (voir
+ * `bloque[slot].item`), et `assembler` ne fige QUE les gemmes déjà posées
+ * (`figees`) — un emplacement resté vide dans le formulaire reste libre à la
+ * recherche. Le reste du stuff se calcule normalement autour. */
+const TYPES_GEMME_MANUEL = [
+  [1, 'Agate'], [2, 'Amethyst'], [3, 'Moonstone'], [4, 'Peridot'], [-1, 'Universal'],
+];
+
+function poserPieceManuelle() {
+  if (!D) return;
+  const selSlot = $('manuelSlot');
+  if (selSlot) {
+    remplirSelect(selSlot, D.ordreSlots.map((s) => [s, D.nomsSlots[s] || s]), selSlot.value);
+  }
+  const selPalier = $('manuelPalier');
+  if (selPalier) {
+    remplirSelect(selPalier,
+      Object.keys(D.raretes).map(Number).sort((a, b) => a - b)
+        .map((g) => [g, D.raretes[String(g)]]),
+      selPalier.value || '7');
+  }
+  const selInne = $('manuelInne');
+  if (selInne) {
+    const noms = Object.keys(D.affixes).sort((a, b) => libelleAffixe(a).localeCompare(libelleAffixe(b)));
+    remplirSelect(selInne, [['', t('manuel.aucun')]].concat(noms.map((n) => [n, libelleAffixe(n)])),
+      selInne.value);
+  }
+  const optionsSocket = [['', t('manuel.aucun')]].concat(
+    TYPES_GEMME_MANUEL.flatMap(([type, nom]) => [
+      [`${type},1`, `${nom} I`],
+      [`${type},2`, `${nom} II`],
+    ]),
+  );
+  for (const id of ['manuelSocket1', 'manuelSocket2']) {
+    const sel = $(id);
+    if (sel) remplirSelect(sel, optionsSocket, sel.value);
+  }
+}
+
+function verrouillerPieceManuelle() {
+  const slot = $('manuelSlot').value;
+  const nom = $('manuelNom').value.trim();
+  const note = $('manuelNote');
+  if (!slot || !nom) {
+    if (note) { note.className = 'ko'; note.textContent = t('manuel.nomManquant'); }
+    return;
+  }
+  const grade = Number($('manuelPalier').value) || 1;
+  const inne = $('manuelInne').value || null;
+  const sockets = [$('manuelSocket1').value, $('manuelSocket2').value]
+    .filter(Boolean)
+    .map((v) => v.split(',').map(Number));
+  const it = {
+    id: `manuel-${slot}-${Date.now()}`, n: nom, g: grade,
+    s: sockets, i: inne, aff: 0, at: {}, d: '', ic: null,
+  };
+  verrouilles.set(slot, { item: it, gemmes: sockets.map(() => null) });
+  majNoteVerrous();
+  if (note) {
+    note.className = 'ok';
+    note.textContent = t('manuel.pose', { nom, slot: D.nomsSlots[slot] || slot });
+  }
+}
+
 const prefs = new Map();            // affixe -> 'bonus' | 'non'
 const CYCLE_PREF = [undefined, 'bonus', 'non'];
 
@@ -1166,7 +1240,16 @@ function repeindreLigneVin(res, nom) {
   tr.classList.toggle('ligneKo', tient === false);
   const cellTotal = cellules[4];
   cellTotal.className = 'n total ' + (tient == null ? '' : (tient ? 'ok' : 'ko'));
-  cellTotal.innerHTML = `${total}<span class="marque">${
+  // MÊME DÉPASSEMENT QU'AU RENDU INITIAL — voir le commentaire sur .majCible
+  // plus haut dans afficher(). Cette fonction repeint la même cellule après
+  // coup (à l'ouverture de la carte, à chaque réglage de vin) et l'écrasait
+  // en texte brut, perdant le bouton posé au premier rendu.
+  const depasse = vise != null && total > vise;
+  const totalAffiche = depasse
+    ? `<button type="button" class="majCible" data-a="${echapper(nom)}" data-n="${total}"
+         title="${echapper(t('table.dejaPlus', { n: total }))}">${total}</button>`
+    : String(total);
+  cellTotal.innerHTML = `${totalAffiche}<span class="marque">${
     tient == null ? '' : (tient ? '✓' : '✗')}</span>`;
 
   const sel = cellules[3].querySelector('select');
@@ -1241,6 +1324,21 @@ function brancherVinTableau() {
     sel.disabled = !compte;
     if (!compte) sel.title = t('affixes.vinEteint');
     sel.onchange = () => appliquerVin(sel.dataset.a, sel.value);
+  }
+  // Verrouille ce que le vin donnait déjà en plus, voir le commentaire au
+  // point d'origine de .majCible. Délégué sur la table (posé une seule
+  // fois) car .majCible est recréé à chaque repeinture — repeindreLigneVin
+  // notamment — et un branchement par bouton se serait perdu à chaque fois.
+  if (!table.dataset.majCibleBranche) {
+    table.dataset.majCibleBranche = '1';
+    table.addEventListener('click', (ev) => {
+      const bouton = ev.target.closest('.majCible');
+      if (!bouton) return;
+      cibles.set(bouton.dataset.a, Number(bouton.dataset.n));
+      dessinerAffixes();
+      majBudgetVin();
+      calculer();
+    });
   }
 }
 
@@ -1956,13 +2054,26 @@ function afficher(res, classe) {
     // Le ✓ / ✗ se lit avant le nombre : on sait si ça passe sans comparer
     // deux chiffres de colonnes différentes.
     const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
+    // LE VIN PEUT DÉPASSER LA CIBLE SANS LE DIRE. Warblood verse jusqu'à son
+    // plafond par affixe même au-delà de ce qui était demandé — la cible
+    // reste écrite « 3 » pendant que le total vaut déjà 4. Rien ne signalait
+    // ce cadeau : la Marge de manœuvre le tait aussi, puisque de son point de
+    // vue actuelDe() vaut déjà 4 et qu'il n'y a plus rien à gagner. Un joueur
+    // a fini par le découvrir en tâtonnant manuellement. Le total devient
+    // cliquable pour verrouiller ce que le vin donne déjà, au lieu de
+    // dépendre d'un hasard de réglage qu'un autre changement peut effacer.
+    const depasse = vise != null && total > vise;
+    const totalAffiche = depasse
+      ? `<button type="button" class="majCible" data-a="${echapper(nom)}" data-n="${total}"
+           title="${echapper(t('table.dejaPlus', { n: total }))}">${total}</button>`
+      : String(total);
     return `<tr data-a="${echapper(nom)}"${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
               ${pastille(nom)}${libelleAffixe(nom)}</span></td>
             <td class="n appoint">${vise == null ? '—' : vise}</td>
             <td class="n appoint">${eq}</td>
             <td class="n vinCase">${selectVin(nom)}</td>
-            <td class="n total ${cls}">${total}<span class="marque">${marque}</span></td>
+            <td class="n total ${cls}">${totalAffiche}<span class="marque">${marque}</span></td>
             ${$('mixte').checked ? `<td class="n cout" data-cout="${echapper(nom)}">${
               vise == null ? '' : '<span class="pas">…</span>'}</td>` : ''}</tr>`;
   }).join('');
@@ -5367,6 +5478,7 @@ window.surChangementDeLangue = function () {
   if (typeof BREWS !== 'undefined') poserBrews();
   poserRaretesParPiece();
   poserSaveurs();
+  poserPieceManuelle();
   if (!D) return;
   remplirSelect($('rarete'),
     [['', t('perso.auto')]].concat(
@@ -5492,6 +5604,7 @@ function demarrer(donnees) {
       [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
   poserRaretesParPiece();
   poserSaveurs();
+  poserPieceManuelle();
   dessinerAffixes();
   majBudgetVin();
 
@@ -5550,6 +5663,8 @@ function demarrer(donnees) {
     dessinerAffixes(); majBudgetVin();
     if (cibles.size) calculer();
   };
+
+  $('manuelVerrouiller').onclick = verrouillerPieceManuelle;
   $('vider').onclick = () => {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
     cacherBandeauDemo();

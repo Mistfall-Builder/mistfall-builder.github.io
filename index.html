@@ -901,6 +901,16 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   border-left:1px solid var(--bord-fort);white-space:nowrap}
 #tableauAffixes th.total{border-left:1px solid var(--bord-fort)}
 #tableauAffixes td.total .marque{font-size:11px;margin-left:5px;opacity:.85}
+/* LE VIN DONNE PARFOIS PLUS QUE LA CIBLE DEMANDÉE, SANS LE DIRE — voir le
+   commentaire dans app.js à la création de .majCible. Même traitement que
+   les lignes de la Marge de manœuvre (accent, bordure pleine) pour que ça
+   se reconnaisse comme cliquable au premier coup d'oeil, pas comme un
+   chiffre de plus. */
+#tableauAffixes .majCible{font:inherit;font-weight:inherit;color:var(--accent-clair);
+  background:rgba(240,123,48,.12);border:1px solid var(--accent-sombre);
+  border-radius:3px;padding:0 5px;cursor:pointer}
+#tableauAffixes .majCible:hover{color:#fff;background:rgba(240,123,48,.22);
+  border-color:var(--accent)}
 #tableauAffixes td:first-child{font-size:13px;color:var(--texte)}
 .ok{color:var(--ok);font-weight:700}.ko{color:var(--ko);font-weight:700}
 #noteCompte .ok,#noteCompte .ko{font-weight:600}
@@ -1318,6 +1328,43 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
           <div class="sousTitre" data-i18n="perso.parPiece">Rareté par pièce</div>
           <div id="plancherSlots" class="grillePiece"></div>
         </div>
+      </div>
+    </details>
+
+    <!-- POUR LES PIÈCES QUE LA RECHERCHE AUTOMATIQUE NE CONNAÎT PAS ENCORE —
+         Holy et Prismatic (paliers 7 et 8) n'ont aucun objet dans les
+         données récupérées, jeu ou communauté : rien à chercher pour le
+         moteur. Décrire la pièce à la main et la verrouiller réutilise
+         exactement le même mécanisme que le cadenas du paperdoll (voir
+         verrouilles dans app.js) : l'objet est imposé, ses emplacements de
+         gemme encore vides restent libres à la recherche, tout le reste du
+         stuff se calcule autour. -->
+    <details class="carte pliable" id="cartePieceManuelle" open>
+      <summary><span data-i18n="manuel.titre">Pièce personnalisée</span></summary>
+      <div class="corps">
+        <p class="pas" data-i18n="manuel.aide">Pas trouvée par la recherche
+          automatique (rareté Holy ou Prismatic, par exemple) ? Décris-la ici
+          et verrouille-la : le moteur calcule le reste du stuff autour,
+          gemmes comprises.</p>
+        <div class="grillePiece">
+          <label><span data-i18n="manuel.slot">Emplacement</span>
+            <select id="manuelSlot"></select></label>
+          <label><span data-i18n="manuel.nom">Nom</span>
+            <input type="text" id="manuelNom" autocomplete="off"></label>
+          <label><span data-i18n="manuel.palier">Palier</span>
+            <select id="manuelPalier"></select></label>
+          <label><span data-i18n="manuel.inne">Inné</span>
+            <select id="manuelInne"></select></label>
+          <label><span data-i18n="manuel.socket1">Emplacement 1</span>
+            <select id="manuelSocket1"></select></label>
+          <label><span data-i18n="manuel.socket2">Emplacement 2</span>
+            <select id="manuelSocket2"></select></label>
+        </div>
+        <div class="rangee" style="margin-top:9px">
+          <button id="manuelVerrouiller" type="button"
+            data-i18n="manuel.verrouiller">Verrouiller cette pièce</button>
+        </div>
+        <div id="manuelNote" class="pas"></div>
       </div>
     </details>
 
