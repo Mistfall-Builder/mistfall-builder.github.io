@@ -154,25 +154,22 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
      display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;
      align-items:start}
 @media(max-width:1040px){main{grid-template-columns:1fr}}
-/* `align-items:start` sur <main> laissait la colonne de gauche a sa
-   hauteur naturelle -- deja plus haute que la fenetre des qu'il y a
-   quelques cibles ou builds enregistres. Une fois sa propre hauteur
-   epuisee, `position:sticky` se detache et elle defile normalement.
+/* DEUX ESSAIS RATES avant celui-ci, pour mémoire :
+   - `align-self:stretch` pour etirer sa boite jusqu'a la hauteur de la
+     colonne de droite -- casse le collant ENTIEREMENT (verifie au pixel
+     pres), cas connu de CSS Grid + position:sticky.
+   - `max-height` + `overflow-y:auto` pour lui donner un defilement
+     interne une fois sa hauteur naturelle depassee -- techniquement
+     collee en permanence, mais ça capture la molette : survoler la
+     sidebar et scroller ne bougeait plus que sa mini-barre interne, plus
+     la page. Ressenti comme cassé, pas comme une amélioration.
 
-   PREMIER ESSAI RATE : `align-self:stretch` pour etirer sa boite jusqu'a
-   la hauteur de la colonne de droite. Mesure : ca casse le collant
-   ENTIEREMENT (verifie au pixel pres, `top` suivait le defilement au lieu
-   de rester bloque a 84px des le debut) -- un item de grille etire ne
-   colle plus correctement, cas connu de CSS Grid + position:sticky.
-
-   LA VRAIE REPONSE : son propre contenu depasse deja la hauteur de
-   l'ecran, donc aucune astuce de collant seul ne peut la garder ENTIERE
-   a l'ecran en permanence -- il faut un defilement INTERNE. `max-height`
-   la borne a l'ecran visible, `overflow-y:auto` lui donne sa propre barre
-   de defilement : elle reste toujours visible et cliquable, avec tout son
-   contenu accessible sans faire defiler la page entiere. */
-.colonne{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto}
-@media(max-width:1040px){.colonne{position:static;max-height:none;overflow-y:visible}}
+   Un collant tout simple reste le bon choix : la molette scrolle
+   toujours la page entiere, la sidebar suit tant que son propre contenu
+   le permet, et se detache normalement au-dela -- comportement standard,
+   pas de surprise. */
+.colonne{position:sticky;top:84px}
+@media(max-width:1040px){.colonne{position:static}}
 /* La fiche et les compétences vivent maintenant dans la colonne de droite
    avec le reste des résultats -- voir le commentaire sur #blocFiche dans
    le HTML. #blocFiche n'a donc plus besoin d'une classe de mise en page
