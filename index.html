@@ -178,8 +178,19 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
    fait defiler la droite, sans jamais perdre l'autre de vue. */
 .colonne,.colonneRes{position:sticky;top:84px;max-height:calc(100vh - 104px);
   overflow-y:auto}
+/* LE BAS TRANCHE NET, SIGNALE PAS BEAU. Une colonne bornee en hauteur
+   coupe sa derniere carte pile au bord de la boite -- ca lit comme une
+   erreur d'affichage, pas comme "il y a plus, scrolle". Un fondu (masque
+   degrade vers transparent) rend la coupure douce et sert au passage
+   d'indice visuel qu'il reste du contenu en dessous. Le meme haut aurait
+   pu en avoir un aussi, mais le haut colle juste sous l'en-tete : rien
+   n'y est jamais tronque, un fondu la` n'aurait rien a annoncer. */
+.colonne,.colonneRes{
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 40px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 40px),transparent 100%)}
 @media(max-width:1040px){
-  .colonne,.colonneRes{position:static;max-height:none;overflow-y:visible}
+  .colonne,.colonneRes{position:static;max-height:none;overflow-y:visible;
+    -webkit-mask-image:none;mask-image:none}
 }
 /* La fiche et les compétences vivent maintenant dans la colonne de droite
    avec le reste des résultats -- voir le commentaire sur #blocFiche dans
@@ -570,16 +581,18 @@ table.cmp .ec.nul{color:var(--terne)}
    d'une liste deroulante, et le point du palier -- pas a la place prise :
    on en voit toujours autant a l'ecran. Le bouton ⛶ reste la pour tout
    voir d'un coup. */
+/* Son propre defilement interne (max-height + overflow-y) a existe, mais
+   double desormais celui de toute la colonne (.colonne) : deux barres
+   emboitees pour descendre d'ici a "Mes builds" plus bas, ressenti comme
+   penible. La colonne entiere scroll deja -- une liste normale, sans
+   plafond, suffit. */
 #listeAffixes{display:grid;gap:5px;grid-template-columns:1fr;
-  align-content:start;max-height:52vh;overflow-y:auto;padding-right:3px}
+  align-content:start;padding-right:3px}
 #listeAffixes .gAff{padding:5px 8px 6px;gap:4px}
 #listeAffixes .gTete .txt{font-size:12.5px}
 #listeAffixes .gNiv button{padding:4px 0;font-size:11px}
 #listeAffixes .gPref{width:20px;min-width:20px;font-size:12px}
 #listeAffixes .vin{width:52px}
-/* Le defilement interne ne doit pas coller les tuiles au bord. */
-#listeAffixes::-webkit-scrollbar{width:8px}
-#listeAffixes::-webkit-scrollbar-thumb{background:var(--releve);border-radius:4px}
 
 /* ---------------------------------------------------------------- guides -- */
 .guide{border:1px solid var(--bord);border-radius:3px;margin-bottom:8px;
@@ -794,7 +807,9 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 #etat{margin-top:11px;color:var(--terne);font-size:12.5px;line-height:1.55}
 
 /* ----------------------------------------------------------- mes builds -- */
-#listeBuilds{margin-top:9px;max-height:210px;overflow-y:auto}
+/* Meme raison que #listeAffixes : la colonne entiere scroll deja, un
+   second plafond ici n'ajoutait qu'une barre de plus a traverser. */
+#listeBuilds{margin-top:9px}
 #listeBuilds:empty{display:none}
 .vide-liste{color:var(--terne);font-size:12px;font-style:italic;padding:4px 2px}
 .buildLigne{display:flex;gap:6px;align-items:stretch;margin-bottom:5px}
