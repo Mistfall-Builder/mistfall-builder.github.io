@@ -156,13 +156,11 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
 @media(max-width:1040px){main{grid-template-columns:1fr}}
 .colonne{position:sticky;top:84px}
 @media(max-width:1040px){.colonne{position:static}}
-/* La fiche s'étale sous les deux colonnes : ses tableaux de stats et sa
-   grille de compétences ne tiennent pas dans 330 px. */
-/* Hors de <main> : la colonne de gauche est collante, et son aire de
-   grille lui laissait recouvrir tout ce qui suivait dans la grille. */
-.pleine{max-width:var(--large);margin:0 auto;padding:0 22px 44px;
-        display:grid;gap:18px}
-.pleine[hidden]{display:none}
+/* La fiche et les compétences vivent maintenant dans la colonne de droite
+   avec le reste des résultats -- voir le commentaire sur #blocFiche dans
+   le HTML. #blocFiche n'a donc plus besoin d'une classe de mise en page
+   séparée : c'est une div ordinaire, cachée tant qu'aucun build n'existe. */
+#blocFiche{display:grid;gap:18px}
 
 /* Les filtres de la bibliotheque locale : compacts, dans une colonne de
    330 px, donc deux par ligne plutot qu'une file qui deborde. */
@@ -1151,7 +1149,6 @@ td.cout{width:64px}
      cartes : leur contenu debordait encore de 12 px, ce qui suffisait a
      elargir la fenetre de mise en page. */
   main{padding:16px 11px 40px}
-  .pleine{padding:0 11px 40px}
 
   /* Le doigt n'a pas la precision du curseur : rien sous 32 px. Les boutons
      de navigation et les drapeaux ont leurs propres regles, plus precises
@@ -1574,46 +1571,51 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       </div>
     </details>
 
+    <!-- LA FICHE ET LES COMPÉTENCES, AVEC LE RESTE DES RÉSULTATS.
+         Elles vivaient auparavant hors de <main>, en pleine largeur sous
+         les deux colonnes -- un correctif pour leur donner plus de place
+         que les 360 px de la colonne de gauche, qui les a fait atterrir
+         sous la colonne collante au lieu d'à côté d'elle (signalé sur
+         Reddit : on dirait qu'elles sont coincées sous la sidebar en
+         scrollant). La colonne de droite n'a pas cette limite de largeur
+         (minmax(0,1fr)) : ce sont juste des cartes de plus, au même
+         endroit que les autres résultats du build. -->
+    <div id="blocFiche" hidden>
+      <details class="carte pliable" id="carteFiche" open>
+        <summary><span data-i18n="fiche.titre">Fiche de personnage</span></summary>
+        <div class="corps">
+          <div id="fiche"></div>
+          <details class="pliable" id="ficheDetail">
+            <summary data-i18n="fiche.detail">D'où vient chaque nombre</summary>
+            <div id="ficheProvenance"></div>
+          </details>
+        </div>
+      </details>
+
+      <div class="carte" id="carteComparer" hidden>
+        <h2 data-i18n="cmp.titre">Comparaison</h2>
+        <div class="corps"><div id="comparaison"></div></div>
+      </div>
+
+      <details class="carte pliable" id="carteSorts" open>
+        <summary><span data-i18n="sorts.titre">Compétences</span></summary>
+        <div class="corps">
+          <div class="filtres">
+            <select id="sortsCible"></select>
+            <label class="coche" style="flex:0 0 auto">
+              <input type="checkbox" id="sortsArme" checked>
+              <span data-i18n="sorts.filtreArme">Seulement mon arme</span></label>
+          </div>
+          <div id="sortsAide" class="pas" style="font-size:12px;margin:8px 0"></div>
+          <div id="listeSorts" class="grilleSorts"></div>
+          <div id="detailSort"></div>
+        </div>
+      </details>
+    </div>
+
   </div>
 
 </main>
-
-  <!-- LA FICHE, PLEINE LARGEUR ET EN BAS. Elle ne sert qu'une fois le build
-       calculé, et sa place sous les deux colonnes évite de repousser les
-       réglages hors de l'écran tant qu'il n'y a rien à montrer. -->
-<section class="pleine" id="blocFiche" hidden>
-    <details class="carte pliable" id="carteFiche" open>
-      <summary><span data-i18n="fiche.titre">Fiche de personnage</span></summary>
-      <div class="corps">
-        <div id="fiche"></div>
-        <details class="pliable" id="ficheDetail">
-          <summary data-i18n="fiche.detail">D'où vient chaque nombre</summary>
-          <div id="ficheProvenance"></div>
-        </details>
-      </div>
-    </details>
-
-    <div class="carte" id="carteComparer" hidden>
-      <h2 data-i18n="cmp.titre">Comparaison</h2>
-      <div class="corps"><div id="comparaison"></div></div>
-    </div>
-
-    <details class="carte pliable" id="carteSorts" open>
-      <summary><span data-i18n="sorts.titre">Compétences</span></summary>
-      <div class="corps">
-        <div class="filtres">
-          <select id="sortsCible"></select>
-          <label class="coche" style="flex:0 0 auto">
-            <input type="checkbox" id="sortsArme" checked>
-            <span data-i18n="sorts.filtreArme">Seulement mon arme</span></label>
-        </div>
-        <div id="sortsAide" class="pas" style="font-size:12px;margin:8px 0"></div>
-        <div id="listeSorts" class="grilleSorts"></div>
-        <div id="detailSort"></div>
-      </div>
-    </details>
-
-</section>
 
 
 <!-- LE CATALOGUE.

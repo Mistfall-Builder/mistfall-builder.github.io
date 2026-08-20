@@ -5440,9 +5440,10 @@ function montrerPage(id) {
   for (const el of document.querySelectorAll('main, .page')) {
     el.hidden = (id === 'main') ? (el.tagName !== 'MAIN') : (el.id !== id);
   }
-  // La fiche vit hors de <main> (la colonne collante la recouvrait dedans),
-  // donc la boucle ci-dessus ne la voit pas : elle suit l'onglet Builder et
-  // ne s'affiche que si un build a été calculé.
+  // La fiche vit dans la colonne de droite, donc <main> la cache déjà quand
+  // on quitte l'onglet Builder -- mais elle a SA PROPRE condition en plus :
+  // ne rien montrer tant qu'aucun build n'a été calculé, même sur l'onglet
+  // Builder. La boucle ci-dessus ne sait pas faire ce second cas.
   const fiche = $('blocFiche');
   if (fiche) fiche.hidden = (id !== 'main') || !dernier;
   for (const b of document.querySelectorAll('#nav button')) {
