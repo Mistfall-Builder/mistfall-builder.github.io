@@ -170,15 +170,14 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
    pas de surprise. */
 .colonne{position:sticky;top:84px}
 @media(max-width:1040px){.colonne{position:static}}
-/* CE QUI ETAIT VRAIMENT DEMANDE : pas la sidebar (elle collait deja), la
-   carte ÉQUIPEMENT -- celle du milieu de la colonne de droite. Depuis que
-   la fiche et les competences allongent cette colonne, scroller vers Marge
-   de manoeuvre / Affixes obtenus / Fiche / Competences faisait perdre de
-   vue le paperdoll. Meme traitement que la sidebar, sur la bonne carte
-   cette fois : elle est bien plus courte que ce qui la suit, donc pas le
-   probleme de hauteur qui a fait echouer les essais precedents. */
-#carteEquip{position:sticky;top:84px}
-@media(max-width:1040px){#carteEquip{position:static}}
+/* ESSAI RATE, POUR MEMOIRE : coller la carte Équipement au scroll, pour
+   garder le paperdoll visible en consultant Marge/Affixes/Fiche plus bas.
+   Marchait avec un paperdoll minimal, mais des qu'un slot affiche
+   plusieurs "N autre(s) choix" (cas reel, pas un cas limite), la carte
+   depasse largement la hauteur de l'ecran -- et un element colle plus
+   haut que la fenetre recouvre alors visuellement ce qui suit, coupe en
+   plein milieu d'une ligne. Aucun collant dans la colonne de droite :
+   la molette fait toujours defiler TOUT normalement, sans rien figer. */
 /* La fiche et les compétences vivent maintenant dans la colonne de droite
    avec le reste des résultats -- voir le commentaire sur #blocFiche dans
    le HTML. #blocFiche n'a donc plus besoin d'une classe de mise en page
