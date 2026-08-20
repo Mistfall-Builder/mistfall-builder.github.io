@@ -3567,7 +3567,7 @@ function dessinerSuggestions(res, classe) {
           titreEchange(e.avant, e.apres)}</div>
         <div class="pu">${puces}</div>
       </div>
-      <button class="appl">Appliquer</button>`;
+      <button class="appl">${t('sugg.appliquer')}</button>`;
     div.querySelector('.appl').onclick = () => {
       const neufs = { ...res.slotItems, [e.slot]: e.apres };
       const a = assembler(neufs, ciblesPourStuff(cibles, res.vinPoints), true,
