@@ -3962,6 +3962,20 @@ function pictoStat(nom) {
     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 }
 
+/* CE QUI N'EST PAS COMPTÉ DANS LE CHIFFRE AU-DESSUS, ET POURQUOI.
+ *
+ * Signalé par un joueur : Stoic (sous 50% de Vie) et Resilience (en
+ * subissant un CC) apportaient de la Résistance qui n'est pas permanente,
+ * additionnée quand même — la fiche affichait une Résistance qu'on n'a pas
+ * en dehors de ces moments. Voir fiche.js (CONDITIONNELS_CONNUS) pour le
+ * calcul ; ici on ne fait que l'écrire, sous le chiffre qu'elle ne compte
+ * plus. */
+function situationnelsTexte(liste) {
+  if (!liste || !liste.length) return '';
+  return t('fiche.situationnel') + ' '
+    + liste.map((s) => `${s.nom} +${pc(s.valeur)} (${t('fiche.cond.' + s.condKey)})`).join(' · ');
+}
+
 function carteStat(lib, val, sous, fort, picto) {
   return `<div class="stat${fort ? ' fort' : ''}">
     <div class="lib">${pictoStat(picto)}<span>${lib}</span></div>
@@ -4003,8 +4017,10 @@ function dessinerFiche(res, classeId) {
     ${carteStat(t('fiche.ehpMag'), nb(f.ehpMagique), t('fiche.ehpSous'), false, 'ehp')}
     ${carteStat(t('fiche.degPhys'), '+' + pc(f.bonusPhysique), '', false, 'physique')}
     ${carteStat(t('fiche.degMag'), '+' + pc(f.bonusMagique), '', false, 'magique')}
-    ${carteStat(t('fiche.resPhys'), pc(f.resistPhysique), '', false, 'defense')}
-    ${carteStat(t('fiche.resMag'), pc(f.resistMagique), '', false, 'defense')}
+    ${carteStat(t('fiche.resPhys'), pc(f.resistPhysique),
+                situationnelsTexte(f.conditionnels.resistPhysique), false, 'defense')}
+    ${carteStat(t('fiche.resMag'), pc(f.resistMagique),
+                situationnelsTexte(f.conditionnels.resistMagique), false, 'defense')}
     ${carteStat(t('fiche.penetration'), pc(f.penetration), '', false, 'penetration')}
     ${carteStat(t('fiche.resCrit'), pc(f.resistCritique), '', false, 'critique')}
     ${carteStat(t('fiche.critique'), pc(f.critique, 0),

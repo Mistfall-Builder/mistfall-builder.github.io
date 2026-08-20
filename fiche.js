@@ -93,6 +93,22 @@
     /recover\s+health\s+equal\s+to\s+[\d.]+\s*%/i,
   ];
 
+  /* CE QUE LE LIBELLÉ DU JEU NE DIT PAS.
+   *
+   * Signalé par un joueur : Stoic et Resilience apportent de la Résistance
+   * Physique/Magique qui n'est PAS permanente — Stoic seulement sous 50% de
+   * Vie, Resilience seulement en subissant un contrôle de foule (CC). La
+   * phrase récoltée du wiki ne le dit pourtant jamais (« Physical Resistance
+   * +5.5%. Magic Resistance +5.5%. Restores 15% Health. » — rien sur le
+   * seuil de Vie) : la condition n'existe nulle part dans les données, il
+   * faut la connaître. Additionner ces apports à la Résistance de la fiche
+   * la faisait donc mentir par excès — un chiffre qu'on n'a pas en
+   * permanence, affiché comme si on l'avait. Liste volontairement courte :
+   * seuls ces deux cas ont été signalés et vérifiés, pas de supposition sur
+   * d'autres affixes. */
+  const CONDITIONNELS_CONNUS = { Stoic: 'stoic', Resilience: 'resilience' };
+  const STATS_CONDITIONNELLES = new Set(['resistPhysique', 'resistMagique']);
+
   /* Renvoie les apports chiffrés d'une phrase d'effet, plus ce qui reste.
    *
    * ON CHERCHE LES LIBELLÉS, ON NE DÉCOUPE PAS LA PHRASE. Découper puis
@@ -177,6 +193,8 @@
 
     // 2. Ce qu'ajoutent les affixes, au niveau RÉELLEMENT atteint.
     const aff = {};
+    // Les apports SITUATIONNELS, à part : { resistPhysique: [...], resistMagique: [...] }.
+    const conditionnels = {};
     const detailAffixes = [];
     const restes = [];
     const niveaux = {};
@@ -195,7 +213,14 @@
       if (niveau < 1) continue;
       const phrase = info.eff[niveau - 1];
       const { trouve, restes: r } = lireEffet(phrase);
-      for (const [k, v] of Object.entries(trouve)) aff[k] = (aff[k] || 0) + v;
+      const condKey = CONDITIONNELS_CONNUS[nom];
+      for (const [k, v] of Object.entries(trouve)) {
+        if (condKey && STATS_CONDITIONNELLES.has(k)) {
+          (conditionnels[k] = conditionnels[k] || []).push({ nom, niveau, valeur: v, condKey });
+        } else {
+          aff[k] = (aff[k] || 0) + v;
+        }
+      }
       if (r.length) restes.push([nom, niveau, r]);
       detailAffixes.push({ nom, niveau, phrase, apports: trouve });
     }
@@ -221,6 +246,7 @@
       base,
       stuff,
       aff,
+      conditionnels,
       detailAffixes,
       restes,
       attaque,
