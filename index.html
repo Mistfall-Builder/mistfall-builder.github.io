@@ -154,30 +154,33 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
      display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;
      align-items:start}
 @media(max-width:1040px){main{grid-template-columns:1fr}}
-/* DEUX ESSAIS RATES avant celui-ci, pour mémoire :
-   - `align-self:stretch` pour etirer sa boite jusqu'a la hauteur de la
-     colonne de droite -- casse le collant ENTIEREMENT (verifie au pixel
-     pres), cas connu de CSS Grid + position:sticky.
-   - `max-height` + `overflow-y:auto` pour lui donner un defilement
-     interne une fois sa hauteur naturelle depassee -- techniquement
-     collee en permanence, mais ça capture la molette : survoler la
-     sidebar et scroller ne bougeait plus que sa mini-barre interne, plus
-     la page. Ressenti comme cassé, pas comme une amélioration.
+/* TROIS ESSAIS RATES avant celui-ci, pour mémoire :
+   - `align-self:stretch` sur la colonne de gauche pour etirer sa boite --
+     casse le collant ENTIEREMENT (verifie au pixel pres), cas connu de
+     CSS Grid + position:sticky.
+   - Collant simple sur la colonne de gauche SEULE : marche tant que la
+     colonne de droite est la plus longue des deux. Mais avec plusieurs
+     builds enregistres et beaucoup d'affixes visees, c'est la colonne de
+     GAUCHE qui devient la plus longue -- filme par l'utilisateur : la
+     droite finit par n'avoir plus rien a montrer (noire) pendant que la
+     gauche continue de defiler. Laquelle des deux est la plus longue
+     depend de l'etat de l'utilisateur, ça ne peut pas etre fige d'avance.
+   - Collant sur la carte Équipement seule : casse des qu'un slot affiche
+     plusieurs "N autre(s) choix", elle depasse alors l'ecran et recouvre
+     ce qui suit.
 
-   Un collant tout simple reste le bon choix : la molette scrolle
-   toujours la page entiere, la sidebar suit tant que son propre contenu
-   le permet, et se detache normalement au-dela -- comportement standard,
-   pas de surprise. */
-.colonne{position:sticky;top:84px}
-@media(max-width:1040px){.colonne{position:static}}
-/* ESSAI RATE, POUR MEMOIRE : coller la carte Équipement au scroll, pour
-   garder le paperdoll visible en consultant Marge/Affixes/Fiche plus bas.
-   Marchait avec un paperdoll minimal, mais des qu'un slot affiche
-   plusieurs "N autre(s) choix" (cas reel, pas un cas limite), la carte
-   depasse largement la hauteur de l'ecran -- et un element colle plus
-   haut que la fenetre recouvre alors visuellement ce qui suit, coupe en
-   plein milieu d'une ligne. Aucun collant dans la colonne de droite :
-   la molette fait toujours defiler TOUT normalement, sans rien figer. */
+   LA REPONSE QUI MARCHE DANS LES DEUX SENS : les DEUX colonnes recoivent
+   le meme traitement (collant + hauteur bornee a l'ecran + defilement
+   interne). Peu importe laquelle est la plus longue a un instant donne,
+   aucune des deux ne se vide jamais -- on voit toujours les reglages ET
+   les resultats en meme temps. Chaque colonne defile sous la souris
+   independamment : survoler la gauche fait defiler la gauche, la droite
+   fait defiler la droite, sans jamais perdre l'autre de vue. */
+.colonne,.colonneRes{position:sticky;top:84px;max-height:calc(100vh - 104px);
+  overflow-y:auto}
+@media(max-width:1040px){
+  .colonne,.colonneRes{position:static;max-height:none;overflow-y:visible}
+}
 /* La fiche et les compétences vivent maintenant dans la colonne de droite
    avec le reste des résultats -- voir le commentaire sur #blocFiche dans
    le HTML. #blocFiche n'a donc plus besoin d'une classe de mise en page
@@ -1509,7 +1512,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
     </details>
   </div>
 
-  <div>
+  <div class="colonneRes">
     <!-- Tant qu'aucun build n'a tourne, la colonne propose des builds a
          charger plutot que des cartes vides. Pas de texte d'explication :
          les vignettes se suffisent, et elles, on peut cliquer dessus. -->
