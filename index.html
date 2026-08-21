@@ -156,12 +156,14 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
 @media(max-width:1040px){main{grid-template-columns:1fr}}
 .colonne{position:sticky;top:84px}
 @media(max-width:1040px){.colonne{position:static}}
-/* Le paperdoll suit le defilement quand sa propre hauteur le permet, pour
-   rester visible pendant qu'on consulte Marge/Affixes/Fiche plus bas --
-   comportement standard de position:sticky, rien de plus : au-dela de sa
-   propre hauteur, il se detache et defile normalement comme le reste. */
-#carteEquip{position:sticky;top:84px}
-@media(max-width:1040px){#carteEquip{position:static}}
+/* ESSAI RATE, CONFIRME PAR CAPTURE : position:sticky simple sur la carte
+   Equipement, sans plafond de hauteur. Des qu'elle porte plusieurs pieces
+   a 2 gemmes + une option alternative, sa hauteur naturelle depasse
+   l'ecran -- et un element colle plus haut que la fenetre recouvre alors
+   visuellement ce qui suit (Marge/Affixes), lignes fantomes en double. Pas
+   un cas rare : n'importe quel build un peu rempli le declenche. Rester
+   sur du 100% normal ici tant qu'on n'a pas de moyen fiable de detecter
+   "la carte tient sur un ecran" avant de decider si elle colle. */
 /* La fiche et les compétences vivent maintenant dans la colonne de droite
    avec le reste des résultats -- voir le commentaire sur #blocFiche dans
    le HTML. #blocFiche n'a donc plus besoin d'une classe de mise en page
