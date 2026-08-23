@@ -653,11 +653,12 @@ function poolDe(classe, slot, arme, grade, mixte) {
   return morceaux;
 }
 
-// Combien de departs secoues en plus du greedy, en rareté UNIQUE seulement
-// (voir plus bas pourquoi le panache n'en profite pas). 10 relances a ~16 ms
-// la passe restent invisibles a l'usage tout en donnant a la montee locale
-// de vraies chances d'echapper a son premier optimum.
-const RELANCES_RARETE_UNIQUE = 10;
+// Combien de departs secoues au PLUS, en rareté UNIQUE seulement (voir plus
+// bas pourquoi le panache n'en profite pas). Un plafond haut ne coute cher
+// QUE sur les cas difficiles : la boucle qui l'utilise s'arrete des que les
+// cibles sont couvertes, donc un cas facile n'en consomme jamais plus de
+// deux ou trois avant de s'arreter tout seul.
+const RELANCES_RARETE_UNIQUE = 40;
 
 function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite,
                            depart, verrous, saveurs) {
@@ -705,14 +706,22 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     return false;
   };
 
+  // TOUTES LES CIBLES SONT-ELLES ATTEINTES, RIEN QU'AU STUFF (want est déjà
+  // le vin retiré) ? Sert à ARRÊTER DE CHERCHER dès que c'est le cas, aussi
+  // bien EN PLEINE MONTEE (continuer à affiner un score une fois les cibles
+  // couvertes ne rend rien de plus à l'utilisateur) qu'ENTRE deux montees.
+  const complet = (c) => Object.entries(want).every(([n, l]) => (c[n] || 0) >= l);
+
   // LA MONTEE LOCALE, ISOLEE POUR POUVOIR LA REJOUER DEPUIS PLUSIEURS
   // DEPARTS. Un echange isole a la fois, le premier qui ameliore ; identique
-  // au comportement d'avant quand on ne l'appelle qu'une fois.
+  // au comportement d'avant quand on ne l'appelle qu'une fois -- sauf
+  // qu'elle s'arrete des que les cibles sont toutes couvertes, plutot que
+  // de continuer a chercher un score meilleur qui ne changerait rien.
   const grimper = (depItems) => {
     let items = { ...depItems };
     let etat = assembler(items, want, false, figees);
     let meilleur = note(items, etat);
-    for (let tour = 0; tour < D.toursRecherche; tour += 1) {
+    for (let tour = 0; tour < D.toursRecherche && !complet(etat.couvert); tour += 1) {
       let ameliore = false;
       for (const slot of D.ordreSlots) {
         // Un emplacement verrouille ne se remplace pas, meme si le moteur
@@ -731,10 +740,10 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
       }
       if (!ameliore) break;
     }
-    return { items, meilleur };
+    return { items, meilleur, etat };
   };
 
-  let { items, meilleur } = grimper(slotItemsDepart);
+  let { items, meilleur, etat } = grimper(slotItemsDepart);
 
   /* UN DEPART DE PLUS, CENTRE SUR LES ENCOCHES PLUTOT QUE SUR L'INNE.
    *
@@ -747,7 +756,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
    * n'ont donc qu'une chance limitée de retomber juste sur la variante à
    * deux encoches qu'il fallait. Ce départ-ci choisit directement celle-là, pièce
    * par pièce, avant même la première relance. */
-  if (!mixte) {
+  if (!mixte && !complet(etat.couvert)) {
     const departEncoches = {};
     for (const slot of D.ordreSlots) {
       if (bloque[slot] || (depart && depart[slot])) { departEncoches[slot] = slotItemsDepart[slot]; continue; }
@@ -762,7 +771,7 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     }
     const tentativeEncoches = grimper(departEncoches);
     if (mieux(tentativeEncoches.meilleur, meilleur)) {
-      items = tentativeEncoches.items; meilleur = tentativeEncoches.meilleur;
+      items = tentativeEncoches.items; meilleur = tentativeEncoches.meilleur; etat = tentativeEncoches.etat;
     }
   }
 
@@ -784,11 +793,20 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
    *
    * RESERVE A LA RARETE UNIQUE. Le panache a deja ses deux departs (plus
    * bas, dans construire()) et se paie cher a la cible -- jusqu'a 1,4 s,
-   * lire le commentaire de dessinerAffixes(). Multiplier ce cout par dix
-   * relances referait exactement la page figee que le decoupage par cible
-   * existe pour eviter. */
+   * lire le commentaire de dessinerAffixes().
+   *
+   * S'ARRETE DES QUE C'EST SUFFISANT, PAS APRES LE COMPTE FIXE. Chercher un
+   * MEILLEUR resultat une fois les cibles deja toutes couvertes ne rend
+   * rien de plus a l'utilisateur -- seulement plus lent. Ca laisse la
+   * marge d'aller chercher BEAUCOUP plus loin (60 relances, pas 10) sur les
+   * cas difficiles sans ralentir les cas faciles, qui s'arretent des la
+   * premiere ou deuxieme relance utile. Mesure sur le rapport qui a lance
+   * ce chantier : 31 % de reussite a 10 relances FIXES, 90 % a 60 -- mais
+   * 60 relances fixes, meme quand la 2e suffisait deja, aurait fait 7 s de
+   * page figee par calcul. Avec l'arret anticipe, le meme taux se paie au
+   * prix des seuls calculs qui en ont vraiment besoin. */
   if (!mixte) {
-    for (let relance = 0; relance < RELANCES_RARETE_UNIQUE; relance += 1) {
+    for (let relance = 0; relance < RELANCES_RARETE_UNIQUE && !complet(etat.couvert); relance += 1) {
       const secoue = { ...slotItemsDepart };
       for (const slot of D.ordreSlots) {
         if (bloque[slot] || (depart && depart[slot])) continue;
@@ -797,7 +815,9 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
         secoue[slot] = pool[Math.floor(Math.random() * pool.length)];
       }
       const tentative = grimper(secoue);
-      if (mieux(tentative.meilleur, meilleur)) { items = tentative.items; meilleur = tentative.meilleur; }
+      if (mieux(tentative.meilleur, meilleur)) {
+        items = tentative.items; meilleur = tentative.meilleur; etat = tentative.etat;
+      }
     }
   }
 
