@@ -1686,7 +1686,7 @@ function choisirSecondeArme(classe, arme, grade, cibleAffixes, res, armeActuelle
   if (arme === armeActuelle && armePrincipale && (!grade || grade === armePrincipale.g)) {
     const item = armePrincipale;
     const sockets = (res.sockets || []).filter((s) => s.slot === SLOT_ARME);
-    return { item, sockets, approche: false };
+    return { item, sockets, approche: false, manque: {} };
   }
   if (!grade) return null;
   const pool = poolDe(classe, SLOT_ARME, arme, grade, false);
@@ -1695,18 +1695,31 @@ function choisirSecondeArme(classe, arme, grade, cibleAffixes, res, armeActuelle
     ? Object.values(cibleAffixes).reduce((s, n) => s + n, 0) : 0;
   if (!totalVoulu) {
     const it = pool.find((x) => x.i) || pool[0];
-    return { item: it, approche: false, sockets: it.s.map((sk, idx) => (
+    return { item: it, approche: false, manque: {}, sockets: it.s.map((sk, idx) => (
       { slot: SLOT_ARME, index: idx, type: sk[0], level: sk[1], gem: null })) };
   }
-  let meilleur = null, meilleurScore = -1, meilleurSockets = null;
+  let meilleur = null, meilleurScore = -1, meilleurSockets = null, meilleurCouvert = null;
   for (const it of pool) {
     const r = assembler({ [SLOT_ARME]: it }, cibleAffixes, true, {});
     let score = 0;
     for (const [a, n] of Object.entries(cibleAffixes)) score += Math.min(r.couvert[a] || 0, n);
-    if (score > meilleurScore) { meilleur = it; meilleurScore = score; meilleurSockets = r.sockets; }
+    if (score > meilleurScore) {
+      meilleur = it; meilleurScore = score; meilleurSockets = r.sockets; meilleurCouvert = r.couvert;
+    }
   }
-  return meilleur ? { item: meilleur, sockets: meilleurSockets, approche: meilleurScore < totalVoulu }
-    : null;
+  if (!meilleur) return null;
+  // CE QUI MANQUE PRECISEMENT, PAS JUSTE "C'EST APPROXIMATIF". Rareté plus
+  // basse ou type different qui n'a pas les bons emplacements : la carte
+  // doit dire LESQUELS des affixes de l'arme active ne sont pas repris, et
+  // de combien -- l'ecran qui se contente d'un "approximatif" oblige a
+  // comparer les deux cartes a la main pour savoir ce qui a vraiment ete
+  // perdu.
+  const manque = {};
+  for (const [a, n] of Object.entries(cibleAffixes)) {
+    const trou = n - (meilleurCouvert[a] || 0);
+    if (trou > 0) manque[a] = trou;
+  }
+  return { item: meilleur, sockets: meilleurSockets, approche: meilleurScore < totalVoulu, manque };
 }
 
 function secondeArmeActuelle(classe, res) {
@@ -2355,12 +2368,22 @@ function afficher(res, classe) {
       </div>`).join('');
     const noteArme2 = res.secondeArme.approche
       ? t('perso.secondeArmeApproche') : t('perso.secondeArmeNote');
+    // CE QUI MANQUE, PAR AFFIXE. "Approximatif" seul oblige a comparer les
+    // deux cartes a la main pour savoir quoi -- ici la carte le dit tout de
+    // suite : quels affixes de l'arme active la deuxieme ne reprend pas en
+    // entier, et de combien il s'en faut.
+    const manque = res.secondeArme.manque || {};
+    const manqueTexte = Object.entries(manque)
+      .sort((a, b) => b[1] - a[1])
+      .map(([a, n]) => `${echapper(a)} −${n}`).join(' · ');
     carte2.innerHTML = `<div class="slot">${t('equip.secondeArme')}</div>
       ${vignette(it2.ic, couleur2)}
       <div class="nom" style="color:${couleur2}">${it2.n}</div>
       <div class="inne${it2.i ? '' : ' sans'}">${it2.i ? t('equip.inne') + ' ' + it2.i : t('equip.aucunInne')}</div>
       ${gems2}
-      <div class="pas" style="font-size:11px;margin-top:4px">${noteArme2}</div>`;
+      <div class="pas" style="font-size:11px;margin-top:4px">${noteArme2}</div>
+      ${manqueTexte ? `<div class="ko" style="font-size:11px;margin-top:2px">${
+          t('perso.secondeArmeManque')} ${manqueTexte}</div>` : ''}`;
     pd.appendChild(carte2);
   }
   majNoteVerrous();
