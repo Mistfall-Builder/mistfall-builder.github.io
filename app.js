@@ -658,7 +658,7 @@ function poolDe(classe, slot, arme, grade, mixte) {
 // QUE sur les cas difficiles : la boucle qui l'utilise s'arrete des que les
 // cibles sont couvertes, donc un cas facile n'en consomme jamais plus de
 // deux ou trois avant de s'arreter tout seul.
-const RELANCES_RARETE_UNIQUE = 40;
+const RELANCES_RARETE_UNIQUE = 20;
 
 function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite,
                            depart, verrous, saveurs) {
@@ -4084,39 +4084,60 @@ function calculer() {
   const saveurs = saveursActuelles();
   $('etat').textContent = t('etat.calcul');
   const t0 = performance.now();
-  setTimeout(() => {
-    try {
-      const res = construire(classe, arme, [...cibles.entries()], grade,
-                             $('vin').checked, mixte, planchers, vinManuel, verrousObjet(), saveurs);
-      res.secondeArme = secondeArmeActuelle(classe, res);
-      dernier = res;
-      afficher(res, classe);
-      const raretes = {};
-      for (const it of Object.values(res.slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
-      const detail = Object.entries(raretes).sort()
-        .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
-      const chrono = t('etat.chrono',
-                       { detail, ms: Math.round(performance.now() - t0) });
-      if (res.suffisant) {
+
+  /* LA RELANCE EST AUTOMATIQUE, PAS AU JOUEUR DE RE-CLIQUER.
+   *
+   * La recherche en rareté unique tire des départs au hasard (voir
+   * construireAuGrade) : elle réussit dans l'écrasante majorité des cas dès
+   * le premier calcul, mais pas tous. Faire découvrir ça au joueur en le
+   * laissant re-cliquer "Calculer" pour retomber, par chance, sur un tirage
+   * qui marche est absurde — la machine peut retirer les dés elle-même.
+   * Trois tentatives internes, chacune sa propre recherche fraîche, avant
+   * de vraiment renoncer et proposer une autre rareté. Réservé à la rareté
+   * unique : le panaché a déjà ses deux départs et coûte cher à la cible,
+   * le refaire trois fois referait la page figée qu'on cherche à éviter. */
+  const TENTATIVES_MAX = mixte ? 1 : 3;
+
+  const tenter = (tentative) => {
+    setTimeout(() => {
+      try {
+        const res = construire(classe, arme, [...cibles.entries()], grade,
+                               $('vin').checked, mixte, planchers, vinManuel, verrousObjet(), saveurs);
+        if (!res.suffisant && tentative < TENTATIVES_MAX) {
+          tenter(tentative + 1);
+          return;
+        }
+        res.secondeArme = secondeArmeActuelle(classe, res);
+        dernier = res;
+        afficher(res, classe);
+        const raretes = {};
+        for (const it of Object.values(res.slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
+        const detail = Object.entries(raretes).sort()
+          .map(([g, n]) => `${n} × ${D.raretes[g]}`).join(', ');
+        const chrono = t('etat.chrono',
+                         { detail, ms: Math.round(performance.now() - t0) });
+        if (res.suffisant) {
+          $('etat').innerHTML =
+            `<span class="ok">${t('etat.ok')}</span><br>${chrono}`;
+          return;
+        }
+        // ÉCHEC : ne pas s'arrêter à « pas atteignable ». Une rareté figée
+        // n'escalade JAMAIS, par construction — c'est le piège quand on passe
+        // d'un build tout-violet à un build qui a besoin de deux pièces
+        // dorées. On cherche donc ce qui marcherait, et on le propose.
         $('etat').innerHTML =
-          `<span class="ok">${t('etat.ok')}</span><br>${chrono}`;
-        return;
+          `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
+          + `<br><span class="pas">${t('etat.recherche')}</span>`;
+        const issue = chercherUneIssue(classe, arme, grade, mixte, planchers, saveurs);
+        $('etat').innerHTML =
+          `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
+          + (issue ? `<br>${issue}` : `<br><span class="pas">${t('etat.rien')}</span>`);
+      } catch (err) {
+        $('etat').innerHTML = `<span class="ko">${tH('etat.erreur', { message: err.message })}</span>`;
       }
-      // ÉCHEC : ne pas s'arrêter à « pas atteignable ». Une rareté figée
-      // n'escalade JAMAIS, par construction — c'est le piège quand on passe
-      // d'un build tout-violet à un build qui a besoin de deux pièces
-      // dorées. On cherche donc ce qui marcherait, et on le propose.
-      $('etat').innerHTML =
-        `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
-        + `<br><span class="pas">${t('etat.recherche')}</span>`;
-      const issue = chercherUneIssue(classe, arme, grade, mixte, planchers, saveurs);
-      $('etat').innerHTML =
-        `<span class="ko">${t('etat.ko')}</span><br>${chrono}`
-        + (issue ? `<br>${issue}` : `<br><span class="pas">${t('etat.rien')}</span>`);
-    } catch (err) {
-      $('etat').innerHTML = `<span class="ko">${tH('etat.erreur', { message: err.message })}</span>`;
-    }
-  }, 10);
+    }, 10);
+  };
+  tenter(1);
 }
 
 /* Quel réglage atteindrait les cibles ? On essaie, dans l'ordre du moins
