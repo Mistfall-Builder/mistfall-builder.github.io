@@ -405,14 +405,40 @@ function poserGemmesExact(sockets, want, couvert) {
   }
 
   // meilleur état final
+  //
+  // « QUE LE VIN NE PEUT PAS COMBLER » PASSE AVANT LE SCORE, PAS APRES.
+  //
+  // couvertureEffective plafonne chaque affixe à sa cible et ajoute un tout
+  // petit bonus (D.poidsPalier, 0.01) quand un affixe franchit son palier.
+  // Ce bonus est cense departager des etats par ailleurs equivalents -- pas
+  // decider a la place du reste. Or un etat qui sacrifie ENTIEREMENT un
+  // affixe (0 gemme dessus) pour en faire franchir le palier de QUATRE
+  // AUTRES peut battre de 0,02 point un etat qui, lui, couvre les SIX cibles
+  // au prix d'un seul palier manque. Mesure sur un stuff reel : le premier
+  // etat notait 24,04 (Stoic laisse a 2 sur 5, hors de portee du vin qui ne
+  // rattrape que 2), le second 24,02 (les six cibles servies, vin compris)
+  // -- le meilleur SCORE gagnait, et le build echouait alors qu'un stuff
+  // identique, gemme differemment, marchait.
+  //
+  // Le vin ne rattrapant que 2 points par affixe, un manque de plus de 2
+  // est un ECHEC GARANTI sur cet affixe, quel que soit le score par
+  // ailleurs. C'est donc CE critere qui doit trancher en premier ; le score
+  // (paliers compris) ne departage plus qu'entre etats a egalite de
+  // rattrapabilite.
   const finale = etapes[etapes.length - 1];
-  let meilleur = -1, meilleureNote = -Infinity;
+  let meilleur = -1, meilleureNote = -Infinity, meilleurSecours = -Infinity;
   for (let idx = 0; idx < total; idx += 1) {
     if (finale[idx] === INF) continue;
     const c = {};
     noms.forEach((n, i) => { c[n] = Math.floor(idx / strides[i]) % (caps[i] + 1); });
     const note = couvertureEffective(c, want, null);
-    if (note > meilleureNote) { meilleureNote = note; meilleur = idx; }
+    let secours = 0;
+    for (const [n, lvl] of Object.entries(want)) {
+      secours -= Math.max(0, (lvl - (c[n] || 0)) - 2);
+    }
+    if (secours > meilleurSecours || (secours === meilleurSecours && note > meilleureNote)) {
+      meilleureNote = note; meilleurSecours = secours; meilleur = idx;
+    }
   }
   if (meilleur < 0) return false;
 
@@ -499,6 +525,34 @@ function scoreObjet(it, want) {
   for (const nom of Object.keys(want)) {
     for (const g of affixVersGemmes.get(nom) || []) types.add(g.t);
   }
+  for (const sk of it.s) {
+    if (sk[0] === -1) score += 2;
+    else if (types.has(sk[0])) score += 1;
+    if ((sk[0] === -1 || types.has(sk[0])) && sk[1] === 2) score += 0.5;
+  }
+  return score;
+}
+
+/* MEME CHOSE, MAIS SANS LE BONUS D'INNÉ.
+ *
+ * scoreObjet() préfère une pièce à inné correspondant (+3), même face à une
+ * variante à deux encoches qui, elle, peut servir DEUX affixes visés au
+ * lieu d'un seul figé. Quand aucune pièce de la classe ne porte certains
+ * affixes visés en inné (Unyielding et Valor n'existent nulle part en inné
+ * pour un Withered Knight, uniquement en gemme), ce +3 pousse le départ
+ * glouton vers des pièces qui ne PEUVENT pas les couvrir, au prix des
+ * encoches qui, elles, le pourraient.
+ *
+ * Sert uniquement à fournir UN départ de plus à la montée locale (voir
+ * DEPART_ENCOCHES ci-dessous) : la montée reste libre de revenir aux pièces
+ * à inné si elles s'avèrent meilleures une fois les gemmes vraiment posées.
+ */
+function scoreEncoches(it, want) {
+  const types = new Set();
+  for (const nom of Object.keys(want)) {
+    for (const g of affixVersGemmes.get(nom) || []) types.add(g.t);
+  }
+  let score = 0;
   for (const sk of it.s) {
     if (sk[0] === -1) score += 2;
     else if (types.has(sk[0])) score += 1;
@@ -682,6 +736,36 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
 
   let { items, meilleur } = grimper(slotItemsDepart);
 
+  /* UN DEPART DE PLUS, CENTRE SUR LES ENCOCHES PLUTOT QUE SUR L'INNE.
+   *
+   * Le depart glouton (scoreObjet) privilegie une piece a inné qui
+   * correspond, meme au prix d'une seule encoche contre deux. Pour un
+   * affixe qui n'existe EN INNE NULLE PART -- rien à faire de ce côté,
+   * seule une encoche du bon materiau y arrive -- ce départ-là ne peut
+   * jamais couvrir cet affixe, quel que soit le nombre de relances
+   * secouées ensuite : elles restent tirées AU HASARD dans le pool, et
+   * n'ont donc qu'une chance limitée de retomber juste sur la variante à
+   * deux encoches qu'il fallait. Ce départ-ci choisit directement celle-là, pièce
+   * par pièce, avant même la première relance. */
+  if (!mixte) {
+    const departEncoches = {};
+    for (const slot of D.ordreSlots) {
+      if (bloque[slot] || (depart && depart[slot])) { departEncoches[slot] = slotItemsDepart[slot]; continue; }
+      const pool = options[slot];
+      if (!pool || !pool.length) { departEncoches[slot] = slotItemsDepart[slot]; continue; }
+      let best = null, bestScore = -Infinity;
+      for (const it of pool) {
+        const s = scoreEncoches(it, want);
+        if (s > bestScore) { best = it; bestScore = s; }
+      }
+      departEncoches[slot] = best;
+    }
+    const tentativeEncoches = grimper(departEncoches);
+    if (mieux(tentativeEncoches.meilleur, meilleur)) {
+      items = tentativeEncoches.items; meilleur = tentativeEncoches.meilleur;
+    }
+  }
+
   /* PLUSIEURS DEPARTS SECOUES, EN RARETE UNIQUE SEULEMENT.
    *
    * La montee locale s'arrete au PREMIER optimum rencontre : deux
@@ -797,8 +881,6 @@ function sommeRaretes(slotItems) {
 function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi,
                     verrous, saveurs) {
   const affinite = D.affinites[String(classe)] || null;
-  const vinPoints = vin ? repartitionVin(cibleListe, vinChoisi) : new Map();
-  const vinNoms = new Set(vinPoints.keys());
 
   /* LE VIN SE RETIRE DES CIBLES AVANT DE CHERCHER, PAS APRÈS.
    *
@@ -815,34 +897,73 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
    * Le stuff n'a donc à fournir que `niveau visé − vin`. Un affixe entièrement
    * couvert par le vin disparaît de la recherche : lui réserver une gemme
    * volerait la place d'une cible qui, elle, en a besoin. */
-  const cibleGear = cibleListe
-    .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
-    .filter(([, l]) => l > 0);
-  const want = Object.fromEntries(cibleGear);
-
-  const essai = (g, mx, dep) => {
+  const essaiVin = (vinPoints, g, mx, dep) => {
+    const cibleGear = cibleListe
+      .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
+      .filter(([, l]) => l > 0);
+    const want = Object.fromEntries(cibleGear);
     const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep, verrous, saveurs);
-    if (!affinite) return a;
-    const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous, saveurs);
-    const na = [couvertureEffective(a.couvert, want, null), surplus(a.couvert, want)];
-    const nb = [couvertureEffective(b.couvert, want, null), surplus(b.couvert, want)];
-    return (nb[0] > na[0] || (nb[0] === na[0] && nb[1] >= na[1])) ? b : a;
+    let r = a;
+    if (affinite) {
+      const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous, saveurs);
+      const na = [couvertureEffective(a.couvert, want, null), surplus(a.couvert, want)];
+      const nb = [couvertureEffective(b.couvert, want, null), surplus(b.couvert, want)];
+      r = (nb[0] > na[0] || (nb[0] === na[0] && nb[1] >= na[1])) ? b : a;
+    }
+    return { r, cibleGear, want };
   };
   // Le contrôle reste sur les cibles PLEINES : c'est la promesse faite à
   // l'utilisateur, et elle doit être vérifiée telle qu'il l'a formulée.
-  const suffit = (r) => cibleListe.every(([n, l]) =>
+  const suffitVin = (r, vinPoints) => cibleListe.every(([n, l]) =>
     (r.couvert[n] || 0) + (vinPoints.get(n) || 0) >= l);
 
-  let res = null;
-  // On retient le dernier palier INSUFFISANT : c'est le meilleur point de
-  // départ pour le panaché (voir plus bas).
-  let justeEnDessous = null;
-  const grades = grade ? [grade] : [1, 2, 3, 4, 5, 6];
-  for (const g of grades) {
-    res = essai(g, false, null);
-    if (suffit(res)) break;
-    justeEnDessous = res;
+  // UNE SEULE PASSE DE GRADE, POUR UNE REPARTITION DE VIN DONNEE.
+  const tenter = (vinPoints) => {
+    let res = null;
+    let justeEnDessous = null;
+    const grades = grade ? [grade] : [1, 2, 3, 4, 5, 6];
+    let want = {}, cibleGear = [];
+    for (const g of grades) {
+      const e = essaiVin(vinPoints, g, false, null);
+      res = e.r; want = e.want; cibleGear = e.cibleGear;
+      if (suffitVin(res, vinPoints)) break;
+      justeEnDessous = res;
+    }
+    return { res, justeEnDessous, want, cibleGear };
+  };
+
+  const vinPoints = vin ? repartitionVin(cibleListe, vinChoisi) : new Map();
+  let { res, justeEnDessous, want, cibleGear } = tenter(vinPoints);
+
+  /* UNE SECONDE REPARTITION, SI LA PREMIERE NE SUFFIT PAS.
+   *
+   * repartitionVin() sert le vin aux quatre cibles les plus hautes, deux
+   * points chacune, et rien aux autres -- une decision prise AVANT de savoir
+   * ce que le stuff peut vraiment fournir. Quand un affixe delaisse n'existe
+   * QU'EN GEMME nulle part en inne, le laisser a zero de vin l'oblige a
+   * tenir seul sur les encoches disponibles, souvent hors de portee, alors
+   * qu'un partage plus egal l'aurait complete. Mesure sur un rapport reel :
+   * la repartition concentree echouait sur Unyielding ET Stoic ; etalee sur
+   * les six cibles, le meme stuff les couvrait toutes les deux.
+   *
+   * Reserve au vin AUTOMATIQUE (une consigne manuelle est un choix du
+   * joueur, pas a corriger) et a la rareté UNIQUE -- le panache a deja ses
+   * deux departs et se paie cher a la cible ; doubler ce cout ici referait
+   * la page figee que dessinerAffixes() decoupe justement pour eviter. */
+  const vinAutomatique = vin && (!vinChoisi || ![...vinChoisi.values()].some((p) => p > 0));
+  if (!mixte && vinAutomatique && res && !suffitVin(res, vinPoints)) {
+    const vinPointsEtalee = repartitionVinEtalee(cibleListe);
+    const tentative = tenter(vinPointsEtalee);
+    if (tentative.res && suffitVin(tentative.res, vinPointsEtalee)) {
+      ({ res, justeEnDessous, want, cibleGear } = tentative);
+      vinPoints.clear();
+      for (const [n, p] of vinPointsEtalee) vinPoints.set(n, p);
+    }
   }
+  const vinNoms = new Set(vinPoints.keys());
+
+  const essai = (g, mx, dep) => essaiVin(vinPoints, g, mx, dep).r;
+  const suffit = (r) => suffitVin(r, vinPoints);
 
   if (mixte) {
     // DEUX POINTS DE DÉPART, PAS UN.
@@ -1433,6 +1554,41 @@ function repartitionVin(cibleListe, manuel) {
     reste -= donne;
   }
   return sortie;
+}
+
+/* LE MEME BUDGET, ETALE AU LIEU DE CONCENTRE.
+ *
+ * repartitionVin() sert le vin aux affixes de plus haut niveau visé,
+ * jusqu'a quatre, deux points chacun -- et RIEN aux autres, quel que soit
+ * ce qu'ils ont vraiment besoin. Ce choix est fait AVANT toute recherche de
+ * stuff : il ne sait pas lesquels de ces affixes sont faciles en objets et
+ * lesquels ne vivent que par gemme. Quand deux affixes visés n'existent
+ * QU'EN GEMME (aucun inné nulle part dans la classe), les laisser à zero de
+ * vin leur demande de tenir seuls sur les encoches disponibles -- souvent
+ * hors de portee, alors qu'un partage plus egal les aurait completes.
+ *
+ * Sert de secours dans construire() : si la repartition concentree ne
+ * suffit pas, on retente avec celle-ci avant de renoncer. */
+function repartitionVinEtalee(cibleListe) {
+  const r = reglesVin();
+  const ordre = cibleListe.slice()
+    .sort((a, b) => b[1] - a[1])
+    .map(([n]) => n);
+  const donne = new Map(ordre.map((n) => [n, 0]));
+  let reste = r.total;
+  let progresse = true;
+  while (reste > 0 && progresse) {
+    progresse = false;
+    for (const n of ordre) {
+      if (reste <= 0) break;
+      if (donne.get(n) >= r.bonus) continue;
+      donne.set(n, donne.get(n) + 1);
+      reste -= 1;
+      progresse = true;
+    }
+  }
+  for (const n of [...donne.keys()]) if (!donne.get(n)) donne.delete(n);
+  return donne;
 }
 
 function choisirVin(cibleListe) {
