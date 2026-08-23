@@ -2521,6 +2521,21 @@ function afficher(res, classe) {
       }
       objets[Number(codeSlot)] = { cfg: Number(it.id), gemmes };
     }
+    // LA DEUXIEME ARME A SON PROPRE EMPLACEMENT DANS LE JEU (11), JUSTE
+    // APRES L'ARME PRINCIPALE (10) -- versGameData ne connaissait que les 8
+    // emplacements que le solveur remplit, donc le code genere oubliait
+    // cette 9e piece meme quand le paperdoll la montrait. Sean l'a signale :
+    // la piece verte n'arrivait jamais en jeu. Table verifiee identique a
+    // celle de l'arme principale (memes 114 objets), c'est bien elle.
+    if (res.secondeArme && res.secondeArme.item) {
+      const it2 = res.secondeArme.item;
+      const trous2 = D.codec.trous[String(it2.id)] || 0;
+      const gemmes2 = new Array(trous2).fill(0);
+      for (const s of (res.secondeArme.sockets || [])) {
+        if (s.gem && s.index < trous2) gemmes2[s.index] = Number(s.gem.id);
+      }
+      objets[11] = { cfg: Number(it2.id), gemmes: gemmes2 };
+    }
     $('code').value = encoderCode(classe, objets);
     // La classe DOUBLE la pseudo-classe :disabled. Certains moteurs ne
     // recalculent pas le style quand `disabled` change par script : le
@@ -4251,7 +4266,26 @@ function afficherCode(code, vinPoints) {
     const sockets = [];
     const couvert = {};
     let hors = 0;
+    // L'EMPLACEMENT 11, C'EST LA DEUXIEME ARME (voir dessinerAffixes() côté
+    // export) : hors de versGameData, donc absent de la boucle normale, sans
+    // quoi un code réel portant une deuxième arme la ferait disparaître au
+    // premier aller-retour import → export sur le site.
+    let secondeArmeLue = null;
     for (const e of lu.emplacements) {
+      if (e.slot === 11) {
+        if (e.cfg) {
+          const it2 = parId.get(String(e.cfg));
+          if (it2) {
+            const sockets2 = it2.s.map((sk, idx) => {
+              const gid = e.gemmes[idx];
+              const g = gid ? gemParId.get(String(gid)) : null;
+              return { slot: SLOT_ARME, index: idx, type: sk[0], level: sk[1], gem: g || null };
+            });
+            secondeArmeLue = { item: it2, sockets: sockets2, approche: false, manque: {} };
+          } else { hors += 1; }
+        }
+        continue;
+      }
       const slot = D.codec.versGameData[String(e.slot)];
       if (!slot || !e.cfg) continue;
       const it = parId.get(String(e.cfg));
@@ -4284,7 +4318,23 @@ function afficherCode(code, vinPoints) {
     dessinerAffixes();
     majBudgetVin();
     dernier = { slotItems, sockets, couvert, vin: new Set(vp.keys()), vinPoints: vp,
-                suffisant: true, sources: [] };
+                suffisant: true, sources: [], secondeArme: secondeArmeLue };
+    // La case et ses réglages suivent ce que le code portait vraiment,
+    // sinon "Deuxième arme" reste décochée alors que le paperdoll en montre
+    // une, ou coché sur un type qui n'est plus celui lu.
+    if ($('secondeArmeActive')) {
+      $('secondeArmeActive').checked = !!secondeArmeLue;
+      $('blocSecondeArme').hidden = !secondeArmeLue;
+      if (secondeArmeLue && $('secondeArmeType') && $('secondeArmeRarete')) {
+        for (const a of D.armes[String(lu.classe)] || []) {
+          const cle = `${lu.classe}|weapon|${a}|${secondeArmeLue.item.g}`;
+          if ((D.objets[cle] || []).some((x) => x.id === secondeArmeLue.item.id)) {
+            $('secondeArmeType').value = a; break;
+          }
+        }
+        $('secondeArmeRarete').value = String(secondeArmeLue.item.g);
+      }
+    }
     afficher(dernier, lu.classe);
     const raretes = {};
     for (const it of Object.values(slotItems)) if (it) raretes[it.g] = (raretes[it.g] || 0) + 1;
