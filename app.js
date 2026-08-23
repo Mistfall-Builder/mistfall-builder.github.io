@@ -599,6 +599,12 @@ function poolDe(classe, slot, arme, grade, mixte) {
   return morceaux;
 }
 
+// Combien de departs secoues en plus du greedy, en rareté UNIQUE seulement
+// (voir plus bas pourquoi le panache n'en profite pas). 10 relances a ~16 ms
+// la passe restent invisibles a l'usage tout en donnant a la montee locale
+// de vraies chances d'echapper a son premier optimum.
+const RELANCES_RARETE_UNIQUE = 10;
+
 function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite,
                            depart, verrous, saveurs) {
   const want = Object.fromEntries(cibleListe);
@@ -608,17 +614,17 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
   const figees = {};
   for (const [slot, v] of Object.entries(bloque)) figees[slot] = v.gemmes || [];
   const options = {};
-  const slotItems = {};
+  const slotItemsDepart = {};
   for (const slot of D.ordreSlots) {
     if (bloque[slot] && bloque[slot].item) {
-      slotItems[slot] = bloque[slot].item;
+      slotItemsDepart[slot] = bloque[slot].item;
       options[slot] = [bloque[slot].item];
       continue;
     }
     const pool = poolSlot(classe, slot, arme, grade, mixte, planchers, saveurs);
     options[slot] = pool;
     const impose = depart && depart[slot];
-    if (impose) { slotItems[slot] = impose; continue; }
+    if (impose) { slotItemsDepart[slot] = impose; continue; }
     let best = null, bestCle = null;
     for (const it of pool) {
       const cle = [scoreObjet(it, want), affinite ? (affinite === 'magic' ? it.aff : -it.aff) : 0];
@@ -626,10 +632,9 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
         best = it; bestCle = cle;
       }
     }
-    slotItems[slot] = best || null;
+    slotItemsDepart[slot] = best || null;
   }
 
-  let etat = assembler(slotItems, want, false, figees);
   const note = (items, e) => {
     const base = couvertureEffective(e.couvert, want, null);
     const sur = surplus(e.couvert, want);
@@ -646,26 +651,70 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     return false;
   };
 
-  let items = { ...slotItems };
-  let meilleur = note(items, etat);
-  for (let tour = 0; tour < D.toursRecherche; tour += 1) {
-    let ameliore = false;
-    for (const slot of D.ordreSlots) {
-      // Un emplacement verrouille ne se remplace pas, meme si le moteur
-      // trouverait mieux : c'est tout l'objet du cadenas.
-      if (bloque[slot]) continue;
-      const pool = options[slot];
-      if (!pool || pool.length <= 1) continue;
-      for (const alt of pool) {
-        if (alt === items[slot]) continue;
-        const essaiItems = { ...items, [slot]: alt };
-        const essai = assembler(essaiItems, want, false, figees);
-        const n = note(essaiItems, essai);
-        if (mieux(n, meilleur)) { items = essaiItems; etat = essai; meilleur = n; ameliore = true; break; }
+  // LA MONTEE LOCALE, ISOLEE POUR POUVOIR LA REJOUER DEPUIS PLUSIEURS
+  // DEPARTS. Un echange isole a la fois, le premier qui ameliore ; identique
+  // au comportement d'avant quand on ne l'appelle qu'une fois.
+  const grimper = (depItems) => {
+    let items = { ...depItems };
+    let etat = assembler(items, want, false, figees);
+    let meilleur = note(items, etat);
+    for (let tour = 0; tour < D.toursRecherche; tour += 1) {
+      let ameliore = false;
+      for (const slot of D.ordreSlots) {
+        // Un emplacement verrouille ne se remplace pas, meme si le moteur
+        // trouverait mieux : c'est tout l'objet du cadenas.
+        if (bloque[slot]) continue;
+        const pool = options[slot];
+        if (!pool || pool.length <= 1) continue;
+        for (const alt of pool) {
+          if (alt === items[slot]) continue;
+          const essaiItems = { ...items, [slot]: alt };
+          const essai = assembler(essaiItems, want, false, figees);
+          const n = note(essaiItems, essai);
+          if (mieux(n, meilleur)) { items = essaiItems; etat = essai; meilleur = n; ameliore = true; break; }
+        }
+        if (ameliore) break;
       }
-      if (ameliore) break;
+      if (!ameliore) break;
     }
-    if (!ameliore) break;
+    return { items, meilleur };
+  };
+
+  let { items, meilleur } = grimper(slotItemsDepart);
+
+  /* PLUSIEURS DEPARTS SECOUES, EN RARETE UNIQUE SEULEMENT.
+   *
+   * La montee locale s'arrete au PREMIER optimum rencontre : deux
+   * emplacements qui, changes chacun seul, n'ameliorent rien peuvent
+   * pourtant, changes ENSEMBLE, debloquer une cible restee hors de portee.
+   * Mesure sur un vrai rapport : la passe grecque seule laissait Unyielding
+   * a 2 alors qu'un choix different (a la main) montait a 4 pour les MEMES
+   * cibles et la MEME rarete -- l'optimum global existait, la recherche a
+   * un seul depart ne le voyait pas.
+   *
+   * Repartir d'un depart secoue (quelques emplacements tires au hasard dans
+   * leur pool, hors verrous et hors depart impose) puis regrimper depuis la
+   * retrouve parfois cette combinaison. On ne garde que si c'est
+   * STRICTEMENT mieux que ce qu'on a deja : ces relances ne peuvent donc
+   * jamais degrader un resultat, seulement l'ameliorer.
+   *
+   * RESERVE A LA RARETE UNIQUE. Le panache a deja ses deux departs (plus
+   * bas, dans construire()) et se paie cher a la cible -- jusqu'a 1,4 s,
+   * lire le commentaire de dessinerAffixes(). Multiplier ce cout par dix
+   * relances referait exactement la page figee que le decoupage par cible
+   * existe pour eviter. */
+  if (!mixte) {
+    for (let relance = 0; relance < RELANCES_RARETE_UNIQUE; relance += 1) {
+      const secoue = { ...slotItemsDepart };
+      for (const slot of D.ordreSlots) {
+        if (bloque[slot] || (depart && depart[slot])) continue;
+        const pool = options[slot];
+        if (!pool || pool.length <= 1) continue;
+        secoue[slot] = pool[Math.floor(Math.random() * pool.length)];
+      }
+      const tentative = grimper(secoue);
+      if (mieux(tentative.meilleur, meilleur)) { items = tentative.items; meilleur = tentative.meilleur; }
+    }
   }
 
   const final = assembler(items, want, true, figees);
@@ -1424,25 +1473,73 @@ function majArmes() {
   }
 }
 
-/* PICK DE LA DEUXIEME ARME : hors solveur, hors cibles.
- *
- * Aucune optimisation a faire ici -- elle ne sert jamais a couvrir un
- * affixe, donc "la meilleure" ne veut rien dire. On prend juste une piece
- * reelle du type et de la rarete demandes, de preference avec un inne pour
- * que le paperdoll ne montre pas une carte vide de sens. Deterministe :
- * memes reglages, meme piece, pour ne pas changer de tete a chaque calcul. */
-function choisirSecondeArme(classe, arme, grade) {
-  if (!arme || !grade) return null;
-  const pool = poolDe(classe, SLOT_ARME, arme, grade, false);
-  if (!pool.length) return null;
-  return pool.find((it) => it.i) || pool[0];
+/* CE QUE L'ARME ACTIVE FOURNIT VRAIMENT : son inné, plus un point par
+ * affixe de chaque gemme posée dans ses encoches (jamais deux, meme pour
+ * une gemme a deux affixes -- voir assembler(), qui compte pareil). C'est
+ * CE tally que la deuxieme arme doit reproduire pour etre "la meme arme"
+ * du point de vue des affixes. */
+function affixesArmeActive(res) {
+  const tally = {};
+  const it = res && res.slotItems && res.slotItems[SLOT_ARME];
+  if (!it) return tally;
+  if (it.i) tally[it.i] = (tally[it.i] || 0) + 1;
+  for (const s of res.sockets || []) {
+    if (s.slot !== SLOT_ARME || !s.gem) continue;
+    for (const a of s.gem.a) tally[a] = (tally[a] || 0) + 1;
+  }
+  return tally;
 }
 
-function secondeArmeActuelle(classe) {
+/* PICK DE LA DEUXIEME ARME : hors solveur, hors cibles, mais PAS hors
+ * affixes -- le but est justement qu'elle rende les MEMES, pour que passer
+ * de l'une a l'autre en jeu ne change rien au perso.
+ *
+ * Meme type ET meme rarete que l'arme active : c'est litteralement la meme
+ * piece, memes gemmes -- rien a chercher, la reproduction est parfaite par
+ * construction. Des qu'UN DES DEUX differe (un autre type, ou le meme type
+ * mais une rarete demandee plus basse -- l'arme jaune reste jaune, la
+ * deuxieme est violette voulue) on CHERCHE plutot : dans le pool du type et
+ * de la rarete demandes, la piece dont l'inne et les encoches se
+ * rapprochent le plus du tally de l'arme active. `approche` dit si la
+ * reproduction obtenue est totale ou seulement partielle, pour que l'écran
+ * puisse le dire honnetement plutôt que de laisser croire à une identité
+ * qui n'a pas eu lieu. */
+function choisirSecondeArme(classe, arme, grade, cibleAffixes, res, armeActuelle) {
+  if (!arme) return null;
+  const armePrincipale = res && res.slotItems && res.slotItems[SLOT_ARME];
+  if (arme === armeActuelle && armePrincipale && (!grade || grade === armePrincipale.g)) {
+    const item = armePrincipale;
+    const sockets = (res.sockets || []).filter((s) => s.slot === SLOT_ARME);
+    return { item, sockets, approche: false };
+  }
+  if (!grade) return null;
+  const pool = poolDe(classe, SLOT_ARME, arme, grade, false);
+  if (!pool.length) return null;
+  const totalVoulu = cibleAffixes
+    ? Object.values(cibleAffixes).reduce((s, n) => s + n, 0) : 0;
+  if (!totalVoulu) {
+    const it = pool.find((x) => x.i) || pool[0];
+    return { item: it, approche: false, sockets: it.s.map((sk, idx) => (
+      { slot: SLOT_ARME, index: idx, type: sk[0], level: sk[1], gem: null })) };
+  }
+  let meilleur = null, meilleurScore = -1, meilleurSockets = null;
+  for (const it of pool) {
+    const r = assembler({ [SLOT_ARME]: it }, cibleAffixes, true, {});
+    let score = 0;
+    for (const [a, n] of Object.entries(cibleAffixes)) score += Math.min(r.couvert[a] || 0, n);
+    if (score > meilleurScore) { meilleur = it; meilleurScore = score; meilleurSockets = r.sockets; }
+  }
+  return meilleur ? { item: meilleur, sockets: meilleurSockets, approche: meilleurScore < totalVoulu }
+    : null;
+}
+
+function secondeArmeActuelle(classe, res) {
   if (!$('secondeArmeActive') || !$('secondeArmeActive').checked) return null;
   const arme = $('secondeArmeType').value || null;
   const grade = $('secondeArmeRarete').value ? Number($('secondeArmeRarete').value) : null;
-  return choisirSecondeArme(classe, arme, grade);
+  const armeActuelle = $('arme').value || null;
+  const cible = affixesArmeActive(res);
+  return choisirSecondeArme(classe, arme, grade, cible, res, armeActuelle);
 }
 
 function poserSecondeArmeRarete() {
@@ -2066,19 +2163,28 @@ function afficher(res, classe) {
   // emplacements du solveur : elle ne porte ni cadenas ni flèche
   // d'alternative, puisqu'elle ne participe a aucun calcul. La note rappelle
   // pourquoi elle n'apparait dans aucune ligne du tableau des affixes.
-  if (res.secondeArme) {
-    const it2 = res.secondeArme;
+  if (res.secondeArme && res.secondeArme.item) {
+    const it2 = res.secondeArme.item;
     const couleur2 = D.couleurs[String(it2.g)] || '#9fb2c4';
     const carte2 = document.createElement('div');
     carte2.className = 'piece secondeArme';
     carte2.style.setProperty('--tinte', couleur2);
     carte2.style.borderColor = couleur2 + '66';
     carte2.title = infobulle(it2);
+    const gems2 = (res.secondeArme.sockets || []).map((s) => `<div class="socket">
+        ${s.gem && s.gem.ic ? `<img src="icones/${s.gem.ic}" alt="" loading="lazy">`
+                            : '<span class="creux"></span>'}
+        <span>${s.gem ? `<b>${s.gem.n}</b>` : `<span class="pas">${t('equip.vide')}</span>`}
+          <span class="mat">${materiau(s.type, s.level)} ${s.level === 2 ? 'II' : 'I'}</span></span>
+      </div>`).join('');
+    const noteArme2 = res.secondeArme.approche
+      ? t('perso.secondeArmeApproche') : t('perso.secondeArmeNote');
     carte2.innerHTML = `<div class="slot">${t('equip.secondeArme')}</div>
       ${vignette(it2.ic, couleur2)}
       <div class="nom" style="color:${couleur2}">${it2.n}</div>
       <div class="inne${it2.i ? '' : ' sans'}">${it2.i ? t('equip.inne') + ' ' + it2.i : t('equip.aucunInne')}</div>
-      <div class="pas" style="font-size:11px;margin-top:4px">${t('perso.secondeArmeNote')}</div>`;
+      ${gems2}
+      <div class="pas" style="font-size:11px;margin-top:4px">${noteArme2}</div>`;
     pd.appendChild(carte2);
   }
   majNoteVerrous();
@@ -3806,7 +3912,7 @@ function calculer() {
     try {
       const res = construire(classe, arme, [...cibles.entries()], grade,
                              $('vin').checked, mixte, planchers, vinManuel, verrousObjet(), saveurs);
-      res.secondeArme = secondeArmeActuelle(classe);
+      res.secondeArme = secondeArmeActuelle(classe, res);
       dernier = res;
       afficher(res, classe);
       const raretes = {};
@@ -4180,17 +4286,36 @@ function cibleCourante(f) {
            resistPhysique: 0, resistMagique: 0 };
 }
 
+/* LA FICHE « SI C'ETAIT L'AUTRE ARME QUI ETAIT EN MAIN ».
+ *
+ * Seule l'Attaque (et les autres stats brutes de l'objet -- degats
+ * physiques/magiques en %) change : les affixes, eux, ne bougent pas,
+ * puisque la deuxieme arme est justement construite pour les reproduire
+ * (voir choisirSecondeArme). Recalculer toute la fiche avec l'objet
+ * substitue reste donc exact sans avoir a deviner quoi ajuster a la main. */
+function ficheAvecSecondeArme(res, classeId) {
+  if (!res.secondeArme || !res.secondeArme.item) return null;
+  const resAlt = { ...res, slotItems: { ...res.slotItems, [SLOT_ARME]: res.secondeArme.item } };
+  return window.Fiche.ficheDe(resAlt, classeId, D);
+}
+
 function dessinerSorts(res, classeId, f) {
   const boite = $('listeSorts');
   if (!boite || !window.Fiche) return;
   const nomClasse = D.classes[String(classeId)];
   const tous = window.Fiche.competencesDe(nomClasse);
   const arme = ($('arme') || {}).value || '';
+  // LA DEUXIEME ARME COMPTE AUSSI COMME « MON ARME » ICI : sinon "Seulement
+  // mon arme" cachait ses sorts des qu'on l'activait, alors qu'elle est
+  // bien portee et bien jouable.
+  const armeSecondaire = (res.secondeArme && $('secondeArmeType'))
+    ? $('secondeArmeType').value : null;
   const filtrer = ($('sortsArme') || {}).checked;
   const memeArme = (s) => !arme || !s.arme
-    || s.arme.split(' / ').some((a) => a === arme);
+    || s.arme.split(' / ').some((a) => a === arme || a === armeSecondaire);
   const liste = filtrer ? tous.filter(memeArme) : tous;
   const cible = cibleCourante(f);
+  const f2 = armeSecondaire ? ficheAvecSecondeArme(res, classeId) : null;
 
   $('sortsAide').textContent = t('sorts.aide', {
     n: tous.length, classe: nomClasse,
@@ -4223,14 +4348,23 @@ function dessinerSorts(res, classeId, f) {
       if (bloc.open) _ecolesFermees.delete(titre); else _ecolesFermees.add(titre);
     });
     boite.appendChild(bloc);
+    // CE GROUPE EST-IL CELUI DE LA DEUXIEME ARME ? Seulement s'il lui est
+    // PROPRE (le titre est exactement son type, jamais un sort partage
+    // "Greatsword / Polearm and Shield" -- pour un sort partage, laquelle
+    // des deux armes compterait n'a pas de reponse honnete, donc on garde
+    // la principale, comme avant).
+    const ficheGroupe = (f2 && titre === armeSecondaire) ? f2 : f;
     remplirGroupe(bloc.querySelector('.grilleSorts'), membres,
-                  f, cible, memeArme, res, classeId);
+                  ficheGroupe, cible, memeArme, res, classeId,
+                  ficheGroupe === f2);
   }
-  dessinerDetailSort(liste.find((s) => s.nom === _sortChoisi), f, cible,
-                     res, classeId);
+  const sortChoisi = liste.find((s) => s.nom === _sortChoisi);
+  const ficheDetail = (f2 && sortChoisi
+    && (sortChoisi.ecole || sortChoisi.arme) === armeSecondaire) ? f2 : f;
+  dessinerDetailSort(sortChoisi, ficheDetail, cible, res, classeId);
 }
 
-function remplirGroupe(boite, membres, f, cible, memeArme, res, classeId) {
+function remplirGroupe(boite, membres, f, cible, memeArme, res, classeId, secondeArme) {
   for (const s of membres) {
     const b = document.createElement('button');
     b.className = 'sort' + (s.coups.length ? '' : ' muet')
@@ -4241,7 +4375,8 @@ function remplirGroupe(boite, membres, f, cible, memeArme, res, classeId) {
       <span class="icoSort">${s.ic
         ? `<img src="icones_sorts/${s.ic}" alt="" decoding="async">` : '<i></i>'}</span>
       <span class="txtSort">
-        <span class="n">${echapper(s.nom)}</span>
+        <span class="n">${echapper(s.nom)}${
+          secondeArme ? ` <small class="pas" title="${t('perso.secondeArmeNote')}">(${t('equip.secondeArme')})</small>` : ''}</span>
         <span class="d">${s.coups.length ? nb(tot.degats) : t('sorts.sansDegats')}</span>
         <span class="m">${[
           s.energie != null ? `${nb(s.energie, 1)} ${t('sorts.energie')}` : '',

@@ -1337,13 +1337,15 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
           <div id="plancherSlots" class="grillePiece"></div>
         </div>
         <!-- DEUXIEME ARME : le jeu permet d'en porter deux, mais seule celle
-             en main a un instant donne fournit ses affixes -- en garder une
-             deuxieme equipee sert a un sort de secours (ex: un grappin) ou a
-             vraiment jouer les deux a tour de role, jamais a cumuler leurs
-             affixes. Elle reste donc TOTALEMENT hors du solveur des 8
-             emplacements : un choix d'affichage/de cout, jamais une cible. -->
+             en main a un instant donne fournit ses affixes -- passer de
+             l'une a l'autre ne doit rien changer au perso, que ce soit pour
+             un sort de secours (ex: un grappin) ou pour vraiment jouer les
+             deux a tour de role. Elle reproduit donc l'inne + les gemmes de
+             l'arme active (memes affixes, jamais additionnes), et reste
+             hors du solveur des 8 emplacements : jamais une cible. -->
+
         <label class="coche"><input type="checkbox" id="secondeArmeActive">
-          <span data-i18n="perso.secondeArme">Deuxième arme (n'ajoute pas d'affixes)</span></label>
+          <span data-i18n="perso.secondeArme">Deuxième arme (mêmes affixes)</span></label>
         <div id="blocSecondeArme" hidden>
           <label for="secondeArmeType" data-i18n="perso.secondeArmeType">Type</label>
           <select id="secondeArmeType"></select>
