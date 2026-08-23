@@ -1416,6 +1416,40 @@ function remplirSelect(el, entrees, valeurSel) {
 function majArmes() {
   const c = $('classe').value;
   remplirSelect($('arme'), (D.armes[c] || []).map((a) => [a, a]));
+  // La deuxieme arme partage la meme liste de types que la classe : un
+  // Sorcerer n'a qu'un Staff pour les deux, une Withered Knight peut porter
+  // Greatsword ET Polearm and Shield a la fois.
+  if ($('secondeArmeType')) {
+    remplirSelect($('secondeArmeType'), (D.armes[c] || []).map((a) => [a, a]));
+  }
+}
+
+/* PICK DE LA DEUXIEME ARME : hors solveur, hors cibles.
+ *
+ * Aucune optimisation a faire ici -- elle ne sert jamais a couvrir un
+ * affixe, donc "la meilleure" ne veut rien dire. On prend juste une piece
+ * reelle du type et de la rarete demandes, de preference avec un inne pour
+ * que le paperdoll ne montre pas une carte vide de sens. Deterministe :
+ * memes reglages, meme piece, pour ne pas changer de tete a chaque calcul. */
+function choisirSecondeArme(classe, arme, grade) {
+  if (!arme || !grade) return null;
+  const pool = poolDe(classe, SLOT_ARME, arme, grade, false);
+  if (!pool.length) return null;
+  return pool.find((it) => it.i) || pool[0];
+}
+
+function secondeArmeActuelle(classe) {
+  if (!$('secondeArmeActive') || !$('secondeArmeActive').checked) return null;
+  const arme = $('secondeArmeType').value || null;
+  const grade = $('secondeArmeRarete').value ? Number($('secondeArmeRarete').value) : null;
+  return choisirSecondeArme(classe, arme, grade);
+}
+
+function poserSecondeArmeRarete() {
+  const sel = $('secondeArmeRarete');
+  if (!sel) return;
+  const avant = sel.value;
+  remplirSelect(sel, [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]]), avant || '5');
 }
 
 /* LA VRAIE ICÔNE DU JEU, PAS UN DESSIN.
@@ -2027,6 +2061,25 @@ function afficher(res, classe) {
     };
     majCadenas();
     pd.appendChild(carte);
+  }
+  // LA DEUXIEME ARME, A PART. Une 9e carte, hors de la boucle des 8
+  // emplacements du solveur : elle ne porte ni cadenas ni flèche
+  // d'alternative, puisqu'elle ne participe a aucun calcul. La note rappelle
+  // pourquoi elle n'apparait dans aucune ligne du tableau des affixes.
+  if (res.secondeArme) {
+    const it2 = res.secondeArme;
+    const couleur2 = D.couleurs[String(it2.g)] || '#9fb2c4';
+    const carte2 = document.createElement('div');
+    carte2.className = 'piece secondeArme';
+    carte2.style.setProperty('--tinte', couleur2);
+    carte2.style.borderColor = couleur2 + '66';
+    carte2.title = infobulle(it2);
+    carte2.innerHTML = `<div class="slot">${t('equip.secondeArme')}</div>
+      ${vignette(it2.ic, couleur2)}
+      <div class="nom" style="color:${couleur2}">${it2.n}</div>
+      <div class="inne${it2.i ? '' : ' sans'}">${it2.i ? t('equip.inne') + ' ' + it2.i : t('equip.aucunInne')}</div>
+      <div class="pas" style="font-size:11px;margin-top:4px">${t('perso.secondeArmeNote')}</div>`;
+    pd.appendChild(carte2);
   }
   majNoteVerrous();
 
@@ -2838,6 +2891,10 @@ function etatActuel() {
     t: [...cibles.entries()],
     w: [...vinManuel.entries()],
     b: _brew,
+    sa: !!($('secondeArmeActive') && $('secondeArmeActive').checked),
+    st: $('secondeArmeType') ? ($('secondeArmeType').value || null) : null,
+    sg: $('secondeArmeRarete') && $('secondeArmeRarete').value
+      ? Number($('secondeArmeRarete').value) : null,
   };
 }
 
@@ -2867,6 +2924,14 @@ function appliquerEtat(e) {
   const sv = e.sv || {};
   for (const sel of document.querySelectorAll('#saveurSlots select')) {
     sel.value = sv[sel.dataset.slot] || '';
+  }
+  // Absent des builds d'avant cette fonctionnalite : `!!e.sa` retombe a
+  // false, la case reste decochee, rien ne change pour eux.
+  if ($('secondeArmeActive')) {
+    $('secondeArmeActive').checked = !!e.sa;
+    $('blocSecondeArme').hidden = !e.sa;
+    if (e.st) $('secondeArmeType').value = e.st;
+    if (e.sg) $('secondeArmeRarete').value = String(e.sg);
   }
   cibles.clear();
   for (const [n, l] of e.t || []) cibles.set(n, l);
@@ -3574,7 +3639,8 @@ function dessinerSuggestions(res, classe) {
                           figeesDe(verrousObjet()));
       const majeur = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
                        sources: a.sources, vin: res.vin,
-                       vinPoints: res.vinPoints, suffisant: true };
+                       vinPoints: res.vinPoints, suffisant: true,
+                       secondeArme: res.secondeArme };
       dernier = majeur;
       afficher(majeur, classe);
       // `avant` et `apres` nus n'existaient pas dans cette portée : l'affectation
@@ -3604,7 +3670,8 @@ function echangerPiece(res, classe, slot, item) {
     Math.min(plafond(n), (a.couvert[n] || 0) + (vp.get(n) || 0)) < l);
   const maj = { slotItems: neufs, sockets: a.sockets, couvert: a.couvert,
                 sources: a.sources, vin: res.vin,
-                vinPoints: vp, suffisant: !manques.length };
+                vinPoints: vp, suffisant: !manques.length,
+                secondeArme: res.secondeArme };
   dernier = maj;
   afficher(maj, classe);
   $('etat').innerHTML = manques.length
@@ -3739,6 +3806,7 @@ function calculer() {
     try {
       const res = construire(classe, arme, [...cibles.entries()], grade,
                              $('vin').checked, mixte, planchers, vinManuel, verrousObjet(), saveurs);
+      res.secondeArme = secondeArmeActuelle(classe);
       dernier = res;
       afficher(res, classe);
       const raretes = {};
@@ -5504,6 +5572,7 @@ window.surChangementDeLangue = function () {
   poserAideVin();
   if (typeof BREWS !== 'undefined') poserBrews();
   poserRaretesParPiece();
+  poserSecondeArmeRarete();
   poserSaveurs();
   poserPieceManuelle();
   if (!D) return;
@@ -5630,6 +5699,7 @@ function demarrer(donnees) {
     [['', t('perso.auto')]].concat(
       [1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
   poserRaretesParPiece();
+  poserSecondeArmeRarete();
   poserSaveurs();
   poserPieceManuelle();
   dessinerAffixes();
@@ -5976,6 +6046,14 @@ function demarrer(donnees) {
     lecteur.readAsText(f);
   };
   $('mixte').onchange = () => { $('blocPlancher').hidden = !$('mixte').checked; };
+  if ($('secondeArmeActive')) {
+    $('secondeArmeActive').onchange = () => {
+      $('blocSecondeArme').hidden = !$('secondeArmeActive').checked;
+      if (cibles.size) calculer();
+    };
+    $('secondeArmeType').onchange = () => { if ($('secondeArmeActive').checked) calculer(); };
+    $('secondeArmeRarete').onchange = () => { if ($('secondeArmeActive').checked) calculer(); };
+  }
   $('importer').onclick = importer;
   $('copier').onclick = () => {
     // navigator.clipboard n'existe pas sur une page ouverte depuis le disque

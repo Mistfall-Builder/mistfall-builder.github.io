@@ -1193,6 +1193,9 @@ td.cout{width:64px}
 .cadenas.ferme{opacity:1;filter:none}
 .piece.verrouille{border-color:var(--accent)}
 .piece.verrouille .slot{background:var(--accent-sombre);color:var(--texte)}
+/* Portee mais jamais active en meme temps que l'arme principale : le trait
+   pointille dit "hors calcul" avant meme de lire la note en bas de carte. */
+.piece.secondeArme{border-style:dashed;opacity:.82}
 #noteVerrous button{width:auto;padding:3px 9px;font-size:11px;margin-left:8px}
 .piece .slot{font:800 10px/1 var(--condense);letter-spacing:1.7px;
   text-transform:uppercase;color:var(--terne);text-align:center;
@@ -1332,6 +1335,20 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
         <div id="blocPlancher" hidden>
           <div class="sousTitre" data-i18n="perso.parPiece">Rareté par pièce</div>
           <div id="plancherSlots" class="grillePiece"></div>
+        </div>
+        <!-- DEUXIEME ARME : le jeu permet d'en porter deux, mais seule celle
+             en main a un instant donne fournit ses affixes -- en garder une
+             deuxieme equipee sert a un sort de secours (ex: un grappin) ou a
+             vraiment jouer les deux a tour de role, jamais a cumuler leurs
+             affixes. Elle reste donc TOTALEMENT hors du solveur des 8
+             emplacements : un choix d'affichage/de cout, jamais une cible. -->
+        <label class="coche"><input type="checkbox" id="secondeArmeActive">
+          <span data-i18n="perso.secondeArme">Deuxième arme (n'ajoute pas d'affixes)</span></label>
+        <div id="blocSecondeArme" hidden>
+          <label for="secondeArmeType" data-i18n="perso.secondeArmeType">Type</label>
+          <select id="secondeArmeType"></select>
+          <label for="secondeArmeRarete" data-i18n="perso.secondeArmeRarete">Rareté</label>
+          <select id="secondeArmeRarete"></select>
         </div>
       </div>
     </details>
