@@ -3791,8 +3791,18 @@ function chercherUneIssue(classe, arme, grade, mixte, planchers, saveurs) {
   for (const e of essais) {
     let r;
     try {
+      // « panache » garde le grade verrouille comme PLANCHER (c'est
+      // planchersActuels() qui l'imposera une fois applique, rarete non
+      // vide + mixte coche) : l'apercu doit deja le respecter, sinon il
+      // promet un mix qui redescend sous ce plancher et Appliquer echoue
+      // silencieusement sur une combinaison qu'on vient de montrer comme
+      // fonctionnant. « auto »/« auto-panache » vident rarete (e.grade
+      // null) donc n'ont aucun plancher a simuler ici.
+      const planchersEssai = e.mixte
+        ? (e.grade ? Object.fromEntries(D.ordreSlots.map((s) => [s, e.grade])) : planchers)
+        : {};
       r = construire(classe, arme, liste, e.grade, vin, e.mixte,
-                     e.mixte ? planchers : {}, vinManuel, verrousObjet(), saveurs);
+                     planchersEssai, vinManuel, verrousObjet(), saveurs);
     } catch (err) { continue; }
     if (!r.suffisant) continue;
     const raretes = {};
