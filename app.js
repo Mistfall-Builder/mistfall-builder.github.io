@@ -590,6 +590,17 @@ const SLOTS_SAVEUR_COMPLET = ['Ring', 'Necklace'];
 const SLOTS_SAVEUR_ELEMENT = ['Gauntlets', 'Boots'];
 const SLOTS_SAVEUR = [...SLOTS_SAVEUR_COMPLET, ...SLOTS_SAVEUR_ELEMENT];
 
+/* L'ELEMENT PAR DEFAUT DE CHAQUE CLASSE, POUR RING/NECKLACE/GAUNTLETS/
+ * BOOTS QUAND RIEN N'EST CHOISI A LA MAIN. Verifie sur les degats reels de
+ * chaque competence (skills.js, champ `coups[].type`) plutot que suppose :
+ * Sorcerer (Staff) et Seer (Catalyst ET Mace) sont magiques a 100% des
+ * coups types ; Mercenary/Blackarrow/Shadowstrix/Withered Knight sont
+ * physiques. Un choix manuel sur un emplacement l'emporte toujours -- voir
+ * poolSlot, qui n'applique ce defaut que si `saveurs[slot]` est vide. */
+const ELEMENT_PAR_CLASSE = {
+  10: 'phys', 11: 'mag', 12: 'phys', 13: 'phys', 14: 'mag', 15: 'phys',
+};
+
 function elementDe(it) {
   const at = (it && it.at) || {};
   for (const cle of Object.keys(at)) if (SAVEUR_ELEM[cle]) return SAVEUR_ELEM[cle];
@@ -635,10 +646,29 @@ function poolSlot(classe, slot, arme, grade, mixte, raretes, saveurs) {
   const impose = raretes && raretes[slot];
   const pool = impose ? poolDe(classe, slot, arme, impose, false)
                        : poolDe(classe, slot, arme, grade, mixte);
-  const voulue = saveurs && saveurs[slot];
-  if (!voulue) return pool;
-  const filtre = pool.filter((it) => descripteurSaveur(slot, it) === voulue);
-  return filtre.length ? filtre : pool;
+  // PAS DE `saveurs` DU TOUT (alternatives/suggestions/gainsParPiece) :
+  // ces appels montrent TOUJOURS tout, le defaut de classe ci-dessous ne
+  // les concerne pas -- voir le commentaire au-dessus de la fonction.
+  if (!saveurs) return pool;
+  const voulue = saveurs[slot];
+  if (voulue) {
+    const filtre = pool.filter((it) => descripteurSaveur(slot, it) === voulue);
+    return filtre.length ? filtre : pool;
+  }
+  // RIEN CHOISI A LA MAIN : l'element qui correspond aux degats de la
+  // classe (magique pour Sorcerer/Seer, physique pour les autres). On ne
+  // filtre que sur l'element (`elementDe`, pas `descripteurSaveur`) : la
+  // classe n'impose pas de preference attaque/vie, seulement physique ou
+  // magique -- filtrer sur les deux axes aurait ecarte a tort les pieces
+  // qui portent le bon element avec l'autre stat.
+  if (SLOTS_SAVEUR.includes(slot)) {
+    const elemVoulu = ELEMENT_PAR_CLASSE[classe];
+    if (elemVoulu) {
+      const filtre = pool.filter((it) => elementDe(it) === elemVoulu);
+      if (filtre.length) return filtre;
+    }
+  }
+  return pool;
 }
 
 function poolDe(classe, slot, arme, grade, mixte) {
@@ -6296,6 +6326,14 @@ function dessinerSvgCarte() {
         if (carteGlisseDist > 6) return;
         ev.stopPropagation();
         carteInfobulle(ev, it, p[2]);
+      };
+      // SURVOLER MONTRE DEJA LE DETAIL, PAS BESOIN DE CLIQUER : le clic
+      // reste utile au clavier/tactile (rien a survoler), donc les deux
+      // cohabitent sans se marcher dessus.
+      g.onmouseenter = (ev) => carteInfobulle(ev, it, p[2]);
+      g.onmouseleave = () => {
+        const bulle = $('carteTooltip');
+        if (bulle) bulle.hidden = true;
       };
       svg.appendChild(g);
     }
