@@ -6025,9 +6025,8 @@ function indexButin() {
   }
   for (const table of (self.D_LOOT_MOBS || [])) {
     for (const l of table.loot) {
-      const valeur = l.min === l.max ? `${l.min}%` : `${l.min}–${l.max}%`;
       decroche(l.nom, l.rarete).sources.push(
-        { label: table.monstres.join(' / '), valeur });
+        { label: table.monstres.join(' / '), valeur: formaterTaux(l.taux), long: true });
     }
   }
   _butinIndex = [...parNom.values()].sort((a, b) => {
@@ -6055,10 +6054,13 @@ function carteButin(o) {
   el.className = 'objCarte';
   const coul = D.couleurs[raretVersGrade(o.rarete)] || 'var(--bord)';
   el.style.borderLeftColor = coul;
+  // `s.valeur` est soit un simple nombre+% (coffres, intrinsequement sans
+  // danger), soit deja echappe par formaterTaux (monstres, qui coud lui-
+  // meme les libelles d'intensite) -- l'echapper ICI le double-echapperait.
   const sources = o.sources.map((s) => `
-    <div class="butinSource">
+    <div class="butinSource${s.long ? ' long' : ''}">
       <span class="butinConteneurs">${echapper(s.label)}</span>
-      <span class="butinChance">${echapper(s.valeur)}</span>
+      <span class="butinChance">${s.valeur}</span>
     </div>`).join('');
   el.innerHTML = `
     <div class="objTxt">
@@ -6146,6 +6148,31 @@ function indexLootParMonstre() {
   }
   _lootParMonstre = idx;
   return idx;
+}
+
+// L'ORDRE D'AFFICHAGE : Normal, Chaos, Cataclysm d'abord (croissant en
+// difficulte), puis tout le reste (garanti, ou le texte brut du wiki
+// quand aucune intensite precise n'est identifiable) par ordre alphabetique.
+const ORDRE_INTENSITES = ['Normal', 'Chaos', 'Cataclysm'];
+function trierIntensites(cles) {
+  return [...cles].sort((a, b) => {
+    const ia = ORDRE_INTENSITES.indexOf(a);
+    const ib = ORDRE_INTENSITES.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+function maxDeTaux(taux) {
+  return Math.max(...Object.values(taux).map(([, mx]) => mx));
+}
+function formaterTaux(taux) {
+  return trierIntensites(Object.keys(taux)).map((cle) => {
+    const [mn, mx] = taux[cle];
+    const plage = mn === mx ? `${mn}%` : `${mn}–${mx}%`;
+    return `${echapper(cle)} ${plage}`;
+  }).join(' · ');
 }
 
 function carteZoneActuelle() {
@@ -6304,6 +6331,62 @@ function svgEl(nom, attrs) {
   return el;
 }
 
+/* UN SEUL clipPath, PARTAGE PAR TOUS LES POINTS "monstre" : decouper une
+   icone en rond, pas de raison d'en redefinir un par point. */
+function carteDefsClip() {
+  const defs = svgEl('defs', {});
+  const clip = svgEl('clipPath', { id: 'carteClipRond' });
+  clip.appendChild(svgEl('circle', { cx: 0, cy: 0, r: 6 }));
+  defs.appendChild(clip);
+  return defs;
+}
+
+/* LE MARQUEUR D'UN POINT, EN COORDONNEES LOCALES (0,0 = le point lui-meme
+ * -- le <g> parent porte deja le `translate`). Trois familles :
+ *   - monstre  : la vraie icone du bestiaire (recoltee par
+ *     tools/recolter_bestiary_icones.py), sur un fond rond colore ;
+ *   - coffre   : un glyphe de coffre simple (meme silhouette pour tous
+ *     les types -- il en existe ~150, aucune source ne donne une icone
+ *     par type, la rareté/couleur fait deja la distinction utile) ;
+ *   - POI      : un losange, pas un rond -- 34 types differents, la
+ *     plupart des codes internes sans equivalent visuel evident (ex.
+ *     "loose-loot-pack-1001"), la FORME distingue au moins la famille
+ *     sans inventer un sens a des codes qu'on ne peut pas verifier.
+ * Le contour des glyphes passe par une CLASSE (`carteGlyphe`), pas un
+ * attribut `stroke` en JS -- meme raison que pour la couleur de fond. */
+function carteMarqueur(it) {
+  const frag = document.createDocumentFragment();
+  if (it.cat === 'monstres') {
+    frag.appendChild(svgEl('circle', { r: 7 }));
+    const fichier = (self.D_ICONES_MONSTRES || {})[it.nom];
+    if (fichier) {
+      const img = svgEl('image', {
+        x: -6, y: -6, width: 12, height: 12, 'clip-path': 'url(#carteClipRond)',
+      });
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'icones_monstres/' + fichier);
+      img.setAttribute('href', 'icones_monstres/' + fichier);
+      frag.appendChild(img);
+    }
+    return frag;
+  }
+  if (it.cat === 'coffres') {
+    frag.appendChild(svgEl('circle', { r: 6 }));
+    const corps = svgEl('rect', {
+      x: -3.4, y: -2.4, width: 6.8, height: 4.8, rx: 0.7, class: 'carteGlyphe',
+    });
+    const couvercle = svgEl('line', {
+      x1: -3.4, y1: -0.5, x2: 3.4, y2: -0.5, class: 'carteGlyphe',
+    });
+    frag.appendChild(corps);
+    frag.appendChild(couvercle);
+    return frag;
+  }
+  frag.appendChild(svgEl('rect', {
+    x: -4.6, y: -4.6, width: 9.2, height: 9.2, rx: 1.3, transform: 'rotate(45)',
+  }));
+  return frag;
+}
+
 function dessinerSvgCarte() {
   const svg = $('carteSvg');
   svg.innerHTML = '';
@@ -6336,6 +6419,7 @@ function dessinerSvgCarte() {
     }
     return;
   }
+  svg.appendChild(carteDefsClip());
   for (const it of choisis) {
     for (const p of it.points) {
       // La couleur passe par une CLASSE CSS, pas par un attribut `fill`
@@ -6343,8 +6427,11 @@ function dessinerSvgCarte() {
       // les navigateurs ne le resolvent pas tous depuis un attribut de
       // presentation SVG pose via setAttribute -- le point rendait alors
       // noir, sans erreur, donc sans rien a debugger dans la console.
-      const g = svgEl('g', { class: 'cartePoint carteCat-' + it.cat });
-      g.appendChild(svgEl('circle', { cx: p[0] * 1000, cy: p[1] * 1000, r: 5 }));
+      const g = svgEl('g', {
+        class: 'cartePoint carteCat-' + it.cat,
+        transform: `translate(${p[0] * 1000},${p[1] * 1000})`,
+      });
+      g.appendChild(carteMarqueur(it));
       g.onclick = (ev) => {
         // UN CLIC QUI SUIT UN GLISSEMENT DE CARTE N'EST PAS UN CLIC SUR LE
         // POINT : sans ce garde-fou, relacher le glisser-deposer pile sur
@@ -6393,20 +6480,21 @@ function carteInfobulle(ev, it, aire) {
       }
     }
   } else if (it.cat === 'monstres') {
-    // LE TAUX VARIE SELON LA DIFFICULTE/le mode solo-trio : on montre la
-    // fourchette min-max plutot qu'un chiffre qui ferait croire au meme
-    // taux partout (voir tools/recolter_loot.py pour le detail).
+    // LE TAUX VARIE SELON LA DIFFICULTE (Normal/Chaos/Cataclysm) : on
+    // montre chaque intensite separement plutot qu'une fourchette globale
+    // qui masquerait que Cataclysm peut donner 10x plus que Normal (voir
+    // tools/recolter_loot.py pour le detail).
     const loot = indexLootParMonstre().get(it.nom);
     if (loot && loot.length) {
-      const tries = [...loot].sort((a, b) => b.max - a.max);
-      html += tries.slice(0, 8).map((l) => {
+      const tries = [...loot].sort((a, b) => maxDeTaux(b.taux) - maxDeTaux(a.taux));
+      html += tries.slice(0, 6).map((l) => {
         const coul = D.couleurs[raretVersGrade(l.rarete)] || 'var(--terne)';
-        const plage = l.min === l.max ? `${l.min}%` : `${l.min}–${l.max}%`;
-        return `<div class="tLoot"><span style="color:${coul}">${echapper(l.nom)}</span>
-          <span class="n">${plage}</span></div>`;
+        return `<div class="tLoot tLootMob">
+          <span style="color:${coul}">${echapper(l.nom)}</span>
+          <span class="n">${formaterTaux(l.taux)}</span></div>`;
       }).join('');
-      if (tries.length > 8) {
-        html += `<div class="tLoot pas">${t('carte.plusObjets', { n: tries.length - 8 })}</div>`;
+      if (tries.length > 6) {
+        html += `<div class="tLoot pas">${t('carte.plusObjets', { n: tries.length - 6 })}</div>`;
       }
     }
   }

@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=138">
+<link rel="stylesheet" href="icones_affixes.css?v=139">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1016,11 +1016,16 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
    sur sa ligne, le nom a gauche et la chance a droite, pour rester lisible
    meme quand un objet a cinq sources ou plus. */
 .butinSources{display:flex;flex-direction:column;gap:2px;margin-top:4px}
-.butinSource{display:flex;justify-content:space-between;gap:8px;
-  font-size:11px;color:var(--doux)}
+.butinSource{display:flex;flex-wrap:wrap;justify-content:space-between;
+  gap:2px 8px;font-size:11px;color:var(--doux)}
 .butinConteneurs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.butinChance{flex:0 0 auto;color:var(--accent-clair);
+.butinChance{flex:0 1 auto;color:var(--accent-clair);text-align:right;
   font-variant-numeric:tabular-nums}
+/* Le detail par intensite (Chaos/Cataclysm/...) d'un monstre est plus
+   long qu'un simple pourcentage de coffre : sur sa propre ligne, pleine
+   largeur, plutot que de forcer son nom a se compresser a cote. */
+.butinSource.long{flex-direction:column}
+.butinSource.long .butinChance{text-align:left}
 .butinCatTitre{grid-column:1/-1;font:700 11.5px/1 var(--condense);
   letter-spacing:1px;text-transform:uppercase;color:var(--accent-clair);
   border-bottom:1px solid var(--bord);padding:12px 0 5px;margin-top:4px}
@@ -1042,9 +1047,12 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .cartePoint{cursor:pointer}
 .cartePoint circle{stroke:var(--fond);stroke-width:1}
 .cartePoint:hover circle{stroke:var(--texte);stroke-width:1.5}
+.cartePoint:hover rect{stroke:var(--texte);stroke-width:1.5}
 .carteCat-coffres circle{fill:var(--accent)}
 .carteCat-monstres circle{fill:var(--ko)}
-.carteCat-pois circle{fill:var(--def)}
+.carteCat-pois rect{fill:var(--def);stroke:var(--fond);stroke-width:1}
+.carteGlyphe{fill:none;stroke:var(--fond);stroke-width:.9;
+  stroke-linecap:round}
 .carteZoom{position:absolute;right:8px;bottom:8px;display:flex;
   flex-direction:column;gap:3px}
 .carteZoom button{width:28px;height:28px;padding:0;font-size:15px;
@@ -1081,10 +1089,14 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   box-shadow:0 4px 16px rgba(0,0,0,.5)}
 #carteTooltip .tTitre{font-weight:600;margin-bottom:2px}
 #carteTooltip .tAire{color:var(--terne);font-size:11px;margin-bottom:5px}
-#carteTooltip .tLoot{display:flex;justify-content:space-between;gap:8px;
-  font-size:11px;padding:2px 0}
+#carteTooltip .tLoot{display:flex;flex-wrap:wrap;justify-content:space-between;
+  gap:1px 8px;font-size:11px;padding:2px 0}
 #carteTooltip .tLoot .n{color:var(--accent-clair);
   font-variant-numeric:tabular-nums;flex:0 0 auto}
+/* Le detail par intensite d'un monstre est plus long qu'un pourcentage
+   de coffre : sur sa propre ligne, pour rester lisible. */
+#carteTooltip .tLootMob{flex-direction:column}
+#carteTooltip .tLootMob .n{color:var(--doux);font-size:10.5px}
 #carteTooltip .tFermer{position:absolute;top:3px;right:5px;width:auto;
   padding:0 3px;font-size:11px;background:none;border:none;color:var(--terne)}
 #carteTooltip .tFermer:hover{color:var(--texte)}
@@ -1965,17 +1977,18 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=138"></script>
-<script src="config.js?v=138"></script>
-<script src="comptes.js?v=138"></script>
-<script src="donnees.js?v=138"></script>
-<script src="skills.js?v=138"></script>
-<script src="loot.js?v=138"></script>
-<script src="maps.js?v=138"></script>
-<script src="talents.js?v=138"></script>
-<script src="builds_reference.js?v=138"></script>
-<script src="guides_classes.js?v=138"></script>
-<script src="fiche.js?v=138"></script>
-<script src="app.js?v=138"></script>
+<script src="i18n.js?v=139"></script>
+<script src="config.js?v=139"></script>
+<script src="comptes.js?v=139"></script>
+<script src="donnees.js?v=139"></script>
+<script src="skills.js?v=139"></script>
+<script src="loot.js?v=139"></script>
+<script src="maps.js?v=139"></script>
+<script src="monstres_icones.js?v=139"></script>
+<script src="talents.js?v=139"></script>
+<script src="builds_reference.js?v=139"></script>
+<script src="guides_classes.js?v=139"></script>
+<script src="fiche.js?v=139"></script>
+<script src="app.js?v=139"></script>
 </body>
 </html>
