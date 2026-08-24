@@ -6253,17 +6253,27 @@ function dessinerSvgCarte() {
   svg.innerHTML = '';
   const z = carteZoneActuelle();
   if (!z) return;
+  // LE VRAI FOND DE CARTE : un rendu du terrain du jeu (meme nature que
+  // les icones d'objets/competences deja reprises sur ce site), pas une
+  // illustration originale du wiki -- toujours en premier, sous tout le
+  // reste. `href` seul suffit aux navigateurs actuels ; `xlink:href` en
+  // plus pour les moteurs SVG plus anciens qui ne lisent que lui.
+  if (z.image) {
+    const img = svgEl('image', { x: 0, y: 0, width: 1000, height: 1000 });
+    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'maps/' + z.image);
+    img.setAttribute('href', 'maps/' + z.image);
+    svg.appendChild(img);
+  }
   const items = carteListeItems();
   const choisis = items.filter((it) => carteEtat.selection.has(it.cat + '|' + it.nom));
 
-  // RIEN DE COCHE : les aires servent de repere, discretes, pour ne pas
-  // recreer le fouillis dont on nous a parle.
+  // RIEN DE COCHE : de petits reperes d'aires, discrets -- la carte est
+  // deja lisible par elle-meme, pas besoin de grosses bulles par-dessus.
   if (!choisis.length) {
     for (const a of z.aires) {
       const g = svgEl('g', { class: 'carteAire' });
-      const rayon = Math.max(10, Math.min(40, Math.sqrt(a.n) * 2.4));
-      g.appendChild(svgEl('circle', { cx: a.pos[0] * 1000, cy: a.pos[1] * 1000, r: rayon }));
-      const texte = svgEl('text', { x: a.pos[0] * 1000, y: a.pos[1] * 1000 + rayon + 13 });
+      g.appendChild(svgEl('circle', { cx: a.pos[0] * 1000, cy: a.pos[1] * 1000, r: 4 }));
+      const texte = svgEl('text', { x: a.pos[0] * 1000, y: a.pos[1] * 1000 - 8 });
       texte.textContent = a.nom;
       g.appendChild(texte);
       svg.appendChild(g);
