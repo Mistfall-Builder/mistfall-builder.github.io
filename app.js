@@ -6249,13 +6249,14 @@ function dessinerSvgCarte() {
     return;
   }
   for (const it of choisis) {
-    const [, couleur] = CARTE_CATEGORIES.find(([c]) => c === it.cat);
     for (const p of it.points) {
-      const g = svgEl('g', { class: 'cartePoint' });
-      g.appendChild(svgEl('circle', {
-        cx: p[0] * 1000, cy: p[1] * 1000, r: 5, fill: couleur,
-        'fill-opacity': .85, stroke: 'var(--fond)', 'stroke-width': 1,
-      }));
+      // La couleur passe par une CLASSE CSS, pas par un attribut `fill`
+      // pose en JS : `var(--accent)` colle dans une regle de style, mais
+      // les navigateurs ne le resolvent pas tous depuis un attribut de
+      // presentation SVG pose via setAttribute -- le point rendait alors
+      // noir, sans erreur, donc sans rien a debugger dans la console.
+      const g = svgEl('g', { class: 'cartePoint carteCat-' + it.cat });
+      g.appendChild(svgEl('circle', { cx: p[0] * 1000, cy: p[1] * 1000, r: 5 }));
       g.onclick = (ev) => {
         // UN CLIC QUI SUIT UN GLISSEMENT DE CARTE N'EST PAS UN CLIC SUR LE
         // POINT : sans ce garde-fou, relacher le glisser-deposer pile sur
