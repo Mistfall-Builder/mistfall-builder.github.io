@@ -5966,18 +5966,29 @@ const BUTIN_PAR_PAGE = 60;
 const butinEtat = { page: 0, total: 0 };
 let _butinIndex = null;
 
-/* Un objet peut tomber de plusieurs types de conteneurs, a des chances
-   differentes selon la table : on aplatit D_LOOT en une seule liste par
-   NOM d'objet, chaque entree gardant la liste de ses tables d'origine. */
+/* Un objet peut venir de plusieurs coffres ET de plusieurs monstres, a
+   des chances differentes selon la source : on aplatit D_LOOT (coffres,
+   pourcentage fixe) et D_LOOT_MOBS (monstres, fourchette selon le mode)
+   en une seule liste par NOM d'objet, chaque source deja mise en forme
+   pour l'affichage -- pas de branchement par type au moment de dessiner. */
 function indexButin() {
   if (_butinIndex) return _butinIndex;
   const parNom = new Map();
+  const decroche = (nom, rarete) => {
+    if (!parNom.has(nom)) parNom.set(nom, { nom, rarete, sources: [] });
+    return parNom.get(nom);
+  };
   for (const table of (self.D_LOOT || [])) {
     for (const l of table.loot) {
-      if (!parNom.has(l.nom)) {
-        parNom.set(l.nom, { nom: l.nom, rarete: l.rarete, sources: [] });
-      }
-      parNom.get(l.nom).sources.push({ conteneurs: table.conteneurs, part: l.part });
+      decroche(l.nom, l.rarete).sources.push(
+        { label: table.conteneurs.join(' / '), valeur: `${l.part}%` });
+    }
+  }
+  for (const table of (self.D_LOOT_MOBS || [])) {
+    for (const l of table.loot) {
+      const valeur = l.min === l.max ? `${l.min}%` : `${l.min}–${l.max}%`;
+      decroche(l.nom, l.rarete).sources.push(
+        { label: table.monstres.join(' / '), valeur });
     }
   }
   _butinIndex = [...parNom.values()].sort((a, b) => a.nom.localeCompare(b.nom));
@@ -6003,8 +6014,8 @@ function carteButin(o) {
   el.style.borderLeftColor = coul;
   const sources = o.sources.map((s) => `
     <div class="butinSource">
-      <span class="butinConteneurs">${echapper(s.conteneurs.join(' / '))}</span>
-      <span class="butinChance">${s.part}%</span>
+      <span class="butinConteneurs">${echapper(s.label)}</span>
+      <span class="butinChance">${echapper(s.valeur)}</span>
     </div>`).join('');
   el.innerHTML = `
     <div class="objTxt">
@@ -6067,6 +6078,17 @@ function indexLootParConteneur() {
     for (const c of table.conteneurs) idx.set(c, table.loot);
   }
   _lootParConteneur = idx;
+  return idx;
+}
+
+let _lootParMonstre = null;
+function indexLootParMonstre() {
+  if (_lootParMonstre) return _lootParMonstre;
+  const idx = new Map();
+  for (const table of (self.D_LOOT_MOBS || [])) {
+    for (const m of table.monstres) idx.set(m, table.loot);
+  }
+  _lootParMonstre = idx;
   return idx;
 }
 
@@ -6291,6 +6313,23 @@ function carteInfobulle(ev, it, aire) {
         const coul = D.couleurs[raretVersGrade(l.rarete)] || 'var(--terne)';
         return `<div class="tLoot"><span style="color:${coul}">${echapper(l.nom)}</span>
           <span class="n">${l.part}%</span></div>`;
+      }).join('');
+      if (tries.length > 8) {
+        html += `<div class="tLoot pas">${t('carte.plusObjets', { n: tries.length - 8 })}</div>`;
+      }
+    }
+  } else if (it.cat === 'monstres') {
+    // LE TAUX VARIE SELON LA DIFFICULTE/le mode solo-trio : on montre la
+    // fourchette min-max plutot qu'un chiffre qui ferait croire au meme
+    // taux partout (voir tools/recolter_loot.py pour le detail).
+    const loot = indexLootParMonstre().get(it.nom);
+    if (loot && loot.length) {
+      const tries = [...loot].sort((a, b) => b.max - a.max);
+      html += tries.slice(0, 8).map((l) => {
+        const coul = D.couleurs[raretVersGrade(l.rarete)] || 'var(--terne)';
+        const plage = l.min === l.max ? `${l.min}%` : `${l.min}–${l.max}%`;
+        return `<div class="tLoot"><span style="color:${coul}">${echapper(l.nom)}</span>
+          <span class="n">${plage}</span></div>`;
       }).join('');
       if (tries.length > 8) {
         html += `<div class="tLoot pas">${t('carte.plusObjets', { n: tries.length - 8 })}</div>`;
