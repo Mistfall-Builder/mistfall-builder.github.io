@@ -5950,6 +5950,7 @@ function montrerPage(id) {
   // coute rien tant qu'on reste sur le Builder.
   if (id === 'pageObjets') ouvrirRessources();
   if (id === 'pageButin') ouvrirButin();
+  if (id === 'pageCarte') ouvrirCarte();
   if (id === 'pageCommunaute') {
     dessinerBuildsClasses();
     dessinerGuidesClasses();
@@ -6044,14 +6045,229 @@ function ouvrirButin() {
   dessinerButin();
 }
 
+/* CARTE. Vide par defaut : un joueur nous a ecrit que devoir decocher
+   toutes les cases avant chaque run genait plus que ca n'aidait -- ici on
+   coche ce qu'on veut voir, rien de plus, et on peut sauver la selection
+   pour la retrouver la prochaine fois (localStorage, pas de compte). */
+const CARTE_CLE_PRESETS = 'mistfallCartePresets';
+const CARTE_CATEGORIES = [
+  ['coffres', 'var(--accent)', 'carte.coffres'],
+  ['monstres', 'var(--ko)', 'carte.monstres'],
+  ['pois', 'var(--def)', 'carte.pois'],
+];
+const carteEtat = { zone: null, selection: new Set() };
+
+function carteZoneActuelle() {
+  return (self.D_MAPS || []).find((z) => z.slug === carteEtat.zone);
+}
+
+function carteListeItems() {
+  const z = carteZoneActuelle();
+  if (!z) return [];
+  const q = ($('carteRecherche').value || '').trim().toLowerCase();
+  const items = [];
+  for (const [cat] of CARTE_CATEGORIES) {
+    for (const groupe of z[cat]) {
+      if (q && !groupe.nom.toLowerCase().includes(q)) continue;
+      items.push({ cat, nom: groupe.nom, n: groupe.n, points: groupe.points });
+    }
+  }
+  return items;
+}
+
+function carteClePresets() {
+  try { return JSON.parse(localStorage.getItem(CARTE_CLE_PRESETS)) || []; }
+  catch (e) { return []; }
+}
+
+function dessinerZonesCarte() {
+  const boite = $('carteZones');
+  boite.innerHTML = '';
+  for (const z of (self.D_MAPS || [])) {
+    const b = document.createElement('button');
+    b.textContent = z.nom;
+    b.className = z.slug === carteEtat.zone ? 'actif' : '';
+    b.onclick = () => changerZoneCarte(z.slug);
+    boite.appendChild(b);
+  }
+}
+
+function changerZoneCarte(slug) {
+  carteEtat.zone = slug;
+  carteEtat.selection.clear();
+  dessinerZonesCarte();
+  dessinerCarte();
+}
+
+function dessinerListeCarte() {
+  const boite = $('carteListe');
+  boite.innerHTML = '';
+  const items = carteListeItems();
+  if (!items.length) {
+    boite.innerHTML = `<div class="objVide">${t('obj.rien')}</div>`;
+    return;
+  }
+  const f = document.createDocumentFragment();
+  for (const it of items) {
+    const cle = it.cat + '|' + it.nom;
+    const [, couleur] = CARTE_CATEGORIES.find(([c]) => c === it.cat);
+    const l = document.createElement('label');
+    l.className = 'carteItem';
+    const puce = document.createElement('span');
+    puce.className = 'puce';
+    puce.style.background = couleur;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = carteEtat.selection.has(cle);
+    cb.onchange = () => {
+      if (cb.checked) carteEtat.selection.add(cle);
+      else carteEtat.selection.delete(cle);
+      dessinerSvgCarte();
+    };
+    const nom = document.createElement('span');
+    nom.className = 'nom';
+    nom.textContent = it.nom;
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = it.n;
+    l.appendChild(cb); l.appendChild(puce); l.appendChild(nom); l.appendChild(n);
+    f.appendChild(l);
+  }
+  boite.innerHTML = '';
+  boite.appendChild(f);
+}
+
+const NS_SVG = 'http://www.w3.org/2000/svg';
+function svgEl(nom, attrs) {
+  const el = document.createElementNS(NS_SVG, nom);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  return el;
+}
+
+function dessinerSvgCarte() {
+  const svg = $('carteSvg');
+  svg.innerHTML = '';
+  const z = carteZoneActuelle();
+  if (!z) return;
+  const items = carteListeItems();
+  const choisis = items.filter((it) => carteEtat.selection.has(it.cat + '|' + it.nom));
+
+  // RIEN DE COCHE : les aires servent de repere, discretes, pour ne pas
+  // recreer le fouillis dont on nous a parle.
+  if (!choisis.length) {
+    for (const a of z.aires) {
+      const g = svgEl('g', { class: 'carteAire' });
+      const rayon = Math.max(10, Math.min(40, Math.sqrt(a.n) * 2.4));
+      g.appendChild(svgEl('circle', { cx: a.pos[0] * 1000, cy: a.pos[1] * 1000, r: rayon }));
+      const texte = svgEl('text', { x: a.pos[0] * 1000, y: a.pos[1] * 1000 + rayon + 13 });
+      texte.textContent = a.nom;
+      g.appendChild(texte);
+      svg.appendChild(g);
+    }
+    return;
+  }
+  for (const it of choisis) {
+    const [, couleur] = CARTE_CATEGORIES.find(([c]) => c === it.cat);
+    for (const p of it.points) {
+      const g = svgEl('g', { class: 'cartePoint' });
+      g.appendChild(svgEl('circle', {
+        cx: p[0] * 1000, cy: p[1] * 1000, r: 5, fill: couleur,
+        'fill-opacity': .85, stroke: 'var(--fond)', 'stroke-width': 1,
+      }));
+      g.onclick = (ev) => carteInfobulle(ev, it.nom, p[2]);
+      svg.appendChild(g);
+    }
+  }
+}
+
+function carteInfobulle(ev, nom, aire) {
+  let bulle = $('carteTooltip');
+  if (!bulle) {
+    bulle = document.createElement('div');
+    bulle.id = 'carteTooltip';
+    $('carteSvg').parentElement.style.position = 'relative';
+    $('carteSvg').parentElement.appendChild(bulle);
+  }
+  bulle.textContent = aire ? `${nom} — ${aire}` : nom;
+  const cadre = $('carteSvg').getBoundingClientRect();
+  bulle.style.left = (ev.clientX - cadre.left + 10) + 'px';
+  bulle.style.top = (ev.clientY - cadre.top + 10) + 'px';
+  bulle.hidden = false;
+  clearTimeout(carteInfobulle._t);
+  carteInfobulle._t = setTimeout(() => { bulle.hidden = true; }, 2500);
+}
+
+function dessinerPresetsCarte() {
+  const boite = $('cartePresetsListe');
+  boite.innerHTML = '';
+  const presets = carteClePresets();
+  for (let i = 0; i < presets.length; i += 1) {
+    const p = presets[i];
+    const el = document.createElement('span');
+    el.className = 'cartePreset';
+    const nom = document.createElement('span');
+    nom.textContent = p.nom;
+    nom.onclick = () => appliquerPresetCarte(p);
+    const suppr = document.createElement('button');
+    suppr.type = 'button';
+    suppr.textContent = '✕';
+    suppr.title = t('carte.presetSupprimer');
+    suppr.onclick = (ev) => {
+      ev.stopPropagation();
+      const tous = carteClePresets();
+      tous.splice(i, 1);
+      localStorage.setItem(CARTE_CLE_PRESETS, JSON.stringify(tous));
+      dessinerPresetsCarte();
+    };
+    el.appendChild(nom); el.appendChild(suppr);
+    boite.appendChild(el);
+  }
+}
+
+function appliquerPresetCarte(p) {
+  carteEtat.zone = p.zone;
+  carteEtat.selection = new Set(p.selection);
+  dessinerZonesCarte();
+  dessinerCarte();
+}
+
+function sauverPresetCarte() {
+  const champ = $('cartePresetNom');
+  const nom = (champ.value || '').trim();
+  if (!nom || !carteEtat.selection.size) return;
+  const presets = carteClePresets();
+  presets.push({ nom, zone: carteEtat.zone, selection: [...carteEtat.selection] });
+  localStorage.setItem(CARTE_CLE_PRESETS, JSON.stringify(presets));
+  champ.value = '';
+  dessinerPresetsCarte();
+}
+
+function dessinerCarte() {
+  dessinerListeCarte();
+  dessinerSvgCarte();
+}
+
+let _carteBranchee = false;
+function ouvrirCarte() {
+  if (!_carteBranchee) {
+    _carteBranchee = true;
+    if (!carteEtat.zone && (self.D_MAPS || []).length) carteEtat.zone = self.D_MAPS[0].slug;
+    dessinerZonesCarte();
+    $('carteRecherche').oninput = dessinerListeCarte;
+    $('cartePresetSauver').onclick = sauverPresetCarte;
+    dessinerPresetsCarte();
+  }
+  dessinerCarte();
+}
+
 function poserNavigation() {
   for (const b of document.querySelectorAll('#nav button')) {
     b.onclick = () => montrerPage(b.dataset.page);
     // Sans compte branché, cet onglet n'a rien à montrer : un onglet qui
-    // ouvre sur du vide est pire que pas d'onglet. Où farmer n'a besoin
-    // d'aucun compte, c'est une table statique.
+    // ouvre sur du vide est pire que pas d'onglet. Où farmer et Carte
+    // n'ont besoin d'aucun compte, ce sont des tables statiques.
     if (b.dataset.page !== 'main' && b.dataset.page !== 'pageButin'
-        && !comptesDispo()) b.hidden = true;
+        && b.dataset.page !== 'pageCarte' && !comptesDispo()) b.hidden = true;
   }
 }
 
