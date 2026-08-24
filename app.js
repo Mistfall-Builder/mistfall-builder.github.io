@@ -5949,6 +5949,7 @@ function montrerPage(id) {
   // Le catalogue ne se dessine qu'ici : c'est ce qui garantit qu'il ne
   // coute rien tant qu'on reste sur le Builder.
   if (id === 'pageObjets') ouvrirRessources();
+  if (id === 'pageButin') ouvrirButin();
   if (id === 'pageCommunaute') {
     dessinerBuildsClasses();
     dessinerGuidesClasses();
@@ -5960,12 +5961,97 @@ function montrerPage(id) {
   window.scrollTo({ top: 0 });
 }
 
+const BUTIN_PAR_PAGE = 60;
+const butinEtat = { page: 0, total: 0 };
+let _butinIndex = null;
+
+/* Un objet peut tomber de plusieurs types de conteneurs, a des chances
+   differentes selon la table : on aplatit D_LOOT en une seule liste par
+   NOM d'objet, chaque entree gardant la liste de ses tables d'origine. */
+function indexButin() {
+  if (_butinIndex) return _butinIndex;
+  const parNom = new Map();
+  for (const table of (self.D_LOOT || [])) {
+    for (const l of table.loot) {
+      if (!parNom.has(l.nom)) {
+        parNom.set(l.nom, { nom: l.nom, rarete: l.rarete, sources: [] });
+      }
+      parNom.get(l.nom).sources.push({ conteneurs: table.conteneurs, part: l.part });
+    }
+  }
+  _butinIndex = [...parNom.values()].sort((a, b) => a.nom.localeCompare(b.nom));
+  return _butinIndex;
+}
+
+function raretVersGrade(nom) {
+  for (const [g, n] of Object.entries(D.raretes)) if (n === nom) return g;
+  return null;
+}
+
+function butinFiltres() {
+  const q = ($('butinRecherche').value || '').trim().toLowerCase();
+  const liste = indexButin();
+  if (!q) return liste;
+  return liste.filter((o) => o.nom.toLowerCase().includes(q));
+}
+
+function carteButin(o) {
+  const el = document.createElement('div');
+  el.className = 'objCarte';
+  const coul = D.couleurs[raretVersGrade(o.rarete)] || 'var(--bord)';
+  el.style.borderLeftColor = coul;
+  const sources = o.sources.map((s) => `
+    <div class="butinSource">
+      <span class="butinConteneurs">${echapper(s.conteneurs.join(' / '))}</span>
+      <span class="butinChance">${s.part}%</span>
+    </div>`).join('');
+  el.innerHTML = `
+    <div class="objTxt">
+      <span class="objNom">${echapper(o.nom)}</span>
+      <span class="objMeta"><span class="objTier" style="color:${coul}">${echapper(o.rarete)}</span></span>
+      <div class="butinSources">${sources}</div>
+    </div>`;
+  return el;
+}
+
+function dessinerButin(page) {
+  const boite = $('butinGrille');
+  if (!boite) return;
+  if (typeof page === 'number') butinEtat.page = page;
+  const liste = butinFiltres();
+  butinEtat.total = liste.length;
+  if (butinEtat.page * BUTIN_PAR_PAGE >= liste.length) butinEtat.page = 0;
+  const tranche = liste.slice(butinEtat.page * BUTIN_PAR_PAGE,
+                               butinEtat.page * BUTIN_PAR_PAGE + BUTIN_PAR_PAGE);
+  boite.innerHTML = '';
+  if (!tranche.length) {
+    boite.innerHTML = `<div class="objVide">${t('obj.rien')}</div>`;
+  } else {
+    const f = document.createDocumentFragment();
+    for (const o of tranche) f.appendChild(carteButin(o));
+    boite.appendChild(f);
+  }
+  $('butinCompte').textContent = t('obj.compte', { n: liste.length });
+  dessinerPages($('butinPages'), butinEtat, BUTIN_PAR_PAGE, dessinerButin);
+}
+
+let _butinBranche = false;
+function ouvrirButin() {
+  if (!_butinBranche) {
+    _butinBranche = true;
+    $('butinRecherche').oninput = () => dessinerButin(0);
+  }
+  dessinerButin();
+}
+
 function poserNavigation() {
   for (const b of document.querySelectorAll('#nav button')) {
     b.onclick = () => montrerPage(b.dataset.page);
-    // Sans compte branché, ces deux onglets n'ont rien à montrer : un
-    // onglet qui ouvre sur du vide est pire que pas d'onglet.
-    if (b.dataset.page !== 'main' && !comptesDispo()) b.hidden = true;
+    // Sans compte branché, cet onglet n'a rien à montrer : un onglet qui
+    // ouvre sur du vide est pire que pas d'onglet. Où farmer n'a besoin
+    // d'aucun compte, c'est une table statique.
+    if (b.dataset.page !== 'main' && b.dataset.page !== 'pageButin'
+        && !comptesDispo()) b.hidden = true;
   }
 }
 
