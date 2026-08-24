@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=139">
+<link rel="stylesheet" href="icones_affixes.css?v=140">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1051,6 +1051,12 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .carteCat-coffres circle{fill:var(--accent)}
 .carteCat-monstres circle{fill:var(--ko)}
 .carteCat-pois rect{fill:var(--def);stroke:var(--fond);stroke-width:1}
+/* La ou les sources ou la chance de trouver l'objet cherche est la plus
+   haute : une couleur a part (pas la couleur de categorie), pour sauter
+   aux yeux au milieu des autres points du meme type. Prime sur la
+   couleur de categorie normale (regle plus specifique, meme ordre CSS). */
+.carteMeilleur circle{fill:var(--avert)}
+.carteMeilleur rect{fill:var(--avert)}
 .carteGlyphe{fill:none;stroke:var(--fond);stroke-width:.9;
   stroke-linecap:round}
 .carteZoom{position:absolute;right:8px;bottom:8px;display:flex;
@@ -1059,6 +1065,32 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   line-height:1;background:var(--panneau2);border:1px solid var(--bord-fort)}
 .carteZoom button:hover{border-color:var(--accent-sombre);color:var(--accent)}
 .cartePanneau{display:flex;flex-direction:column;gap:8px;min-width:0}
+.carteObjetRecherche{position:relative}
+.carteObjetSuggestions{position:absolute;top:100%;left:0;right:0;z-index:8;
+  margin-top:3px;background:var(--panneau2);border:1px solid var(--bord-fort);
+  border-radius:4px;max-height:320px;overflow-y:auto;
+  box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.carteSuggestion{display:flex;align-items:center;gap:8px;padding:6px 8px;
+  cursor:pointer;font-size:12px}
+.carteSuggestion:hover{background:rgba(255,255,255,.05)}
+.carteSuggestion img{width:24px;height:24px;flex:0 0 auto;object-fit:contain;
+  border-radius:3px;background:rgba(255,255,255,.03)}
+.carteSuggestion .sansIcone{width:24px;height:24px;flex:0 0 auto;
+  border-radius:3px;background:rgba(255,255,255,.03);
+  border:1px dashed var(--bord-fort)}
+.carteSuggestion .nom{flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.carteSuggestion .n{flex:0 0 auto;color:var(--accent-clair);font-size:11px;
+  font-variant-numeric:tabular-nums}
+.carteObjetActif{display:flex;align-items:center;gap:8px;padding:7px 9px;
+  background:var(--panneau2);border:1px solid var(--accent-sombre);
+  border-radius:4px;font-size:12px}
+.carteObjetActif img{width:26px;height:26px;flex:0 0 auto;object-fit:contain;
+  border-radius:3px}
+.carteObjetActif .nom{flex:1;min-width:0;font-weight:600}
+.carteObjetActif button{width:auto;padding:2px 7px;font-size:11px;
+  background:none;border:1px solid var(--bord-fort);color:var(--terne)}
+.carteObjetActif button:hover{color:var(--texte);border-color:var(--accent-sombre)}
 .carteListe{max-height:340px;overflow-y:auto;display:flex;
   flex-direction:column;gap:2px;border:1px solid var(--bord);
   border-radius:4px;padding:4px}
@@ -1920,6 +1952,12 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
           </div>
         </div>
         <div class="cartePanneau">
+          <div class="carteObjetRecherche">
+            <input type="text" id="carteObjetInput" autocomplete="off"
+                   data-i18n-ph="carte.objetRecherche" placeholder="Trouver un objet (ex: Agate)…">
+            <div id="carteObjetSuggestions" class="carteObjetSuggestions" hidden></div>
+          </div>
+          <div id="carteObjetActif" class="carteObjetActif" hidden></div>
           <input type="text" id="carteRecherche" autocomplete="off"
                  data-i18n-ph="carte.recherche" placeholder="Coffre, monstre, point d'intérêt…">
           <div id="carteListe" class="carteListe"></div>
@@ -1977,18 +2015,18 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=139"></script>
-<script src="config.js?v=139"></script>
-<script src="comptes.js?v=139"></script>
-<script src="donnees.js?v=139"></script>
-<script src="skills.js?v=139"></script>
-<script src="loot.js?v=139"></script>
-<script src="maps.js?v=139"></script>
-<script src="monstres_icones.js?v=139"></script>
-<script src="talents.js?v=139"></script>
-<script src="builds_reference.js?v=139"></script>
-<script src="guides_classes.js?v=139"></script>
-<script src="fiche.js?v=139"></script>
-<script src="app.js?v=139"></script>
+<script src="i18n.js?v=140"></script>
+<script src="config.js?v=140"></script>
+<script src="comptes.js?v=140"></script>
+<script src="donnees.js?v=140"></script>
+<script src="skills.js?v=140"></script>
+<script src="loot.js?v=140"></script>
+<script src="maps.js?v=140"></script>
+<script src="monstres_icones.js?v=140"></script>
+<script src="talents.js?v=140"></script>
+<script src="builds_reference.js?v=140"></script>
+<script src="guides_classes.js?v=140"></script>
+<script src="fiche.js?v=140"></script>
+<script src="app.js?v=140"></script>
 </body>
 </html>

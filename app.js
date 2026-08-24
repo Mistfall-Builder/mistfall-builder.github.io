@@ -6019,14 +6019,19 @@ function indexButin() {
   };
   for (const table of (self.D_LOOT || [])) {
     for (const l of table.loot) {
-      decroche(l.nom, l.rarete).sources.push(
-        { label: table.conteneurs.join(' / '), valeur: `${l.part}%` });
+      decroche(l.nom, l.rarete).sources.push({
+        cat: 'coffres', noms: table.conteneurs,
+        label: table.conteneurs.join(' / '), valeur: `${l.part}%`, tauxMax: l.part,
+      });
     }
   }
   for (const table of (self.D_LOOT_MOBS || [])) {
     for (const l of table.loot) {
-      decroche(l.nom, l.rarete).sources.push(
-        { label: table.monstres.join(' / '), valeur: formaterTaux(l.taux), long: true });
+      decroche(l.nom, l.rarete).sources.push({
+        cat: 'monstres', noms: table.monstres,
+        label: table.monstres.join(' / '), valeur: formaterTaux(l.taux),
+        tauxMax: maxDeTaux(l.taux), long: true,
+      });
     }
   }
   _butinIndex = [...parNom.values()].sort((a, b) => {
@@ -6124,7 +6129,10 @@ const CARTE_CATEGORIES = [
   ['monstres', 'var(--ko)', 'carte.monstres'],
   ['pois', 'var(--def)', 'carte.pois'],
 ];
-const carteEtat = { zone: null, selection: new Set() };
+// `meilleur` : les cles ('cat|nom') de la ou des sources ou l'objet
+// cherche a la plus grande chance de tomber -- vide en navigation normale,
+// rempli seulement par une recherche d'objet (carteSelectionnerObjet).
+const carteEtat = { zone: null, selection: new Set(), meilleur: new Set() };
 const carteVue = { x: 0, y: 0, w: 1000, h: 1000 };
 let carteGlisseDist = 0;
 
@@ -6213,6 +6221,11 @@ function dessinerZonesCarte() {
 function changerZoneCarte(slug) {
   carteEtat.zone = slug;
   carteEtat.selection.clear();
+  if (carteEtat.meilleur.size) {
+    carteEtat.meilleur.clear();
+    $('carteObjetActif').hidden = true;
+    $('carteObjetInput').value = '';
+  }
   resetVueCarte();
   dessinerZonesCarte();
   dessinerCarte();
@@ -6309,6 +6322,14 @@ function dessinerListeCarte() {
     cb.onchange = () => {
       if (cb.checked) carteEtat.selection.add(cle);
       else carteEtat.selection.delete(cle);
+      // Une case cochee/decochee a la main sort du mode "recherche
+      // d'objet" : garder une couleur "meilleure source" sans rapport
+      // avec ce qu'on regarde maintenant serait trompeur.
+      if (carteEtat.meilleur.size) {
+        carteEtat.meilleur.clear();
+        $('carteObjetActif').hidden = true;
+        $('carteObjetInput').value = '';
+      }
       dessinerSvgCarte();
     };
     const nom = document.createElement('span');
@@ -6427,8 +6448,9 @@ function dessinerSvgCarte() {
       // les navigateurs ne le resolvent pas tous depuis un attribut de
       // presentation SVG pose via setAttribute -- le point rendait alors
       // noir, sans erreur, donc sans rien a debugger dans la console.
+      const surligne = carteEtat.meilleur.has(it.cat + '|' + it.nom);
       const g = svgEl('g', {
-        class: 'cartePoint carteCat-' + it.cat,
+        class: 'cartePoint carteCat-' + it.cat + (surligne ? ' carteMeilleur' : ''),
         transform: `translate(${p[0] * 1000},${p[1] * 1000})`,
       });
       g.appendChild(carteMarqueur(it));
@@ -6552,6 +6574,87 @@ function sauverPresetCarte() {
   dessinerPresetsCarte();
 }
 
+/* RECHERCHE D'UN OBJET PRECIS (pas un type de coffre/monstre) : trouve
+ * TOUTES ses sources (indexButin, deja croise coffres+monstres), coche
+ * automatiquement celles qui existent sur une carte, et retient la ou
+ * les sources au taux le plus haut pour les colorer a part. */
+function carteObjetsFiltres() {
+  const q = ($('carteObjetInput').value || '').trim().toLowerCase();
+  if (!q) return [];
+  return indexButin().filter((o) => o.nom.toLowerCase().includes(q)).slice(0, 8);
+}
+
+function dessinerSuggestionsObjet() {
+  const boite = $('carteObjetSuggestions');
+  const items = carteObjetsFiltres();
+  if (!items.length) { boite.hidden = true; boite.innerHTML = ''; return; }
+  boite.innerHTML = '';
+  for (const o of items) {
+    const meilleure = [...o.sources].sort((a, b) => b.tauxMax - a.tauxMax)[0];
+    const chemin = (self.D_LOOT_ICONES || {})[o.nom];
+    const el = document.createElement('div');
+    el.className = 'carteSuggestion';
+    el.innerHTML = `
+      ${chemin ? `<img src="${echapper(chemin)}" alt="" loading="lazy">`
+                : '<span class="sansIcone"></span>'}
+      <span class="nom">${echapper(o.nom)}</span>
+      <span class="n">${echapper(meilleure.valeur)}</span>`;
+    el.onclick = () => carteSelectionnerObjet(o);
+    boite.appendChild(el);
+  }
+  boite.hidden = false;
+}
+
+function carteEffacerObjetActif() {
+  carteEtat.meilleur.clear();
+  carteEtat.selection.clear();
+  $('carteObjetActif').hidden = true;
+  $('carteObjetInput').value = '';
+  dessinerCarte();
+}
+
+function carteSelectionnerObjet(o) {
+  const zones = self.D_MAPS || [];
+  // LA ZONE ACTUELLE D'ABORD : si elle a au moins une source, on y reste
+  // plutot que de deplacer le joueur sans qu'il l'ait demande. Sinon, la
+  // premiere zone qui a une source -- une carte vide serait pire.
+  const aUneSource = (zone, s) => zone[s.cat].some((g) => s.noms.includes(g.nom));
+  let zoneCible = zones.find((z) => z.slug === carteEtat.zone
+    && o.sources.some((s) => aUneSource(z, s)));
+  if (!zoneCible) zoneCible = zones.find((z) => o.sources.some((s) => aUneSource(z, s)));
+  if (!zoneCible) return;  // aucune zone connue n'a ce que le wiki liste comme source
+
+  if (carteEtat.zone !== zoneCible.slug) {
+    carteEtat.zone = zoneCible.slug;
+    resetVueCarte();
+    dessinerZonesCarte();
+  }
+  carteEtat.selection.clear();
+  carteEtat.meilleur.clear();
+  const tauxTop = Math.max(...o.sources.map((s) => s.tauxMax));
+  for (const s of o.sources) {
+    if (!aUneSource(zoneCible, s)) continue;  // pas sur CETTE carte -- rien a cocher ici
+    for (const nom of s.noms) {
+      if (!zoneCible[s.cat].some((g) => g.nom === nom)) continue;
+      const cle = s.cat + '|' + nom;
+      carteEtat.selection.add(cle);
+      if (s.tauxMax === tauxTop) carteEtat.meilleur.add(cle);
+    }
+  }
+
+  const chemin = (self.D_LOOT_ICONES || {})[o.nom];
+  const actif = $('carteObjetActif');
+  actif.innerHTML = `
+    ${chemin ? `<img src="${echapper(chemin)}" alt="" loading="lazy">` : ''}
+    <span class="nom">${echapper(o.nom)}</span>
+    <button type="button" id="carteObjetEffacer">✕</button>`;
+  actif.hidden = false;
+  $('carteObjetEffacer').onclick = carteEffacerObjetActif;
+  $('carteObjetInput').value = o.nom;
+  $('carteObjetSuggestions').hidden = true;
+  dessinerCarte();
+}
+
 function dessinerCarte() {
   dessinerListeCarte();
   dessinerSvgCarte();
@@ -6565,8 +6668,16 @@ function ouvrirCarte() {
     dessinerZonesCarte();
     brancherPanZoom();
     $('carteRecherche').oninput = dessinerListeCarte;
+    $('carteObjetInput').oninput = dessinerSuggestionsObjet;
     $('cartePresetSauver').onclick = sauverPresetCarte;
     dessinerPresetsCarte();
+    // Un clic hors du champ/de la liste de suggestions les referme.
+    document.addEventListener('click', (ev) => {
+      const boite = $('carteObjetSuggestions');
+      if (boite && !boite.hidden && !ev.target.closest('.carteObjetRecherche')) {
+        boite.hidden = true;
+      }
+    });
     // Un clic hors de la fiche (ou sur un autre point) la referme : pas
     // besoin de chercher la petite croix a chaque fois.
     document.addEventListener('click', (ev) => {
