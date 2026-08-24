@@ -2275,6 +2275,19 @@ function majNoteVerrous() {
   };
 }
 
+// N'APPELÉE QU'APRÈS UN BUILD RÉUSSI (res.suffisant) : c'est le seul moment
+// où l'outil vient de livrer sa valeur. Une fermeture est définitive
+// (localStorage), donc réappeler cette fonction ensuite ne redonne rien.
+function afficherRappelDon() {
+  const box = $('donRappel');
+  if (!box || localStorage.getItem('donRappelFerme') === '1') return;
+  box.hidden = false;
+  $('donRappelFermer').onclick = () => {
+    box.hidden = true;
+    localStorage.setItem('donRappelFerme', '1');
+  };
+}
+
 function afficher(res, classe) {
   const pd = $('paperdoll');
   pd.innerHTML = '';
@@ -4157,6 +4170,7 @@ function calculer() {
         if (res.suffisant) {
           $('etat').innerHTML =
             `<span class="ok">${t('etat.ok')}</span><br>${chrono}`;
+          afficherRappelDon();
           return;
         }
         // ÉCHEC : ne pas s'arrêter à « pas atteignable ». Une rareté figée

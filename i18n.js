@@ -483,6 +483,9 @@
       'pied.texte': 'Le code produit ici se colle dans',
       'pied.texte2': 'Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.',
       'pied.don': 'Offrir un café',
+      'don.rappelTexte': 'Ce build t’a été utile ? L’outil est gratuit et le restera.',
+      'don.rappelBouton': 'Offrir un café ☕',
+      'don.fermer': 'Fermer, je ne veux plus voir ce message',
       'raretes.auto': 'auto',
     },
 
@@ -954,6 +957,9 @@
       'pied.texte': 'The code produced here pastes into',
       'pied.texte2': 'Format verified in game both ways. No prices, no market.',
       'pied.don': 'Buy me a coffee',
+      'don.rappelTexte': 'Was this build useful? The tool is free and stays free.',
+      'don.rappelBouton': 'Buy me a coffee ☕',
+      'don.fermer': 'Close, don’t show this again',
       'raretes.auto': 'auto',
     },
 
@@ -1435,6 +1441,9 @@
       'pied.texte': 'Полученный код вставляется в',
       'pied.texte2': 'Формат проверен в игре в обе стороны. Без цен и рынка.',
       'pied.don': 'Купить мне кофе',
+      'don.rappelTexte': 'Эта сборка пригодилась? Инструмент бесплатный и останется бесплатным.',
+      'don.rappelBouton': 'Купить мне кофе ☕',
+      'don.fermer': 'Закрыть, больше не показывать',
       'raretes.auto': 'авто',
     },
   };
