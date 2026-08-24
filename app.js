@@ -5996,6 +5996,12 @@ const BUTIN_PAR_PAGE = 60;
 const butinEtat = { page: 0, total: 0 };
 let _butinIndex = null;
 
+/* L'ORDRE D'AFFICHAGE DES CATEGORIES, PAS L'ORDRE ALPHABETIQUE : les
+   ressources d'artisanat et les objets d'esprit sont ce qui interesse le
+   plus (farming), l'equipement le moins (on le trouve deja en jouant) --
+   voir tools/recolter_loot.py pour comment D_LOOT_CAT est calcule. */
+const BUTIN_CATEGORIES = ['ressources', 'esprit', 'cles', 'autres', 'items'];
+
 /* Un objet peut venir de plusieurs coffres ET de plusieurs monstres, a
    des chances differentes selon la source : on aplatit D_LOOT (coffres,
    pourcentage fixe) et D_LOOT_MOBS (monstres, fourchette selon le mode)
@@ -6005,7 +6011,10 @@ function indexButin() {
   if (_butinIndex) return _butinIndex;
   const parNom = new Map();
   const decroche = (nom, rarete) => {
-    if (!parNom.has(nom)) parNom.set(nom, { nom, rarete, sources: [] });
+    if (!parNom.has(nom)) {
+      const cat = (self.D_LOOT_CAT || {})[nom] || 'autres';
+      parNom.set(nom, { nom, rarete, categorie: cat, sources: [] });
+    }
     return parNom.get(nom);
   };
   for (const table of (self.D_LOOT || [])) {
@@ -6021,7 +6030,11 @@ function indexButin() {
         { label: table.monstres.join(' / '), valeur });
     }
   }
-  _butinIndex = [...parNom.values()].sort((a, b) => a.nom.localeCompare(b.nom));
+  _butinIndex = [...parNom.values()].sort((a, b) => {
+    const oa = BUTIN_CATEGORIES.indexOf(a.categorie);
+    const ob = BUTIN_CATEGORIES.indexOf(b.categorie);
+    return oa !== ob ? oa - ob : a.nom.localeCompare(b.nom);
+  });
   return _butinIndex;
 }
 
@@ -6070,7 +6083,20 @@ function dessinerButin(page) {
     boite.innerHTML = `<div class="objVide">${t('obj.rien')}</div>`;
   } else {
     const f = document.createDocumentFragment();
-    for (const o of tranche) f.appendChild(carteButin(o));
+    // UN TITRE QUAND LA CATEGORIE CHANGE, PAS A CHAQUE OBJET : la liste
+    // est deja triee par categorie (indexButin), donc un simple "categorie
+    // precedente" suffit -- pas besoin de grouper en amont.
+    let categoriePrecedente = null;
+    for (const o of tranche) {
+      if (o.categorie !== categoriePrecedente) {
+        categoriePrecedente = o.categorie;
+        const titre = document.createElement('div');
+        titre.className = 'butinCatTitre';
+        titre.textContent = t('butin.cat.' + o.categorie);
+        f.appendChild(titre);
+      }
+      f.appendChild(carteButin(o));
+    }
     boite.appendChild(f);
   }
   $('butinCompte').textContent = t('obj.compte', { n: liste.length });
