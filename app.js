@@ -6056,6 +6056,19 @@ const CARTE_CATEGORIES = [
   ['pois', 'var(--def)', 'carte.pois'],
 ];
 const carteEtat = { zone: null, selection: new Set() };
+const carteVue = { x: 0, y: 0, w: 1000, h: 1000 };
+let carteGlisseDist = 0;
+
+let _lootParConteneur = null;
+function indexLootParConteneur() {
+  if (_lootParConteneur) return _lootParConteneur;
+  const idx = new Map();
+  for (const table of (self.D_LOOT || [])) {
+    for (const c of table.conteneurs) idx.set(c, table.loot);
+  }
+  _lootParConteneur = idx;
+  return idx;
+}
 
 function carteZoneActuelle() {
   return (self.D_MAPS || []).find((z) => z.slug === carteEtat.zone);
@@ -6095,8 +6108,77 @@ function dessinerZonesCarte() {
 function changerZoneCarte(slug) {
   carteEtat.zone = slug;
   carteEtat.selection.clear();
+  resetVueCarte();
   dessinerZonesCarte();
   dessinerCarte();
+}
+
+/* PAN/ZOOM PAR VIEWBOX : pas de librairie, juste deplacer et retailler le
+   cadre visible. `w` et `h` restent toujours egaux (le cadre est carre,
+   comme le contenu) pour ne jamais deformer les points. */
+function appliquerVueCarte() {
+  $('carteSvg').setAttribute('viewBox',
+    `${carteVue.x} ${carteVue.y} ${carteVue.w} ${carteVue.h}`);
+}
+function clamperVueCarte() {
+  carteVue.w = Math.min(1000, Math.max(40, carteVue.w));
+  carteVue.h = carteVue.w;
+  carteVue.x = Math.min(1000 - carteVue.w, Math.max(0, carteVue.x));
+  carteVue.y = Math.min(1000 - carteVue.h, Math.max(0, carteVue.y));
+}
+function resetVueCarte() {
+  carteVue.x = 0; carteVue.y = 0; carteVue.w = 1000; carteVue.h = 1000;
+  appliquerVueCarte();
+}
+function zoomerCarte(facteur, px, py) {
+  const w2 = carteVue.w * facteur;
+  const wc = Math.min(1000, Math.max(40, w2));
+  carteVue.x = px - (px - carteVue.x) * (wc / carteVue.w);
+  carteVue.y = py - (py - carteVue.y) * (wc / carteVue.h);
+  carteVue.w = wc; carteVue.h = wc;
+  clamperVueCarte();
+  appliquerVueCarte();
+}
+function cartePointVersSvg(ev, rect) {
+  return {
+    x: carteVue.x + ((ev.clientX - rect.left) / rect.width) * carteVue.w,
+    y: carteVue.y + ((ev.clientY - rect.top) / rect.height) * carteVue.h,
+  };
+}
+function brancherPanZoom() {
+  const svg = $('carteSvg');
+  svg.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    const p = cartePointVersSvg(ev, svg.getBoundingClientRect());
+    zoomerCarte(ev.deltaY > 0 ? 1.15 : 1 / 1.15, p.x, p.y);
+  }, { passive: false });
+  let actif = false;
+  let dx0 = 0;
+  let dy0 = 0;
+  svg.addEventListener('pointerdown', (ev) => {
+    actif = true; dx0 = ev.clientX; dy0 = ev.clientY; carteGlisseDist = 0;
+    svg.setPointerCapture(ev.pointerId);
+  });
+  svg.addEventListener('pointermove', (ev) => {
+    if (!actif) return;
+    const rect = svg.getBoundingClientRect();
+    const dxPx = ev.clientX - dx0;
+    const dyPx = ev.clientY - dy0;
+    carteGlisseDist += Math.abs(dxPx) + Math.abs(dyPx);
+    carteVue.x -= (dxPx / rect.width) * carteVue.w;
+    carteVue.y -= (dyPx / rect.height) * carteVue.h;
+    dx0 = ev.clientX; dy0 = ev.clientY;
+    clamperVueCarte();
+    appliquerVueCarte();
+  });
+  const finGlisse = () => { actif = false; };
+  svg.addEventListener('pointerup', finGlisse);
+  svg.addEventListener('pointerleave', finGlisse);
+  $('carteZoomPlus').onclick = () => zoomerCarte(1 / 1.4,
+    carteVue.x + carteVue.w / 2, carteVue.y + carteVue.h / 2);
+  $('carteZoomMoins').onclick = () => zoomerCarte(1.4,
+    carteVue.x + carteVue.w / 2, carteVue.y + carteVue.h / 2);
+  $('carteZoomReset').onclick = resetVueCarte;
 }
 
 function dessinerListeCarte() {
@@ -6174,27 +6256,53 @@ function dessinerSvgCarte() {
         cx: p[0] * 1000, cy: p[1] * 1000, r: 5, fill: couleur,
         'fill-opacity': .85, stroke: 'var(--fond)', 'stroke-width': 1,
       }));
-      g.onclick = (ev) => carteInfobulle(ev, it.nom, p[2]);
+      g.onclick = (ev) => {
+        // UN CLIC QUI SUIT UN GLISSEMENT DE CARTE N'EST PAS UN CLIC SUR LE
+        // POINT : sans ce garde-fou, relacher le glisser-deposer pile sur
+        // un point ouvrait sa fiche au lieu de simplement finir le geste.
+        if (carteGlisseDist > 6) return;
+        ev.stopPropagation();
+        carteInfobulle(ev, it, p[2]);
+      };
       svg.appendChild(g);
     }
   }
 }
 
-function carteInfobulle(ev, nom, aire) {
+/* LES TAUX DE DROP, DIRECTEMENT SUR LA CARTE. Un coffre porte le meme nom
+   ici et dans les tables de butin (loot.js) -- le lien se fait par ce nom,
+   sans dupliquer les chiffres nulle part. */
+function carteInfobulle(ev, it, aire) {
   let bulle = $('carteTooltip');
   if (!bulle) {
     bulle = document.createElement('div');
     bulle.id = 'carteTooltip';
-    $('carteSvg').parentElement.style.position = 'relative';
     $('carteSvg').parentElement.appendChild(bulle);
   }
-  bulle.textContent = aire ? `${nom} — ${aire}` : nom;
+  let html = `<button type="button" class="tFermer">✕</button>
+    <div class="tTitre">${echapper(it.nom)}</div>`;
+  if (aire) html += `<div class="tAire">${echapper(aire)}</div>`;
+  if (it.cat === 'coffres') {
+    const loot = indexLootParConteneur().get(it.nom);
+    if (loot && loot.length) {
+      const tries = [...loot].sort((a, b) => b.part - a.part);
+      html += tries.slice(0, 8).map((l) => {
+        const coul = D.couleurs[raretVersGrade(l.rarete)] || 'var(--terne)';
+        return `<div class="tLoot"><span style="color:${coul}">${echapper(l.nom)}</span>
+          <span class="n">${l.part}%</span></div>`;
+      }).join('');
+      if (tries.length > 8) {
+        html += `<div class="tLoot pas">${t('carte.plusObjets', { n: tries.length - 8 })}</div>`;
+      }
+    }
+  }
+  bulle.innerHTML = html;
+  bulle.querySelector('.tFermer').onclick = () => { bulle.hidden = true; };
   const cadre = $('carteSvg').getBoundingClientRect();
-  bulle.style.left = (ev.clientX - cadre.left + 10) + 'px';
+  const gauche = Math.min(ev.clientX - cadre.left + 10, Math.max(0, cadre.width - 250));
+  bulle.style.left = gauche + 'px';
   bulle.style.top = (ev.clientY - cadre.top + 10) + 'px';
   bulle.hidden = false;
-  clearTimeout(carteInfobulle._t);
-  carteInfobulle._t = setTimeout(() => { bulle.hidden = true; }, 2500);
 }
 
 function dessinerPresetsCarte() {
@@ -6253,9 +6361,17 @@ function ouvrirCarte() {
     _carteBranchee = true;
     if (!carteEtat.zone && (self.D_MAPS || []).length) carteEtat.zone = self.D_MAPS[0].slug;
     dessinerZonesCarte();
+    brancherPanZoom();
     $('carteRecherche').oninput = dessinerListeCarte;
     $('cartePresetSauver').onclick = sauverPresetCarte;
     dessinerPresetsCarte();
+    // Un clic hors de la fiche (ou sur un autre point) la referme : pas
+    // besoin de chercher la petite croix a chaque fois.
+    document.addEventListener('click', (ev) => {
+      const bulle = $('carteTooltip');
+      if (bulle && !bulle.hidden && !bulle.contains(ev.target)
+          && !ev.target.closest('.cartePoint')) bulle.hidden = true;
+    });
   }
   dessinerCarte();
 }
