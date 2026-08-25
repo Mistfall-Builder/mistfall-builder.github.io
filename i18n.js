@@ -486,7 +486,7 @@
 
       'table.titre': 'Affixes obtenus',
       'accueil.essaie': 'Depuis un guide :',
-      'accueil.tous': 'les 12 →',
+      'accueil.tous': 'les 14 →',
       'demo.bandeau': "Build d'exemple : {nom}, d'après {source}. « Tout effacer » pour repartir des tiens.",
       'legende.palier': "Le point marque le palier : le niveau où l'affixe gagne un second effet.",
       'table.affixe': 'Affixe',
@@ -1050,7 +1050,7 @@
 
       'table.titre': 'Affixes obtained',
       'accueil.essaie': 'From a guide:',
-      'accueil.tous': 'all 12 →',
+      'accueil.tous': 'all 14 →',
       'demo.bandeau': 'Example build: {nom}, from {source}. Hit "Clear all" to start your own.',
       'legende.palier': 'The dot marks the breakpoint: the level where the affix gains a second effect.',
       'table.affixe': 'Affix',
@@ -1614,7 +1614,7 @@
 
       'table.titre': 'Полученные аффиксы',
       'accueil.essaie': 'Из гайда:',
-      'accueil.tous': 'все 12 →',
+      'accueil.tous': 'все 14 →',
       'demo.bandeau': 'Пример сборки: {nom}, по материалам {source}. «Очистить всё», чтобы собрать свою.',
       'legende.palier': 'Точка отмечает порог: уровень, на котором аффикс получает второй эффект.',
       'table.affixe': 'Аффикс',
