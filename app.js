@@ -6079,8 +6079,14 @@ function carteButin(o) {
   // `s.valeur` est soit un simple nombre+% (coffres, intrinsequement sans
   // danger), soit deja echappe par formaterTaux (monstres, qui coud lui-
   // meme les libelles d'intensite) -- l'echapper ICI le double-echapperait.
-  const sources = parTaux.map((s) => `
-    <div class="butinSource${s.long ? ' long' : ''}">
+  // SUR LA CARTE OU PAS : une source dont aucun des noms n'existe sur une
+  // zone connue de D_MAPS (mob generique jamais releve, etc.) ne peut mener
+  // nulle part -- elle reste une ligne d'info, pas un lien mort.
+  const surCarte = (s) => (self.D_MAPS || []).some(
+    (z) => (z[s.cat] || []).some((g) => s.noms.includes(g.nom)));
+  const sources = parTaux.map((s, i) => `
+    <div class="butinSource${s.long ? ' long' : ''}${surCarte(s) ? ' cliquable' : ''}"
+         data-idx="${i}" ${surCarte(s) ? `title="${echapper(t('carte.voirSur'))}"` : ''}>
       <span class="butinConteneurs">${echapper(s.label)}</span>
       <span class="butinChance">${s.valeur}</span>
     </div>`).join('');
@@ -6094,6 +6100,12 @@ function carteButin(o) {
       ${o.usage ? `<span class="objUsage">${usageEnHtml(o.usage)}</span>` : ''}
       <div class="butinSources">${sources || `<div class="pas" style="font-size:11px">${t('butin.aucuneSource')}</div>`}</div>
     </div>`;
+  // UNE SOURCE CLIQUEE OUVRE LA CARTE DESSUS, PAS BESOIN DE LA RECHERCHER
+  // A LA MAIN : "Où farmer" dit qu'un objet tombe ici, "Carte" montre où
+  // "ici" se trouve -- la boucle se ferme comme pour Artisanat -> Où farmer.
+  el.querySelectorAll('.butinSource.cliquable').forEach((div) => {
+    div.onclick = () => allerVersCarteSource(o, parTaux[Number(div.dataset.idx)]);
+  });
   return el;
 }
 
@@ -6832,6 +6844,46 @@ function carteSelectionnerObjet(o) {
   if (autres > 0) {
     actif.innerHTML += `<div class="carteObjetAutres">${t('carte.autresSourcesM', { n: autres })}</div>`;
   }
+  actif.hidden = false;
+  $('carteObjetEffacer').onclick = carteEffacerObjetActif;
+  $('carteObjetInput').value = o.nom;
+  $('carteObjetSuggestions').hidden = true;
+  dessinerCarte();
+}
+
+/* DEPUIS "OU FARMER", VERS LA CARTE, SUR UNE SOURCE PRECISE.
+   carteSelectionnerObjet() ne garde que la MEILLEURE source d'un objet --
+   utile pour « où le trouver le mieux », pas pour « montre-moi CETTE ligne
+   que je viens de cliquer ». Ici on sait déjà laquelle : on la coche telle
+   quelle, sans la comparer aux autres sources du même objet. */
+function allerVersCarteSource(o, s) {
+  montrerPage('pageCarte');
+
+  const zones = self.D_MAPS || [];
+  const aCetteSource = (zone) => (zone[s.cat] || []).some((g) => s.noms.includes(g.nom));
+  let zoneCible = zones.find((z) => z.slug === carteEtat.zone && aCetteSource(z));
+  if (!zoneCible) zoneCible = zones.find(aCetteSource);
+  if (!zoneCible) return;  // cette source n'existe sur aucune carte connue
+
+  if (carteEtat.zone !== zoneCible.slug) {
+    carteEtat.zone = zoneCible.slug;
+    resetVueCarte();
+    dessinerZonesCarte();
+  }
+  carteEtat.selection.clear();
+  carteEtat.meilleur.clear();
+  for (const nom of s.noms) {
+    if (!zoneCible[s.cat].some((g) => g.nom === nom)) continue;
+    const cle = s.cat + '|' + nom;
+    carteEtat.selection.add(cle);
+    carteEtat.meilleur.add(cle);
+  }
+
+  const actif = $('carteObjetActif');
+  actif.innerHTML = `
+    ${o.chemin ? `<img src="${echapper(o.chemin)}" alt="" loading="lazy">` : ''}
+    <span class="nom">${echapper(o.nom)}<span class="carteObjetTaux">${s.valeur}</span></span>
+    <button type="button" id="carteObjetEffacer">✕</button>`;
   actif.hidden = false;
   $('carteObjetEffacer').onclick = carteEffacerObjetActif;
   $('carteObjetInput').value = o.nom;

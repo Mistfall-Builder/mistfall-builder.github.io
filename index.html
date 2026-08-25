@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=147">
+<link rel="stylesheet" href="icones_affixes.css?v=148">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1031,6 +1031,13 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
    passer a la ligne normalement (white-space:normal par defaut). */
 .butinSource.long{flex-direction:column;flex-wrap:nowrap}
 .butinSource.long .butinChance{text-align:left;width:100%}
+/* Une source qu'on peut retrouver sur la carte se comporte comme un lien,
+   sans en avoir l'air avant le survol -- la ligne reste sobre tant qu'on
+   ne l'approche pas. */
+.butinSource.cliquable{cursor:pointer;border-radius:4px;margin:-2px -4px;
+  padding:2px 4px;transition:.12s}
+.butinSource.cliquable:hover{background:rgba(255,255,255,.05)}
+.butinSource.cliquable:hover .butinConteneurs{color:var(--accent-clair)}
 .butinCatTitre{grid-column:1/-1;font:700 11.5px/1 var(--condense);
   letter-spacing:1px;text-transform:uppercase;color:var(--accent-clair);
   border-bottom:1px solid var(--bord);padding:12px 0 5px;margin-top:4px}
@@ -2310,19 +2317,19 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=147"></script>
-<script src="config.js?v=147"></script>
-<script src="comptes.js?v=147"></script>
-<script src="donnees.js?v=147"></script>
-<script src="skills.js?v=147"></script>
-<script src="loot.js?v=147"></script>
-<script src="maps.js?v=147"></script>
-<script src="monstres_icones.js?v=147"></script>
-<script src="craft.js?v=147"></script>
-<script src="talents.js?v=147"></script>
-<script src="builds_reference.js?v=147"></script>
-<script src="guides_classes.js?v=147"></script>
-<script src="fiche.js?v=147"></script>
-<script src="app.js?v=147"></script>
+<script src="i18n.js?v=148"></script>
+<script src="config.js?v=148"></script>
+<script src="comptes.js?v=148"></script>
+<script src="donnees.js?v=148"></script>
+<script src="skills.js?v=148"></script>
+<script src="loot.js?v=148"></script>
+<script src="maps.js?v=148"></script>
+<script src="monstres_icones.js?v=148"></script>
+<script src="craft.js?v=148"></script>
+<script src="talents.js?v=148"></script>
+<script src="builds_reference.js?v=148"></script>
+<script src="guides_classes.js?v=148"></script>
+<script src="fiche.js?v=148"></script>
+<script src="app.js?v=148"></script>
 </body>
 </html>
