@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=141">
+<link rel="stylesheet" href="icones_affixes.css?v=142">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1449,6 +1449,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <button data-page="pageCommunaute" data-i18n="nav.communaute">Communauté</button>
       <button data-page="pageButin" data-i18n="nav.butin">Où farmer</button>
       <button data-page="pageCarte" data-i18n="nav.carte">Carte</button>
+      <button data-page="pageObjets" data-i18n="nav.objets">Ressources</button>
     </nav>
     <div class="droite">
       <div class="langues" id="langues" title="Change language"></div>
@@ -1804,13 +1805,31 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      1482 objets : on ne les rend pas d'un bloc. La page ne se dessine qu'a
      l'ouverture de l'onglet, par pages de 60, et les icones ne partent sur
      le reseau que lorsqu'elles entrent dans le champ. -->
-<!-- L'ONGLET RESSOURCES EST RETIRE, PAS SUPPRIME.
-     Le catalogue et les provenances tenaient debout ; la carte, non — des
+<!-- LES RESSOURCES.
+     Ce qui se ramasse sur le terrain : materiaux, consommables, munitions,
+     boissons. Ni coffres a butin ni cles — ils encombraient sans repondre a
+     la question qu'on pose ici, qui est « ou est-ce que je trouve ça ».
+
+     LA CARTE INCRUSTEE DE LA VERSION D'ORIGINE N'EST PAS RESTAUREE : des
      territoires calcules a partir de nuages de points, sans les frontieres
-     du jeu, ça ne ressemblait a rien. Le balisage revient tel quel quand la
-     carte sera presentable : ressources.js, provenances.js et cartes.js
-     restent en place, et rien ne les charge tant que personne n'ouvre
-     l'onglet. -->
+     du jeu, ça ne ressemblait a rien -- exactement ce que l'onglet Carte
+     (vrai fond de jeu, vraies icones) fait bien desormais. brancherCarte()
+     reste dans app.js mais ne s'accroche a rien ici (elle se retire toute
+     seule si son element n'existe pas), pas la peine de la retirer. -->
+<section id="pageObjets" class="page" hidden>
+  <div class="objBarre">
+    <input type="search" id="resRecherche" name="recherche-ressource" autocomplete="off"
+           data-form-type="other" data-i18n-ph="res.chercher" placeholder="nom de ressource…">
+    <select id="resCat"></select>
+    <select id="resTier"></select>
+    <label class="coche" id="resSuLabel"><input type="checkbox" id="resSu">
+      <span data-i18n="res.seulementSus">Seulement ceux qu'on sait où trouver</span></label>
+    <span class="objCompte" id="resCompte"></span>
+  </div>
+  <div class="objNote" id="resNote"></div>
+  <div class="objGrille resGrille" id="resGrille"></div>
+  <div class="pages" id="resPages"></div>
+</section>
 
 <section id="pageCommunaute" class="page" hidden>
   <div class="banniere">
@@ -2019,18 +2038,18 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=141"></script>
-<script src="config.js?v=141"></script>
-<script src="comptes.js?v=141"></script>
-<script src="donnees.js?v=141"></script>
-<script src="skills.js?v=141"></script>
-<script src="loot.js?v=141"></script>
-<script src="maps.js?v=141"></script>
-<script src="monstres_icones.js?v=141"></script>
-<script src="talents.js?v=141"></script>
-<script src="builds_reference.js?v=141"></script>
-<script src="guides_classes.js?v=141"></script>
-<script src="fiche.js?v=141"></script>
-<script src="app.js?v=141"></script>
+<script src="i18n.js?v=142"></script>
+<script src="config.js?v=142"></script>
+<script src="comptes.js?v=142"></script>
+<script src="donnees.js?v=142"></script>
+<script src="skills.js?v=142"></script>
+<script src="loot.js?v=142"></script>
+<script src="maps.js?v=142"></script>
+<script src="monstres_icones.js?v=142"></script>
+<script src="talents.js?v=142"></script>
+<script src="builds_reference.js?v=142"></script>
+<script src="guides_classes.js?v=142"></script>
+<script src="fiche.js?v=142"></script>
+<script src="app.js?v=142"></script>
 </body>
 </html>

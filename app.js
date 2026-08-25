@@ -6703,10 +6703,11 @@ function poserNavigation() {
   for (const b of document.querySelectorAll('#nav button')) {
     b.onclick = () => montrerPage(b.dataset.page);
     // Sans compte branché, cet onglet n'a rien à montrer : un onglet qui
-    // ouvre sur du vide est pire que pas d'onglet. Où farmer et Carte
-    // n'ont besoin d'aucun compte, ce sont des tables statiques.
+    // ouvre sur du vide est pire que pas d'onglet. Où farmer, Carte et
+    // Ressources n'ont besoin d'aucun compte, ce sont des tables statiques.
     if (b.dataset.page !== 'main' && b.dataset.page !== 'pageButin'
-        && b.dataset.page !== 'pageCarte' && !comptesDispo()) b.hidden = true;
+        && b.dataset.page !== 'pageCarte' && b.dataset.page !== 'pageObjets'
+        && !comptesDispo()) b.hidden = true;
   }
 }
 
