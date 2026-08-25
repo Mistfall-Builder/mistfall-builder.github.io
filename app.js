@@ -6059,10 +6059,14 @@ function carteButin(o) {
   el.className = 'objCarte';
   const coul = D.couleurs[raretVersGrade(o.rarete)] || 'var(--bord)';
   el.style.borderLeftColor = coul;
+  // DU PLUS PROBABLE AU MOINS PROBABLE : sans ce tri, l'ordre venait de
+  // celui des tables sur le wiki, sans rapport avec la chance reelle --
+  // la meilleure source pouvait finir en bas de la liste.
+  const parTaux = [...o.sources].sort((a, b) => b.tauxMax - a.tauxMax);
   // `s.valeur` est soit un simple nombre+% (coffres, intrinsequement sans
   // danger), soit deja echappe par formaterTaux (monstres, qui coud lui-
   // meme les libelles d'intensite) -- l'echapper ICI le double-echapperait.
-  const sources = o.sources.map((s) => `
+  const sources = parTaux.map((s) => `
     <div class="butinSource${s.long ? ' long' : ''}">
       <span class="butinConteneurs">${echapper(s.label)}</span>
       <span class="butinChance">${s.valeur}</span>

@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=142">
+<link rel="stylesheet" href="icones_affixes.css?v=143">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1019,13 +1019,18 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .butinSource{display:flex;flex-wrap:wrap;justify-content:space-between;
   gap:2px 8px;font-size:11px;color:var(--doux)}
 .butinConteneurs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.butinChance{flex:0 1 auto;color:var(--accent-clair);text-align:right;
+.butinChance{flex:0 1 auto;min-width:0;color:var(--accent-clair);text-align:right;
   font-variant-numeric:tabular-nums}
 /* Le detail par intensite (Chaos/Cataclysm/...) d'un monstre est plus
    long qu'un simple pourcentage de coffre : sur sa propre ligne, pleine
    largeur, plutot que de forcer son nom a se compresser a cote. */
-.butinSource.long{flex-direction:column}
-.butinSource.long .butinChance{text-align:left}
+/* `flex-wrap:wrap` (herite de .butinSource, utile pour les coffres en
+   ligne) devient un piege combine a `column` : au lieu d'empiler puis de
+   passer le texte a la ligne, le conteneur ouvre une DEUXIEME colonne et
+   s'etire hors de la carte. `nowrap` ici, le texte lui-meme continue de
+   passer a la ligne normalement (white-space:normal par defaut). */
+.butinSource.long{flex-direction:column;flex-wrap:nowrap}
+.butinSource.long .butinChance{text-align:left;width:100%}
 .butinCatTitre{grid-column:1/-1;font:700 11.5px/1 var(--condense);
   letter-spacing:1px;text-transform:uppercase;color:var(--accent-clair);
   border-bottom:1px solid var(--bord);padding:12px 0 5px;margin-top:4px}
@@ -1131,8 +1136,9 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   font-variant-numeric:tabular-nums;flex:0 0 auto}
 /* Le detail par intensite d'un monstre est plus long qu'un pourcentage
    de coffre : sur sa propre ligne, pour rester lisible. */
-#carteTooltip .tLootMob{flex-direction:column}
-#carteTooltip .tLootMob .n{color:var(--doux);font-size:10.5px}
+#carteTooltip .tLootMob{flex-direction:column;flex-wrap:nowrap}
+#carteTooltip .tLootMob .n{color:var(--doux);font-size:10.5px;
+  min-width:0;width:100%}
 #carteTooltip .tFermer{position:absolute;top:3px;right:5px;width:auto;
   padding:0 3px;font-size:11px;background:none;border:none;color:var(--terne)}
 #carteTooltip .tFermer:hover{color:var(--texte)}
@@ -2038,18 +2044,18 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=142"></script>
-<script src="config.js?v=142"></script>
-<script src="comptes.js?v=142"></script>
-<script src="donnees.js?v=142"></script>
-<script src="skills.js?v=142"></script>
-<script src="loot.js?v=142"></script>
-<script src="maps.js?v=142"></script>
-<script src="monstres_icones.js?v=142"></script>
-<script src="talents.js?v=142"></script>
-<script src="builds_reference.js?v=142"></script>
-<script src="guides_classes.js?v=142"></script>
-<script src="fiche.js?v=142"></script>
-<script src="app.js?v=142"></script>
+<script src="i18n.js?v=143"></script>
+<script src="config.js?v=143"></script>
+<script src="comptes.js?v=143"></script>
+<script src="donnees.js?v=143"></script>
+<script src="skills.js?v=143"></script>
+<script src="loot.js?v=143"></script>
+<script src="maps.js?v=143"></script>
+<script src="monstres_icones.js?v=143"></script>
+<script src="talents.js?v=143"></script>
+<script src="builds_reference.js?v=143"></script>
+<script src="guides_classes.js?v=143"></script>
+<script src="fiche.js?v=143"></script>
+<script src="app.js?v=143"></script>
 </body>
 </html>
