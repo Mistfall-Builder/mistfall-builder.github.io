@@ -6614,15 +6614,22 @@ function carteEffacerObjetActif() {
 }
 
 function carteSelectionnerObjet(o) {
+  // NE MONTRER QUE LA/LES MEILLEURES SOURCES, PAS TOUTES : un objet
+  // partage par une table de 30 monstres allumait toute la carte, la
+  // plupart a un taux minuscule a cote d'une vraie bonne source (ex.
+  // Celestigold : ~0.05% par monstre generique contre 16.67% sur
+  // Medium/Small Ore Pile -- c'est CA qu'on veut voir, pas les 30 autres).
+  // Le retour d'un joueur a l'origine de la recherche par type disait
+  // deja la meme chose : mieux vaut partir de rien que de tout cocher.
+  const tauxTop = Math.max(...o.sources.map((s) => s.tauxMax));
+  const meilleures = o.sources.filter((s) => s.tauxMax === tauxTop);
+
   const zones = self.D_MAPS || [];
-  // LA ZONE ACTUELLE D'ABORD : si elle a au moins une source, on y reste
-  // plutot que de deplacer le joueur sans qu'il l'ait demande. Sinon, la
-  // premiere zone qui a une source -- une carte vide serait pire.
   const aUneSource = (zone, s) => zone[s.cat].some((g) => s.noms.includes(g.nom));
   let zoneCible = zones.find((z) => z.slug === carteEtat.zone
-    && o.sources.some((s) => aUneSource(z, s)));
-  if (!zoneCible) zoneCible = zones.find((z) => o.sources.some((s) => aUneSource(z, s)));
-  if (!zoneCible) return;  // aucune zone connue n'a ce que le wiki liste comme source
+    && meilleures.some((s) => aUneSource(z, s)));
+  if (!zoneCible) zoneCible = zones.find((z) => meilleures.some((s) => aUneSource(z, s)));
+  if (!zoneCible) return;  // meme la meilleure source n'existe sur aucune carte connue
 
   if (carteEtat.zone !== zoneCible.slug) {
     carteEtat.zone = zoneCible.slug;
@@ -6631,23 +6638,26 @@ function carteSelectionnerObjet(o) {
   }
   carteEtat.selection.clear();
   carteEtat.meilleur.clear();
-  const tauxTop = Math.max(...o.sources.map((s) => s.tauxMax));
-  for (const s of o.sources) {
+  for (const s of meilleures) {
     if (!aUneSource(zoneCible, s)) continue;  // pas sur CETTE carte -- rien a cocher ici
     for (const nom of s.noms) {
       if (!zoneCible[s.cat].some((g) => g.nom === nom)) continue;
       const cle = s.cat + '|' + nom;
       carteEtat.selection.add(cle);
-      if (s.tauxMax === tauxTop) carteEtat.meilleur.add(cle);
+      carteEtat.meilleur.add(cle);
     }
   }
 
   const chemin = (self.D_LOOT_ICONES || {})[o.nom];
+  const autres = o.sources.length - meilleures.length;
   const actif = $('carteObjetActif');
   actif.innerHTML = `
     ${chemin ? `<img src="${echapper(chemin)}" alt="" loading="lazy">` : ''}
-    <span class="nom">${echapper(o.nom)}</span>
+    <span class="nom">${echapper(o.nom)}<span class="carteObjetTaux">${echapper(meilleures[0].valeur)}</span></span>
     <button type="button" id="carteObjetEffacer">✕</button>`;
+  if (autres > 0) {
+    actif.innerHTML += `<div class="carteObjetAutres">${t('carte.autresSourcesM', { n: autres })}</div>`;
+  }
   actif.hidden = false;
   $('carteObjetEffacer').onclick = carteEffacerObjetActif;
   $('carteObjetInput').value = o.nom;
