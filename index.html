@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=145">
+<link rel="stylesheet" href="icones_affixes.css?v=146">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1047,6 +1047,18 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .craftMat img{width:16px;height:16px;object-fit:contain;border-radius:50%;
   background:rgba(255,255,255,.05)}
 
+/* -------------------------------------------------------- mecaniques -- */
+.mecFormule{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;
+  font-size:12px;color:var(--accent-clair);background:var(--creux);
+  border:1px solid var(--bord-fort);border-radius:3px;padding:8px 10px;
+  margin:8px 0;overflow-x:auto;white-space:nowrap}
+.mecTable{width:100%;border-collapse:collapse;font-size:11.5px;margin:6px 0 10px}
+.mecTable th{color:var(--doux);font-weight:600;text-align:left;
+  padding:4px 8px;border-bottom:1px solid var(--bord-fort);white-space:nowrap}
+.mecTable td{padding:4px 8px;border-bottom:1px solid var(--bord);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.mecTable tbody tr:hover{background:rgba(255,255,255,.02)}
+
 /* -------------------------------------------------------------- carte -- */
 .carteMise{display:grid;grid-template-columns:1fr 320px;gap:14px;
   margin-top:12px;align-items:start}
@@ -1467,6 +1479,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <button data-page="pageButin" data-i18n="nav.butin">Où farmer</button>
       <button data-page="pageCarte" data-i18n="nav.carte">Carte</button>
       <button data-page="pageCraft" data-i18n="nav.craft">Artisanat</button>
+      <button data-page="pageMeca" data-i18n="nav.meca">Mécaniques</button>
     </nav>
     <div class="droite">
       <div class="langues" id="langues" title="Change language"></div>
@@ -2042,6 +2055,221 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
   </div>
 </section>
 
+<!-- MECANIQUES AVANCEES. Purement informatif -- le moteur de calcul du
+     site n'utilise QUE la formule de base (Attack x coefficient x
+     reduction), deja juste sur ce qu'elle couvre. Cette page rassemble ce
+     qui manquerait pour tout comprendre (penetration, resistances,
+     ténacité, energie...) sans rien changer au calcul lui-meme : le
+     joueur lit, decide, le moteur continue de faire ce qu'il fait deja
+     bien. Chiffres et formules viennent de la page /mechanics/ du wiki
+     communautaire -- des faits de jeu, pas une redaction a reprendre. -->
+<section id="pageMeca" class="page" hidden>
+  <div class="banniere">
+    <img src="marque/logo_petit.webp" alt="Mistfall Hunter Builder" width="320"
+         loading="lazy" decoding="async">
+  </div>
+  <div class="carte">
+    <h2 data-i18n="mec.titre">Mécaniques avancées</h2>
+    <div class="corps">
+      <p class="pas" style="font-size:12.5px;margin:0 0 12px" data-i18n="mec.aide">
+        Ce que le calculateur ne dit pas tout seul : comment les chiffres qu'il produit se
+        transforment vraiment en dégâts, en survie, en rythme de combat. Purement informatif —
+        rien ici ne change ce que le moteur calcule.</p>
+
+      <details class="carte pliable" open>
+        <summary><span data-i18n="mec.degats.titre">Dégâts</span></summary>
+        <div class="corps">
+          <p class="mecFormule">Damage = Attack × coefficient</p>
+          <p class="pas" data-i18n="mec.degats.base">Chaque compétence porte son propre
+            coefficient (visible sur sa fiche) ; le reste vient de l'Attaque du moment.
+            Exemple : 100 Attaque × coefficient 1.296028 = 129,6 dégâts bruts.</p>
+          <p class="pas" data-i18n="mec.degats.type">Physique et Magique ne partagent ni bonus
+            ni résistance : un coup physique lit vos bonus de dégâts physiques et la
+            Résistance Physique de la cible, jamais l'autre paire. Un Dégât Vrai (True
+            Damage) ignore Défense et les deux résistances.</p>
+          <p class="pas" data-i18n="mec.degats.marque">Elemental Magic pose une Marque
+            Élémentaire à chaque coup ; à 2 stacks, chaque marque sur l'ennemi détone pour des
+            dégâts Magiques.</p>
+          <div class="sousTitre" data-i18n="mec.degats.soloTrio">Modificateur solo/trio par arme</div>
+          <p class="pas" data-i18n="mec.degats.soloTrioAide">Chaque type d'arme porte son
+            propre bonus/malus de dégâts PvP, PvE, réduction de dégâts PvE et dégâts de
+            ténacité — différent en solo et en trio.</p>
+          <div class="defil">
+            <table class="mecTable">
+              <thead><tr><th data-i18n="mec.tbl.arme">Arme</th><th data-i18n="mec.tbl.mode">Mode</th>
+                <th>PvP</th><th>PvE</th><th data-i18n="mec.tbl.reducPve">Réduc. PvE</th>
+                <th data-i18n="mec.tbl.tenacite">Ténacité</th></tr></thead>
+              <tbody id="mecTableauArmes"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <details class="carte pliable">
+        <summary><span data-i18n="mec.defense.titre">Défense et résistances</span></summary>
+        <div class="corps">
+          <p class="pas" data-i18n="mec.defense.courbe">La Défense se convertit en réduction de
+            dégâts par une courbe fixe, appliquée avant tout le reste côté défenseur (linéaire
+            entre les points ci-dessous : 400 Défense ≈ 33,1%). Tous les monstres du jeu ont
+            705 Défense, soit 50% de réduction fixe. Un personnage part à 50 Défense (5%) sur
+            toutes les classes.</p>
+          <div class="defil">
+            <table class="mecTable">
+              <thead><tr><th data-i18n="mec.tbl.defense">Défense</th><th data-i18n="mec.tbl.reduction">Réduction</th></tr></thead>
+              <tbody>
+                <tr><td>0</td><td>0%</td></tr><tr><td>100</td><td>10%</td></tr>
+                <tr><td>215</td><td>20%</td></tr><tr><td>350</td><td>30%</td></tr>
+                <tr><td>510</td><td>40%</td></tr><tr><td>705</td><td>50%</td></tr>
+                <tr><td>950</td><td>60%</td></tr><tr><td>1 280</td><td>70%</td></tr>
+                <tr><td>1 780</td><td>80%</td></tr><tr><td>2 800</td><td>90%</td></tr>
+                <tr><td>12 000</td><td>95% <span class="pas" data-i18n="mec.tbl.cap">(plafond)</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mecFormule">Dégâts subis = Attack × coefficient × (1 − réduc. Défense) × (1 + bonus dégâts) × (1 − résistance)</p>
+          <p class="pas" data-i18n="mec.defense.ordre">La Défense s'applique en premier ; les
+            résistances multiplient APRÈS elle, donc un point de résistance garde toute sa
+            valeur peu importe la Défense déjà stackée. Exemple : 50% réduc. Défense + 20%
+            Résistance Physique = 0,50 × 0,80 = 40% des dégâts bruts encaissés.</p>
+          <div class="sousTitre" data-i18n="mec.defense.penTitre">Pénétration de Défense</div>
+          <p class="mecFormule">Réduction effective = max(courbe(Défense) − pénétration, 0)</p>
+          <p class="pas" data-i18n="mec.defense.penAide">La pénétration soustrait des points de
+            pourcentage à la réduction de la cible, jamais sous zéro. Exemple : Pénétration de
+            Défense Lv4 (20%) transforme les 50% d'un monstre en 30% — un coup à 64,8 devient
+            90,7, soit 40% de dégâts en plus rien qu'avec cet affixe.</p>
+          <div class="sousTitre" data-i18n="mec.defense.ehpTitre">Vie effective (EHP)</div>
+          <p class="mecFormule">Vie effective = Vie / [(1 − réduc. Défense) × (1 − résistance)]</p>
+          <p class="pas" data-i18n="mec.defense.setAide">Chaque classe part à 618 Vie / 50
+            Défense. Un set complet 5 pièces ajoute ceci AVANT affixes, arme, bijoux ou
+            talents (le plastron donne la Résistance Physique, les jambes la Résistance
+            Magique, le casque réduit les dégâts critiques subis — ces valeurs de set ne se
+            multiplient pas par pièce) :</p>
+          <div class="defil">
+            <table class="mecTable">
+              <thead><tr><th data-i18n="mec.tbl.rarete">Rareté</th><th data-i18n="mec.tbl.vie">Vie</th>
+                <th data-i18n="mec.tbl.defense">Défense</th><th>Rés. Phys.</th><th>Rés. Mag.</th>
+                <th data-i18n="mec.tbl.critSubis">Crit. subis</th></tr></thead>
+              <tbody>
+                <tr><td>Rare</td><td>819</td><td>207</td><td>2%</td><td>2%</td><td>−2%</td></tr>
+                <tr><td>Excellent</td><td>858</td><td>270</td><td>4%</td><td>4%</td><td>−4%</td></tr>
+                <tr><td>Epic</td><td>883</td><td>335</td><td>6%</td><td>6%</td><td>−6%</td></tr>
+                <tr><td>Legendary</td><td>913</td><td>381</td><td>7,2%</td><td>7,2%</td><td>−7%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="sousTitre" data-i18n="mec.defense.seuilsTitre">Seuils d'affixes défensifs</div>
+          <p class="pas" data-i18n="mec.defense.seuilsAegis">Aegis Lv7 : +105 Défense, +2,5%
+            Rés. Physique (Lv5 : +75 Défense).</p>
+          <p class="pas" data-i18n="mec.defense.seuilsTenacious">Tenacious Lv7 : +12,6% Vie
+            Max, +7,5% Soin reçu (Lv5 : +9% Vie Max).</p>
+          <p class="pas" data-i18n="mec.defense.seuilsStoic">Stoic Lv7 : sous 50% Vie, +7,7%
+            Rés. Physique/Magique ; sous 30% Vie, restaure 15% Vie sur 8s (cooldown 120s).
+            Lv5 : +5,5% Rés. sous 50% Vie.</p>
+        </div>
+      </details>
+
+      <details class="carte pliable">
+        <summary><span data-i18n="mec.soin.titre">Soin et récupération</span></summary>
+        <div class="corps">
+          <p class="pas" data-i18n="mec.soin.springhorn">Chaque classe démarre avec 3 charges
+            de Springhorn, 220 Vie chacune avant bonus. La Statue de la Déesse augmente ce
+            montant de base (jusqu'à 352 au niveau 8). Spirit Spring ajoute 12% de Soin
+            Springhorn au niveau 4 (21% + une charge au niveau 7) ; Tenacious Lv7 ajoute encore
+            7,5% de Soin.</p>
+          <p class="pas" data-i18n="mec.soin.healingArt">Healing Art (Seer) : 25% de l'Attaque
+            actuelle, cooldown 30s — Deep Healing ajoute 20% de la Vie manquante de la cible.</p>
+          <p class="pas" data-i18n="mec.soin.runeDrain">Rune: Drain : soigne 45% des dégâts
+            infligés en PvE (65% en PvP), plafonné à 50% de la Vie Max par activation — doublé
+            sous 50% Vie avec Bloodlust.</p>
+          <p class="pas" data-i18n="mec.soin.siphon">Siphon : un kill restaure 3/6/9% de Vie
+            Max selon le niveau (Lv3 ajoute aussi +6% Attaque pendant 8s).</p>
+          <p class="pas" data-i18n="mec.soin.bloodOffering">Blood Offering : restaure un % de
+            Vie Max immédiatement puis en retire un plus grand au fil du temps — cette perte
+            ne peut jamais tuer.</p>
+        </div>
+      </details>
+
+      <details class="carte pliable">
+        <summary><span data-i18n="mec.tenacite.titre">Ténacité et étourdissement</span></summary>
+        <div class="corps">
+          <p class="pas" data-i18n="mec.tenacite.explication">Les dégâts de Vie et de Ténacité
+            vident deux jauges séparées — les dégâts de Ténacité ne s'ajoutent jamais aux
+            dégâts de Vie. Vider la Ténacité étourdit la cible ; c'est la même jauge que le
+            jeu appelle "poise". Chaque ennemi a sa propre jauge de Ténacité (taille définie
+            par ennemi) et une jauge d'Execute identique partout : plafond 40%, le
+            rechargement démarre 3s après le dernier coup encaissé.</p>
+          <p class="pas" data-i18n="mec.tenacite.impact">L'Impact est ce qu'un coup retire de
+            Ténacité — chaque attaque porte sa propre valeur d'Impact, mise à l'échelle par le
+            taux de Réduction de Poise. Séparé des dégâts de Vie.</p>
+          <p class="pas" data-i18n="mec.tenacite.superArmure">La Super Armure rend immunisé à
+            l'étourdissement par impact pendant qu'elle est active (mais pas aux effets de
+            contrôle) — un état accordé pendant certaines fenêtres de compétence (ex : une
+            attaque de marteau chargée à fond), pas une statistique qu'on construit. Différent
+            de la Ténacité : la Ténacité est une jauge qui se vide, la Super Armure est un
+            état tout-ou-rien.</p>
+          <p class="pas" data-i18n="mec.tenacite.garde">Bloquer coûte de l'Énergie
+            proportionnellement à l'Impact du coup encaissé ; un coup assez fort brise la
+            garde.</p>
+        </div>
+      </details>
+
+      <details class="carte pliable">
+        <summary><span data-i18n="mec.cout.titre">Coûts, cooldowns et rythme</span></summary>
+        <div class="corps">
+          <p class="pas" data-i18n="mec.cout.esquive">Une esquive standard coûte 100 Énergie
+            d'Esquive. Mercenary, Shadowstrix, Withered Knight et Seer (Mace) ont 350 Énergie
+            d'Esquive ; Sorcerer, Blackarrow et Seer (Catalyst) en ont 250. Régénération : 20
+            par seconde avant modificateurs, pour toutes les classes.</p>
+          <div class="defil">
+            <table class="mecTable">
+              <thead><tr><th data-i18n="mec.tbl.classe">Classe</th><th data-i18n="mec.tbl.avant">Avant</th>
+                <th data-i18n="mec.tbl.arriere">Arrière</th><th data-i18n="mec.tbl.gauche">Gauche</th>
+                <th data-i18n="mec.tbl.droite">Droite</th></tr></thead>
+              <tbody>
+                <tr><td>Mercenary / Shadowstrix / Withered Knight</td><td>3,8m</td><td>3,9m</td><td>3,8m</td><td>3,8m</td></tr>
+                <tr><td>Seer</td><td>4,7m</td><td>4,8m</td><td>4,5m</td><td>4,7m</td></tr>
+                <tr><td>Sorcerer (Flash)</td><td>3,5m</td><td>3,5m</td><td>3,5m</td><td>3,5m</td></tr>
+                <tr><td>Blackarrow (Bow Roll)</td><td>4,5m</td><td>4,0m</td><td>4,2m</td><td>4,4m</td></tr>
+                <tr><td>Blackarrow (Slide)</td><td>4,3m</td><td>4,3m</td><td>4,6m</td><td>4,5m</td></tr>
+                <tr><td>Shadowstrix (Lightweight Dodge)</td><td>3,2m</td><td>2,5m</td><td>2,9m</td><td>2,8m</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="pas" data-i18n="mec.cout.distanceNote">Distances arrondies, terrain plat.
+            Pentes, murs, collisions et annulations les raccourcissent. La distance parcourue
+            ne mesure PAS l'invulnérabilité — le Lightweight Dodge de Shadowstrix donne une
+            résistance aux réactions de coup, pas de l'invulnérabilité.</p>
+          <p class="mecFormule">Cooldown réduit = cooldown de base × (1 − réduction de cooldown)</p>
+          <p class="pas" data-i18n="mec.cout.cooldownEx">Exemple : 10s de cooldown avec 20% de
+            réduction = 8s.</p>
+          <div class="sousTitre" data-i18n="mec.cout.burstValor">Burst contre Valor</div>
+          <p class="pas" data-i18n="mec.cout.burstValorAide">Burst Lv5 : +25% de dégâts
+            d'Exécution Wither uniquement. Valor Lv5 : +7,5% Attaque, s'applique à chaque coup
+            et soin qui scale avec l'Attaque. Sans autre bonus d'Attaque ou d'Exécution, Burst
+            dépasse Valor dès que l'Exécution Wither fournit plus de 30% des dégâts de la
+            rotation qui scalent avec l'Attaque.</p>
+        </div>
+      </details>
+
+      <details class="carte pliable">
+        <summary><span data-i18n="mec.usure.titre">Usure de l'équipement</span></summary>
+        <div class="corps">
+          <p class="pas" data-i18n="mec.usure.explication">La durabilité se dépense à la mort
+            ou à l'extraction, pas en temps réel pendant un combat — une arme en perd quand ses
+            coups touchent, une armure quand vous encaissez des dégâts, et mourir coûte un
+            montant fixe à chaque pièce équipée. À zéro durabilité, les affixes de la pièce
+            cessent de fonctionner et elle ne peut plus être emmenée en partie.</p>
+          <p class="pas" data-i18n="mec.usure.reparation">Les réparations se font à l'Atelier
+            avant une partie, payées en Gyldenblod — rien ne peut être réparé une fois la
+            partie commencée. Chaque arme et armure porte son propre coefficient de
+            durabilité/réparation : plus il est haut, plus ramener la pièce à pleine
+            durabilité coûte cher pour la même usure.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
 <!-- La grille plein écran des affixes. Elle n'existe que pour supprimer
      l'aller-retour de la colonne étroite : 44 affixes sur une seule vue,
      réglables sur place. Elle travaille sur le MÊME état que la liste de
@@ -2082,19 +2310,19 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=145"></script>
-<script src="config.js?v=145"></script>
-<script src="comptes.js?v=145"></script>
-<script src="donnees.js?v=145"></script>
-<script src="skills.js?v=145"></script>
-<script src="loot.js?v=145"></script>
-<script src="maps.js?v=145"></script>
-<script src="monstres_icones.js?v=145"></script>
-<script src="craft.js?v=145"></script>
-<script src="talents.js?v=145"></script>
-<script src="builds_reference.js?v=145"></script>
-<script src="guides_classes.js?v=145"></script>
-<script src="fiche.js?v=145"></script>
-<script src="app.js?v=145"></script>
+<script src="i18n.js?v=146"></script>
+<script src="config.js?v=146"></script>
+<script src="comptes.js?v=146"></script>
+<script src="donnees.js?v=146"></script>
+<script src="skills.js?v=146"></script>
+<script src="loot.js?v=146"></script>
+<script src="maps.js?v=146"></script>
+<script src="monstres_icones.js?v=146"></script>
+<script src="craft.js?v=146"></script>
+<script src="talents.js?v=146"></script>
+<script src="builds_reference.js?v=146"></script>
+<script src="guides_classes.js?v=146"></script>
+<script src="fiche.js?v=146"></script>
+<script src="app.js?v=146"></script>
 </body>
 </html>

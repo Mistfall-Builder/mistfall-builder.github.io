@@ -5982,6 +5982,7 @@ function montrerPage(id) {
   if (id === 'pageButin') ouvrirButin();
   if (id === 'pageCarte') ouvrirCarte();
   if (id === 'pageCraft') ouvrirCraft();
+  if (id === 'pageMeca') ouvrirMeca();
   if (id === 'pageCommunaute') {
     dessinerBuildsClasses();
     dessinerGuidesClasses();
@@ -6245,6 +6246,51 @@ function ouvrirCraft() {
     $('craftClasse').onchange = () => dessinerCraft(0);
   }
   dessinerCraft();
+}
+
+/* MECANIQUES AVANCEES. Purement informatif -- transcrit une fois depuis
+ * /mechanics/ du wiki communautaire, pas une donnee qui bouge assez
+ * souvent pour justifier un scraper dedie. Seul le tableau solo/trio par
+ * arme est construit en JS (deux blocs, meme forme) ; le reste de la
+ * page est du balisage statique dans index.html. */
+const MECA_ARMES_SOLO = [
+  ['Bow', '+10%', '+10%', '0%', '+10%'],
+  ['Greatsword', '+18%', '+5%', '+10%', '0%'],
+  ['Catalyst', '+18%', '+15%', '0%', '+10%'],
+  ['Dagger', '+18%', '-5%', '+10%', '0%'],
+  ['Dual Blades', '+18%', '-10%', '+5%', '0%'],
+  ['Hammer', '+18%', '+10%', '+15%', '0%'],
+  ['Mace', '+18%', '-5%', '0%', '0%'],
+  ['Polearm and Shield', '+18%', '+10%', '+10%', '0%'],
+  ['Staff', '+12%', '0%', '0%', '+10%'],
+  ['Sword and Shield', '+18%', '+10%', '+10%', '0%'],
+];
+const MECA_ARMES_TRIO = [
+  ['Bow', '0%', '0%', '-10%', '0%'],
+  ['Greatsword', '0%', '+10%', '+10%', '0%'],
+  ['Catalyst', '0%', '0%', '-10%', '0%'],
+  ['Dagger', '0%', '+5%', '+10%', '0%'],
+  ['Dual Blades', '0%', '0%', '+5%', '0%'],
+  ['Hammer', '0%', '+10%', '+15%', '0%'],
+  ['Mace', '0%', '0%', '+5%', '0%'],
+  ['Polearm and Shield', '0%', '+10%', '+10%', '0%'],
+  ['Staff', '0%', '-5%', '0%', '0%'],
+  ['Sword and Shield', '0%', '+10%', '+10%', '0%'],
+];
+
+let _mecaBranchee = false;
+function ouvrirMeca() {
+  if (_mecaBranchee) return;
+  _mecaBranchee = true;
+  const corps = $('mecTableauArmes');
+  const ligne = (mode, [arme, pvp, pve, reducPve, tenacite]) => `
+    <tr><td>${echapper(arme)}</td><td>${mode}</td><td>${pvp}</td><td>${pve}</td>
+      <td>${reducPve}</td><td>${tenacite}</td></tr>`;
+  corps.innerHTML =
+    `<tr class="butinCatTitre" style="border-bottom:none"><td colspan="6">${t('mec.tbl.solo')}</td></tr>`
+    + MECA_ARMES_SOLO.map((l) => ligne(t('mec.tbl.solo'), l)).join('')
+    + `<tr class="butinCatTitre" style="border-bottom:none"><td colspan="6">${t('mec.tbl.trio')}</td></tr>`
+    + MECA_ARMES_TRIO.map((l) => ligne(t('mec.tbl.trio'), l)).join('');
 }
 
 /* CARTE. Vide par defaut : un joueur nous a ecrit que devoir decocher
@@ -6836,7 +6882,8 @@ function poserNavigation() {
     // tables statiques.
     if (b.dataset.page !== 'main' && b.dataset.page !== 'pageButin'
         && b.dataset.page !== 'pageCarte' && b.dataset.page !== 'pageObjets'
-        && b.dataset.page !== 'pageCraft' && !comptesDispo()) b.hidden = true;
+        && b.dataset.page !== 'pageCraft' && b.dataset.page !== 'pageMeca'
+        && !comptesDispo()) b.hidden = true;
   }
 }
 
