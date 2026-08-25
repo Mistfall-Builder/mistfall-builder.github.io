@@ -7479,12 +7479,29 @@ function demarrer(donnees) {
   $('etat').textContent = t('etat.pret');
 }
 
-if (window.D_MISTFALL) {
-  demarrer(window.D_MISTFALL);
-} else {
-  // Repli pour un vrai serveur web, si donnees.js n'a pas été engendré.
-  fetch('donnees.json').then((r) => r.json()).then(demarrer).catch((e) => {
-    $('etat').innerHTML =
-      `<span class="ko">Data not found: ${echapper(e.message)}</span>`;
-  });
+// LE SITE NE DEMARRE PAS DU TOUT TANT QUE LE VERROU EST FERME.
+//
+// verrou.js montre l'ecran de mot de passe et ne touche a rien d'autre --
+// demarrer() (fetch de donnees.json, rendu de l'interface, compteur de
+// visites...) resterait sinon executé en arrière-plan derrière un simple
+// cache CSS, ce qui n'a rien d'un verrou : quelqu'un qui ouvre les outils
+// dev verrait le site tourner normalement. Inerte sans Supabase configuré,
+// comme verrou.js lui-même -- un clone du dépôt sans config.js rempli
+// n'a pas à être bloqué sans porte de sortie.
+function siteVerrouille() {
+  const cfg = window.MISTFALL_CONFIG;
+  if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return false;
+  try { return localStorage.getItem('mistfall.verrou.v1') !== '1'; } catch (e) { return false; }
+}
+
+if (!siteVerrouille()) {
+  if (window.D_MISTFALL) {
+    demarrer(window.D_MISTFALL);
+  } else {
+    // Repli pour un vrai serveur web, si donnees.js n'a pas été engendré.
+    fetch('donnees.json').then((r) => r.json()).then(demarrer).catch((e) => {
+      $('etat').innerHTML =
+        `<span class="ko">Data not found: ${echapper(e.message)}</span>`;
+    });
+  }
 }

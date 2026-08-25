@@ -20,6 +20,13 @@
       'entete.sous': "Compose ton stuff, récupère le code d'import",
       'entete.langue': 'Changer de langue',
 
+      'verrou.titre': 'Accès restreint',
+      'verrou.texte': "Ce site est réservé à un cercle restreint. Demande le mot de passe à qui te l'a partagé.",
+      'verrou.placeholder': 'Mot de passe',
+      'verrou.entrer': 'Entrer',
+      'verrou.erreur': 'Mot de passe incorrect.',
+      'verrou.injoignable': 'Connexion impossible, réessaie.',
+
       'perso.titre': 'Personnage',
       'perso.classe': 'Classe',
       'perso.arme': 'Arme',
@@ -585,6 +592,13 @@
       'entete.sous': 'Build your gear, get the in-game import code',
       'entete.langue': 'Change language',
 
+      'verrou.titre': 'Restricted access',
+      'verrou.texte': 'This site is limited to a small circle. Ask whoever shared it with you for the password.',
+      'verrou.placeholder': 'Password',
+      'verrou.entrer': 'Enter',
+      'verrou.erreur': 'Wrong password.',
+      'verrou.injoignable': "Couldn't connect, try again.",
+
       'perso.titre': 'Character',
       'perso.classe': 'Class',
       'perso.arme': 'Weapon',
@@ -1149,6 +1163,13 @@
       'meta.langue': 'Русский',
       'entete.sous': 'Собери снаряжение и получи код импорта',
       'entete.langue': 'Сменить язык',
+
+      'verrou.titre': 'Ограниченный доступ',
+      'verrou.texte': 'Этот сайт открыт только узкому кругу. Спроси пароль у того, кто поделился с тобой ссылкой.',
+      'verrou.placeholder': 'Пароль',
+      'verrou.entrer': 'Войти',
+      'verrou.erreur': 'Неверный пароль.',
+      'verrou.injoignable': 'Не удалось подключиться, попробуй ещё раз.',
 
       'perso.titre': 'Персонаж',
       'perso.classe': 'Класс',
