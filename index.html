@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=144">
+<link rel="stylesheet" href="icones_affixes.css?v=145">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1036,6 +1036,17 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   border-bottom:1px solid var(--bord);padding:12px 0 5px;margin-top:4px}
 .butinCatTitre:first-child{margin-top:0}
 
+/* ----------------------------------------------------------- artisanat -- */
+.craftInfo{display:flex;gap:8px;font-size:11px;color:var(--terne);margin-top:2px}
+.craftInfo b{color:var(--accent-clair);font-weight:600}
+.craftMateriaux{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.craftMat{display:inline-flex;align-items:center;gap:4px;padding:3px 7px 3px 3px;
+  background:var(--creux);border:1px solid var(--bord);border-radius:12px;
+  font-size:10.5px;color:var(--texte2);cursor:pointer;transition:.12s}
+.craftMat:hover{border-color:var(--accent-sombre);color:var(--accent-clair)}
+.craftMat img{width:16px;height:16px;object-fit:contain;border-radius:50%;
+  background:rgba(255,255,255,.05)}
+
 /* -------------------------------------------------------------- carte -- */
 .carteMise{display:grid;grid-template-columns:1fr 320px;gap:14px;
   margin-top:12px;align-items:start}
@@ -1455,6 +1466,7 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
       <button data-page="pageCommunaute" data-i18n="nav.communaute">Communauté</button>
       <button data-page="pageButin" data-i18n="nav.butin">Où farmer</button>
       <button data-page="pageCarte" data-i18n="nav.carte">Carte</button>
+      <button data-page="pageCraft" data-i18n="nav.craft">Artisanat</button>
     </nav>
     <div class="droite">
       <div class="langues" id="langues" title="Change language"></div>
@@ -2003,6 +2015,33 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
   </div>
 </section>
 
+<!-- L'ARTISANAT. Ce que "Ou farmer" ne dit pas : avec quoi on FABRIQUE un
+     objet. Chaque materiau renvoie vers "Ou farmer" deja rempli avec son
+     nom -- la boucle "je veux X -> il faut Y -> ou trouver Y" se ferme
+     sans ressaisir de recherche. -->
+<section id="pageCraft" class="page" hidden>
+  <div class="banniere">
+    <img src="marque/logo_petit.webp" alt="Mistfall Hunter Builder" width="320"
+         loading="lazy" decoding="async">
+  </div>
+  <div class="carte">
+    <h2 data-i18n="craft.titre">Artisanat</h2>
+    <div class="corps">
+      <p class="pas" style="font-size:12.5px;margin:0 0 12px" data-i18n="craft.aide">
+        Ce qu'il faut pour fabriquer un objet. Clique un matériau pour voir où le trouver.</p>
+      <div class="filtres">
+        <input type="search" id="craftRecherche" autocomplete="off"
+               data-i18n-ph="craft.recherche" placeholder="nom d'objet ou de matériau…">
+        <select id="craftCat"></select>
+        <select id="craftClasse"></select>
+        <span class="objCompte" id="craftCompte"></span>
+      </div>
+      <div class="objGrille" id="craftGrille"></div>
+      <div class="pages" id="craftPages"></div>
+    </div>
+  </div>
+</section>
+
 <!-- La grille plein écran des affixes. Elle n'existe que pour supprimer
      l'aller-retour de la colonne étroite : 44 affixes sur une seule vue,
      réglables sur place. Elle travaille sur le MÊME état que la liste de
@@ -2043,18 +2082,19 @@ footer .don svg{width:17px;height:17px;flex:0 0 auto}
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=144"></script>
-<script src="config.js?v=144"></script>
-<script src="comptes.js?v=144"></script>
-<script src="donnees.js?v=144"></script>
-<script src="skills.js?v=144"></script>
-<script src="loot.js?v=144"></script>
-<script src="maps.js?v=144"></script>
-<script src="monstres_icones.js?v=144"></script>
-<script src="talents.js?v=144"></script>
-<script src="builds_reference.js?v=144"></script>
-<script src="guides_classes.js?v=144"></script>
-<script src="fiche.js?v=144"></script>
-<script src="app.js?v=144"></script>
+<script src="i18n.js?v=145"></script>
+<script src="config.js?v=145"></script>
+<script src="comptes.js?v=145"></script>
+<script src="donnees.js?v=145"></script>
+<script src="skills.js?v=145"></script>
+<script src="loot.js?v=145"></script>
+<script src="maps.js?v=145"></script>
+<script src="monstres_icones.js?v=145"></script>
+<script src="craft.js?v=145"></script>
+<script src="talents.js?v=145"></script>
+<script src="builds_reference.js?v=145"></script>
+<script src="guides_classes.js?v=145"></script>
+<script src="fiche.js?v=145"></script>
+<script src="app.js?v=145"></script>
 </body>
 </html>

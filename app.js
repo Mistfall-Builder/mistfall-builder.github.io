@@ -5981,6 +5981,7 @@ function montrerPage(id) {
   if (id === 'pageObjets') ouvrirRessources();
   if (id === 'pageButin') ouvrirButin();
   if (id === 'pageCarte') ouvrirCarte();
+  if (id === 'pageCraft') ouvrirCraft();
   if (id === 'pageCommunaute') {
     dessinerBuildsClasses();
     dessinerGuidesClasses();
@@ -6147,6 +6148,103 @@ function ouvrirButin() {
       dessinerButin();
     }).catch(() => {});
   }
+}
+
+/* ARTISANAT. L'AUTRE MOITIE DE LA QUESTION : "Ou farmer" dit ou trouver un
+ * objet, "Artisanat" dit avec quoi en FABRIQUER un. Un materiau cliquable
+ * renvoie vers "Ou farmer" deja rempli avec son nom -- la boucle se ferme
+ * sans ressaisir la recherche. */
+const CRAFT_PAR_PAGE = 60;
+const craftEtat = { page: 0, total: 0 };
+
+function craftFiltres() {
+  const liste = self.D_CRAFT || [];
+  const q = ($('craftRecherche').value || '').trim().toLowerCase();
+  const cat = $('craftCat').value;
+  const cls = $('craftClasse').value;
+  return liste.filter((r) => {
+    if (cat && r.categorie !== cat) return false;
+    if (cls && r.classe !== cls) return false;
+    if (!q) return true;
+    return r.nom.toLowerCase().includes(q)
+        || r.materiaux.some((m) => m.toLowerCase().includes(q));
+  });
+}
+
+function allerVersButin(nom) {
+  montrerPage('pageButin');
+  $('butinRecherche').value = nom;
+  dessinerButin(0);
+}
+
+function carteCraft(r) {
+  const el = document.createElement('div');
+  el.className = 'objCarte';
+  const coul = D.couleurs[raretVersGrade(r.rarete)] || 'var(--bord)';
+  el.style.borderLeftColor = coul;
+  const iconesButin = self.D_LOOT_ICONES || {};
+  const materiaux = r.materiaux.map((m) => {
+    const chemin = iconesButin[m];
+    return `<span class="craftMat" data-nom="${echapper(m)}">
+      ${chemin ? `<img src="${echapper(chemin)}" alt="" loading="lazy">` : ''}
+      ${echapper(m)}</span>`;
+  }).join('');
+  el.innerHTML = `
+    ${r.icone ? `<img src="${echapper(r.icone)}" alt="" loading="lazy" decoding="async">`
+               : '<span class="objSansIcone" aria-hidden="true"></span>'}
+    <div class="objTxt">
+      <span class="objNom">${echapper(r.nom)}</span>
+      <span class="objMeta"><span class="objTier" style="color:${coul}">${echapper(r.rarete)}</span>
+        ${r.classe ? `<span class="objCat">${echapper(r.classe)}</span>` : ''}</span>
+      <div class="craftInfo">
+        <span>${t('craft.atelier', { n: r.atelier })}</span>
+        <span><b>${r.or}</b> ${t('craft.or')}</span>
+      </div>
+      <div class="craftMateriaux">${materiaux}</div>
+    </div>`;
+  for (const puce of el.querySelectorAll('.craftMat')) {
+    puce.onclick = () => allerVersButin(puce.dataset.nom);
+  }
+  return el;
+}
+
+function dessinerCraft(page) {
+  const boite = $('craftGrille');
+  if (!boite) return;
+  if (typeof page === 'number') craftEtat.page = page;
+  const liste = craftFiltres();
+  craftEtat.total = liste.length;
+  if (craftEtat.page * CRAFT_PAR_PAGE >= liste.length) craftEtat.page = 0;
+  const tranche = liste.slice(craftEtat.page * CRAFT_PAR_PAGE,
+                               craftEtat.page * CRAFT_PAR_PAGE + CRAFT_PAR_PAGE);
+  boite.innerHTML = '';
+  if (!tranche.length) {
+    boite.innerHTML = `<div class="objVide">${t('obj.rien')}</div>`;
+  } else {
+    const f = document.createDocumentFragment();
+    for (const r of tranche) f.appendChild(carteCraft(r));
+    boite.appendChild(f);
+  }
+  $('craftCompte').textContent = t('obj.compte', { n: liste.length });
+  dessinerPages($('craftPages'), craftEtat, CRAFT_PAR_PAGE, dessinerCraft);
+}
+
+let _craftBranche = false;
+function ouvrirCraft() {
+  if (!_craftBranche) {
+    _craftBranche = true;
+    remplirSelect($('craftCat'), [
+      ['', t('craft.toutesCat')], ['weapons', t('craft.catArmes')],
+      ['armor', t('craft.catArmures')], ['gems', t('craft.catGemmes')]], '');
+    const classes = [...new Set((self.D_CRAFT || [])
+      .map((r) => r.classe).filter(Boolean))].sort();
+    remplirSelect($('craftClasse'),
+      [['', t('craft.toutesClasses')]].concat(classes.map((c) => [c, c])), '');
+    $('craftRecherche').oninput = () => dessinerCraft(0);
+    $('craftCat').onchange = () => dessinerCraft(0);
+    $('craftClasse').onchange = () => dessinerCraft(0);
+  }
+  dessinerCraft();
 }
 
 /* CARTE. Vide par defaut : un joueur nous a ecrit que devoir decocher
@@ -6734,10 +6832,11 @@ function poserNavigation() {
     b.onclick = () => montrerPage(b.dataset.page);
     // Sans compte branché, cet onglet n'a rien à montrer : un onglet qui
     // ouvre sur du vide est pire que pas d'onglet. Où farmer, Carte et
-    // Ressources n'ont besoin d'aucun compte, ce sont des tables statiques.
+    // Ressources et Artisanat n'ont besoin d'aucun compte, ce sont des
+    // tables statiques.
     if (b.dataset.page !== 'main' && b.dataset.page !== 'pageButin'
         && b.dataset.page !== 'pageCarte' && b.dataset.page !== 'pageObjets'
-        && !comptesDispo()) b.hidden = true;
+        && b.dataset.page !== 'pageCraft' && !comptesDispo()) b.hidden = true;
   }
 }
 
