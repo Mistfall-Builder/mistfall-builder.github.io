@@ -21,7 +21,7 @@
       'entete.langue': 'Changer de langue',
 
       'verrou.titre': 'Accès restreint',
-      'verrou.texte': "Ce site est réservé à un cercle restreint. Demande le mot de passe à qui te l'a partagé.",
+      'verrou.texte': "Ce site est fermé parce que : je trouve ce jeu mal équilibré, le support aux joueurs ne fonctionne pas, et les devs se foutent de ce que les joueurs en pensent. J'ai décidé de ne plus les soutenir en maintenant ce site. Fuck you, Mistfall devs.",
       'verrou.placeholder': 'Mot de passe',
       'verrou.entrer': 'Entrer',
       'verrou.erreur': 'Mot de passe incorrect.',
@@ -593,7 +593,7 @@
       'entete.langue': 'Change language',
 
       'verrou.titre': 'Restricted access',
-      'verrou.texte': 'This site is limited to a small circle. Ask whoever shared it with you for the password.',
+      'verrou.texte': "This site is limited because: I think this game is poorly balanced, player support doesn't work, and the devs don't give a damn what players think. I've decided to stop supporting them by keeping this site running. Fuck you, Mistfall devs.",
       'verrou.placeholder': 'Password',
       'verrou.entrer': 'Enter',
       'verrou.erreur': 'Wrong password.',
@@ -1165,7 +1165,7 @@
       'entete.langue': 'Сменить язык',
 
       'verrou.titre': 'Ограниченный доступ',
-      'verrou.texte': 'Этот сайт открыт только узкому кругу. Спроси пароль у того, кто поделился с тобой ссылкой.',
+      'verrou.texte': 'Этот сайт закрыт, потому что: я считаю эту игру плохо сбалансированной, поддержка игроков не работает, а разработчикам плевать на мнение игроков. Я решил перестать их поддерживать, продолжая вести этот сайт. Fuck you, Mistfall devs.',
       'verrou.placeholder': 'Пароль',
       'verrou.entrer': 'Войти',
       'verrou.erreur': 'Неверный пароль.',
