@@ -6013,7 +6013,8 @@ function indexButin() {
   const decroche = (nom, rarete) => {
     if (!parNom.has(nom)) {
       const cat = (self.D_LOOT_CAT || {})[nom] || 'autres';
-      parNom.set(nom, { nom, rarete, categorie: cat, sources: [] });
+      const chemin = (self.D_LOOT_ICONES || {})[nom] || null;
+      parNom.set(nom, { nom, rarete, categorie: cat, sources: [], chemin, usage: null });
     }
     return parNom.get(nom);
   };
@@ -6033,6 +6034,16 @@ function indexButin() {
         tauxMax: maxDeTaux(l.taux), long: true,
       });
     }
+  }
+  // LE CATALOGUE DE RESSOURCES (ressources.js, charge a part -- voir
+  // ouvrirButin) AJOUTE deux choses que les tables de butin n'ont pas :
+  // l'usage ("sert a...") et, pour ~70 objets, l'existence meme -- des
+  // ressources connues qui ne sortent d'aucune table de butin publiee
+  // (ramassage au sol, artisanat) auraient sinon disparu de la fusion.
+  for (const o of (self.D_RESSOURCES || [])) {
+    const fiche = decroche(o.n, D.raretes[String(o.g)] || null);
+    if (!fiche.chemin && o.ic) fiche.chemin = 'icones_objets/' + o.ic;
+    if (o.u) fiche.usage = o.u;
   }
   _butinIndex = [...parNom.values()].sort((a, b) => {
     const oa = BUTIN_CATEGORIES.indexOf(a.categorie);
@@ -6072,10 +6083,14 @@ function carteButin(o) {
       <span class="butinChance">${s.valeur}</span>
     </div>`).join('');
   el.innerHTML = `
+    ${o.chemin ? `<img src="${echapper(o.chemin)}" alt=""
+                       loading="lazy" decoding="async">`
+                : '<span class="objSansIcone" aria-hidden="true"></span>'}
     <div class="objTxt">
       <span class="objNom">${echapper(o.nom)}</span>
-      <span class="objMeta"><span class="objTier" style="color:${coul}">${echapper(o.rarete)}</span></span>
-      <div class="butinSources">${sources}</div>
+      <span class="objMeta"><span class="objTier" style="color:${coul}">${echapper(o.rarete || '?')}</span></span>
+      ${o.usage ? `<span class="objUsage">${usageEnHtml(o.usage)}</span>` : ''}
+      <div class="butinSources">${sources || `<div class="pas" style="font-size:11px">${t('butin.aucuneSource')}</div>`}</div>
     </div>`;
   return el;
 }
@@ -6121,6 +6136,17 @@ function ouvrirButin() {
     $('butinRecherche').oninput = () => dessinerButin(0);
   }
   dessinerButin();
+  // ICONES ET USAGES VIENNENT DE ressources.js, CHARGE A PART (memes
+  // fichiers que l'ancien onglet Ressources, fusionne ici) : la page
+  // s'affiche tout de suite avec ce qu'on a deja, puis se redessine une
+  // fois ressources.js arrive -- jamais d'attente visible, juste un
+  // complement discret (icones qui apparaissent, ~70 objets en plus).
+  if (!self.D_RESSOURCES) {
+    chargerRessources().then(() => {
+      _butinIndex = null;
+      dessinerButin();
+    }).catch(() => {});
+  }
 }
 
 /* CARTE. Vide par defaut : un joueur nous a ecrit que devoir decocher
