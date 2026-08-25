@@ -19,7 +19,7 @@
 (function () {
   const CLE_VERROU = 'mistfall.verrou.v1';
   const CFG = window.MISTFALL_CONFIG || {};
-  if (!CFG.supabaseUrl || !CFG.supabaseAnonKey) return;
+  if (!CFG.verrouActif || !CFG.supabaseUrl || !CFG.supabaseAnonKey) return;
 
   function deverrouille() {
     try { return localStorage.getItem(CLE_VERROU) === '1'; } catch (e) { return false; }

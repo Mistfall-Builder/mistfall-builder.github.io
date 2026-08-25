@@ -31,4 +31,13 @@ window.MISTFALL_CONFIG = {
    * C'est vrai de n'importe quelle requête vers n'importe quel serveur, mais
    * autant l'écrire que laisser croire à un anonymat de bout en bout. */
   compterVisites: true,
+
+  /* VERROU D'ENTREE — ETEINT.
+   *
+   * Le code du verrou (verrou.js, l'ecran de mot de passe, la fonction
+   * Supabase) reste en place tel quel : il suffit de repasser ce
+   * drapeau a `true` pour rouvrir le site sur le mot de passe partage,
+   * sans rien reecrire. Coupe pour l'instant — trop de monde demandait
+   * le mot de passe, ce n'etait pas le tri escompte. */
+  verrouActif: false,
 };

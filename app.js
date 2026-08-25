@@ -7490,7 +7490,7 @@ function demarrer(donnees) {
 // n'a pas à être bloqué sans porte de sortie.
 function siteVerrouille() {
   const cfg = window.MISTFALL_CONFIG;
-  if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return false;
+  if (!cfg || !cfg.verrouActif || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return false;
   try { return localStorage.getItem('mistfall.verrou.v1') !== '1'; } catch (e) { return false; }
 }
 
