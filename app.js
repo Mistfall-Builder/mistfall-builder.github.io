@@ -4157,6 +4157,20 @@ function calculer() {
     if ($('verdictEquip')) { $('verdictEquip').textContent = ''; $('verdictEquip').className = ''; }
     return;
   }
+  // COMBIEN DE CALCULS SONT VRAIMENT LANCES, PAS COMBIEN DE BUILDS SONT
+  // ENREGISTRES : la table `builds` ne voit que ce qui est sauvegarde dans
+  // un compte, une fraction de ce que les visiteurs essaient vraiment.
+  // Meme bascule et meme anonymat que compter_visite() -- un clic, un
+  // comptage, jamais les tentatives internes de relance d'un meme calcul.
+  if (comptesDispo() && window.MISTFALL_CONFIG.compterVisites) {
+    fetch(`${window.MISTFALL_CONFIG.supabaseUrl}/rest/v1/rpc/compter_calcul`, {
+      method: 'POST',
+      headers: { apikey: window.MISTFALL_CONFIG.supabaseAnonKey,
+                 Authorization: 'Bearer ' + window.MISTFALL_CONFIG.supabaseAnonKey,
+                 'Content-Type': 'application/json' },
+      body: '{}',
+    }).catch(() => {});
+  }
   const classe = Number($('classe').value);
   const arme = $('arme').value || null;
   const grade = $('rarete').value ? Number($('rarete').value) : null;
