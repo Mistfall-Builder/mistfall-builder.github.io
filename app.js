@@ -3350,6 +3350,30 @@ function ecrireBiblio(liste) {
   }
 }
 
+/* L'HISTORIQUE DES CHARGEMENTS -- pas des enregistrements. On y met un nom
+   dès qu'un build est CHARGÉ (bouton "Charger" d'une carte), jamais quand
+   il est créé : c'est "les builds que je suis allé rechercher", pas "les
+   builds que j'ai faits". Huit derniers, sans doublon -- recharger un
+   build déjà dans la liste le remonte en tête plutôt que de le répéter. */
+const CLE_RECENTS = 'mistfall.builds.recents.v1';
+const RECENTS_MAX = 8;
+
+function recentsNoms() {
+  try {
+    return JSON.parse(localStorage.getItem(CLE_RECENTS) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function enregistrerRecent(nom) {
+  try {
+    const l = recentsNoms().filter((n) => n !== nom);
+    l.unshift(nom);
+    localStorage.setItem(CLE_RECENTS, JSON.stringify(l.slice(0, RECENTS_MAX)));
+  } catch (e) { /* pas grave : juste le confort du raccourci qui manque */ }
+}
+
 /* ------------------------------------------------------------- comptes ----
    La bibliothèque locale reste la référence : elle marche hors ligne et sans
    compte. Le compte n'ajoute qu'UNE chose, la synchronisation entre
@@ -3745,17 +3769,40 @@ function raretesDuBuild(b) {
     // jeu, [2 préfixe d'emplacement][1 rareté][2 famille][2 variante]. Pas
     // besoin de retrouver la pièce dans le catalogue pour la connaître, ce
     // qui vaut mieux : les 155 pièces reconstituées n'y figurent pas.
+    // Le detail PAR EMPLACEMENT, pour le mini paperdoll des cartes -- meme
+    // decodage, on ne le refait pas une deuxieme fois pour ça.
+    const parSlot = new Map();
     for (const e of lu.emplacements || []) {
       const g = Number(String(e.cfg)[2]);
       if (g >= 1 && g <= 8) grades.add(g);
+      const nomSlot = D.codec.versGameData[String(e.slot)];
+      if (nomSlot) parSlot.set(nomSlot, e.cfg ? g : 0);
     }
     if (grades.size) {
       sortie = { grades: [...grades].sort((x, y) => x - y),
-                 panache: grades.size > 1 };
+                 panache: grades.size > 1, parSlot };
     }
   } catch (e) { /* code illisible : on ne prétend rien */ }
   _raretesCache.set(code, sortie);
   return sortie;
+}
+
+/* HUIT PETITS CARRÉS, UN PAR EMPLACEMENT DU VRAI PAPERDOLL -- teintés par
+   la rareté de la pièce qui s'y trouve, dans le même ordre (D.ordreSlots)
+   que la fiche d'équipement du Builder. Un emplacement vide (jamais censé
+   arriver sur un build fixé, mais un vieux build peut l'être) reste un
+   simple contour. */
+function miniPaperdoll(b) {
+  const r = raretesDuBuild(b);
+  if (!r || !r.parSlot) return '';
+  const points = D.ordreSlots.map((slot) => {
+    const g = r.parSlot.get(slot) || 0;
+    const nom = D.nomsSlots[slot] || slot;
+    if (!g) return `<span class="mbDoll vide" title="${echapper(nom)}"></span>`;
+    return `<span class="mbDoll" style="--c:${D.couleurs[String(g)] || '#5a6570'}"
+      title="${echapper(nom)} — ${echapper(D.raretes[String(g)] || '')}"></span>`;
+  }).join('');
+  return `<div class="mbPaperdoll">${points}</div>`;
 }
 
 function etiquetteRarete(b) {
@@ -3822,6 +3869,7 @@ function carteBuild(b, i) {
       <span class="mbRarete" style="color:${couleur}">${echapper(etiquetteRarete(b))}</span>
     </div>
     <div class="mbCarteMeta">${echapper(b.etat.a || '—')} · ${t('builds.affixes', { n: (b.etat.t || []).length })}</div>
+    ${miniPaperdoll(b)}
     <div class="mbChips">${chips || `<span class="pas" style="font-size:11px">${t('mesb.rien')}</span>`}</div>
     <div class="mbActions">
       <label class="ami" title="${avecCompte ? t('ami.marque') : t('ami.marqueNon')}">
@@ -3859,6 +3907,7 @@ function carteBuild(b, i) {
     appliquerEtat(b.etat);
     $('noteBuilds').innerHTML = `<span class="pas">${tH('builds.chargeOk', { nom: b.nom })}</span>`;
     restituer(b);
+    enregistrerRecent(b.nom);
     // Choisir un build referme la fenêtre : le charger EST la conclusion de
     // la visite, il n'y a rien d'autre à y faire ensuite.
     fermerModalBuilds();
@@ -3934,18 +3983,36 @@ function dessinerBuilds() {
   const ordre = Object.keys(D.classes).map(Number).filter((c) => parClasse.has(c));
   for (const c of parClasse.keys()) if (!ordre.includes(c)) ordre.push(c);
 
+  // L'ONGLET "RÉCENTS", EN TÊTE. Pas les builds créés — ceux CHARGÉS (voir
+  // enregistrerRecent, appelé au clic sur "Charger") : c'est l'historique
+  // de ce qu'on est venu rechercher, pas de ce qu'on a fait. Indépendant
+  // des filtres classe/recherche du dessous — un raccourci vers "ce que je
+  // viens d'utiliser", pas une nouvelle vue à filtrer.
+  const recentsListe = recentsNoms()
+    .map((nom) => toute.find((x) => x.nom === nom))
+    .filter(Boolean);
+  if (recentsListe.length) ordre.unshift('recent');
+
   const ongletsBoite = $('ongletsBuilds');
-  if (!liste.length) {
+  // AUCUN ONGLET DU TOUT : ni classe correspondante, ni historique -- la
+  // recherche/le filtre en cours ne renvoie rien nulle part.
+  if (!ordre.length) {
     if (ongletsBoite) ongletsBoite.innerHTML = '';
     boite.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
     return;
   }
   // L'onglet ouvert survit à un redessin (recherche, ami/pub, suppression) ;
-  // il ne retombe sur le premier que s'il a disparu — classe supprimée,
-  // filtrée, ou tout premier affichage.
+  // il ne retombe sur le premier — "Récents" s'il existe, sinon la
+  // première classe — que s'il a disparu.
   if (!ordre.includes(_ongletBuildsActif)) [_ongletBuildsActif] = ordre;
   if (ongletsBoite) {
     ongletsBoite.innerHTML = ordre.map((c) => {
+      if (c === 'recent') {
+        return `<button type="button" class="${_ongletBuildsActif === 'recent' ? 'actif' : ''}" data-c="recent">
+          ${echapper(t('mesb.recents'))}
+          <span class="n">${recentsListe.length}</span>
+        </button>`;
+      }
       const img = CLASSE_IMAGE[c];
       return `<button type="button" class="${c === _ongletBuildsActif ? 'actif' : ''}" data-c="${c}">
         ${img ? `<img src="icones_classes/${img}.webp" alt="" loading="lazy" decoding="async">` : ''}
@@ -3954,12 +4021,23 @@ function dessinerBuilds() {
       </button>`;
     }).join('');
     for (const b of ongletsBoite.querySelectorAll('button')) {
-      b.onclick = () => { _ongletBuildsActif = Number(b.dataset.c); dessinerBuilds(); };
+      b.onclick = () => {
+        _ongletBuildsActif = b.dataset.c === 'recent' ? 'recent' : Number(b.dataset.c);
+        dessinerBuilds();
+      };
     }
   }
 
   boite.innerHTML = '';
-  const groupe = parClasse.get(_ongletBuildsActif) || [];
+  const groupe = _ongletBuildsActif === 'recent' ? recentsListe
+    : (parClasse.get(_ongletBuildsActif) || []);
+  // Ne devrait pas arriver (chaque entrée d'`ordre` vient d'un groupe non
+  // vide), gardé quand même : un onglet qui ouvrirait sur du vide sans un
+  // mot serait pris pour une panne.
+  if (!groupe.length) {
+    boite.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
+    return;
+  }
   const grille = document.createElement('div');
   grille.className = 'mbGrille';
   for (const b of groupe) {
