@@ -1450,7 +1450,7 @@ function repeindreLigneVin(res, nom) {
   const tr = table && table.querySelector(`tr[data-a="${CSS.escape(nom)}"]`);
   if (!tr) return;
   const cellules = tr.querySelectorAll('td');
-  if (cellules.length < 5) return;
+  if (cellules.length < 6) return;
   const eq = res.couvert[nom] || 0;
   const accorde = (res.vinPoints && res.vinPoints.get(nom)) || 0;
   const total = Math.min(plafond(nom), eq + accorde);
@@ -1458,7 +1458,7 @@ function repeindreLigneVin(res, nom) {
   const tient = vise == null ? null : total >= vise;
 
   tr.classList.toggle('ligneKo', tient === false);
-  const cellTotal = cellules[4];
+  const cellTotal = cellules[5];
   cellTotal.className = 'n total ' + (tient == null ? '' : (tient ? 'ok' : 'ko'));
   // MÊME DÉPASSEMENT QU'AU RENDU INITIAL — voir le commentaire sur .majCible
   // plus haut dans afficher(). Cette fonction repeint la même cellule après
@@ -1472,7 +1472,7 @@ function repeindreLigneVin(res, nom) {
   cellTotal.innerHTML = `${totalAffiche}<span class="marque">${
     tient == null ? '' : (tient ? '✓' : '✗')}</span>`;
 
-  const sel = cellules[3].querySelector('select');
+  const sel = cellules[4].querySelector('select');
   if (!sel) return;
   // LA VALEUR DU SÉLECTEUR DIT SI C'EST TOI OU LE MOTEUR QUI A DÉCIDÉ.
   // Une ligne jamais touchée reste sur « auto », même quand le moteur lui a
@@ -3930,6 +3930,11 @@ function carteBuild(b, i) {
     $('noteBuilds').innerHTML = `<span class="pas">${tH('builds.chargeOk', { nom: b.nom })}</span>`;
     restituer(b);
     enregistrerRecent(b.nom);
+    // Ce qu'on vient de charger devient la cible du bouton « Écraser », côté
+    // colonne de gauche -- modifier puis réenregistrer sous ce même nom sans
+    // retaper le champ.
+    _buildCharge = b.nom;
+    majBoutonEcraser();
     // Choisir un build referme la fenêtre : le charger EST la conclusion de
     // la visite, il n'y a rien d'autre à y faire ensuite.
     fermerModalBuilds();
@@ -3957,6 +3962,8 @@ function carteBuild(b, i) {
     // sans ça la carte resterait sur un build qui n'existe plus.
     if (_cmpA === b.nom) _cmpA = '';
     if (_cmpB === b.nom) _cmpB = '';
+    // Ni la cible du bouton Écraser -- il n'y aurait plus rien à écraser.
+    if (_buildCharge === b.nom) { _buildCharge = ''; majBoutonEcraser(); }
     dessinerBuilds();
     dessinerComparaison();
     if (comptesDispo() && window.Comptes.connecte() && parti) {
@@ -4107,11 +4114,17 @@ function enregistrerBuild() {
   const etat = etatActuel();
   const entree = { nom, etat, code: etat.k || '',
                    // Réenregistrer un build ne doit pas le dépublier en
-                   // douce : on garde son état de partage.
-                   pub: deja >= 0 ? !!liste[deja].pub : false };
+                   // douce, ni lui faire perdre sa pastille ami : on garde
+                   // son état de partage.
+                   pub: deja >= 0 ? !!liste[deja].pub : false,
+                   ami: deja >= 0 ? !!liste[deja].ami : false };
   if (deja >= 0) liste[deja] = entree; else liste.push(entree);
   if (!ecrireBiblio(liste)) return;
   champ.value = '';
+  // Ce qu'on vient d'enregistrer devient « le build chargé » : le bouton
+  // Écraser, s'il réapparaît après une modification de plus, visera celui-ci.
+  _buildCharge = nom;
+  majBoutonEcraser();
   dessinerBuilds();
   $('noteBuilds').innerHTML =
     `<span class="pas">${t(deja >= 0 ? 'builds.remplace' : 'builds.enregistre', { nom })}</span>`;
@@ -5133,6 +5146,21 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
 let _comparer = null;   // le build mis de côté par le bouton « Comparer »
 let _cmpA = '';         // nom d'un build enregistré, ou '' = le mis de côté
 let _cmpB = '';         // nom d'un build enregistré, ou '' = le build courant
+
+// LE BUILD ACTUELLEMENT CHARGÉ, POUR LE BOUTON « ÉCRASER ». Posé quand on
+// charge une carte depuis « Mes builds » ou qu'on vient d'enregistrer sous
+// ce nom ; vidé si on efface les cibles ou si ce build précis est
+// supprimé. Rien à voir avec la comparaison (_cmpA/_cmpB) : ça peut
+// pointer vers un build qui n'est même pas affiché en ce moment.
+let _buildCharge = '';
+function majBoutonEcraser() {
+  const bouton = $('ecraserBuild');
+  if (!bouton) return;
+  bouton.hidden = !_buildCharge;
+  if (_buildCharge) {
+    bouton.textContent = t('builds.ecraser', { nom: _buildCharge });
+  }
+}
 
 function etatDepuisCode(code, classe, arme) {
   const lu = decoderCode(code.trim());
@@ -7421,6 +7449,10 @@ function demarrer(donnees) {
   $('vider').onclick = () => {
     cibles.clear(); vinManuel.clear(); dessinerAffixes(); majBudgetVin();
     cacherBandeauDemo();
+    // Plus de cibles, plus de build « en cours d'édition » à proposer
+    // d'écraser.
+    _buildCharge = '';
+    majBoutonEcraser();
   };
   /* Le clic a vide ne refuse plus : il montre. Le refus reste dans
      `calculer` pour tous les autres appelants. */
