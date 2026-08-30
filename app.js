@@ -3776,7 +3776,7 @@ function raretesDuBuild(b) {
       const g = Number(String(e.cfg)[2]);
       if (g >= 1 && g <= 8) grades.add(g);
       const nomSlot = D.codec.versGameData[String(e.slot)];
-      if (nomSlot) parSlot.set(nomSlot, e.cfg ? g : 0);
+      if (nomSlot) parSlot.set(nomSlot, e.cfg ? { g, cfg: e.cfg } : null);
     }
     if (grades.size) {
       sortie = { grades: [...grades].sort((x, y) => x - y),
@@ -3787,20 +3787,42 @@ function raretesDuBuild(b) {
   return sortie;
 }
 
+/* L'ID DE CHAQUE OBJET VERS SA FICHE COMPLETE (nom, icône…) -- construit
+   une seule fois, à la première carte qui en a besoin. D.objets est rangé
+   par « classe|type|arme|grade », impossible à interroger directement par
+   id ; cet index inverse les ~1900 pièces du catalogue en un seul passage,
+   après quoi chaque carte n'a plus qu'une lecture de Map à faire. */
+let _catalogueParId = null;
+function catalogueParId() {
+  if (_catalogueParId) return _catalogueParId;
+  _catalogueParId = new Map();
+  for (const liste of Object.values(D.objets)) {
+    for (const it of liste) _catalogueParId.set(Number(it.id), it);
+  }
+  return _catalogueParId;
+}
+
 /* HUIT PETITS CARRÉS, UN PAR EMPLACEMENT DU VRAI PAPERDOLL -- teintés par
-   la rareté de la pièce qui s'y trouve, dans le même ordre (D.ordreSlots)
-   que la fiche d'équipement du Builder. Un emplacement vide (jamais censé
-   arriver sur un build fixé, mais un vieux build peut l'être) reste un
-   simple contour. */
+   la rareté de la pièce qui s'y trouve (fond) ET avec l'icône réelle de
+   l'objet par-dessus, dans le même ordre (D.ordreSlots) que la fiche
+   d'équipement du Builder. Un emplacement vide (jamais censé arriver sur
+   un build fixé, mais un vieux build peut l'être) reste un simple contour.
+   Une pièce reconstituée (catalogue incomplet, ~155 d'entre elles) garde
+   sa couleur mais pas d'icône -- pas d'image à inventer à sa place. */
 function miniPaperdoll(b) {
   const r = raretesDuBuild(b);
   if (!r || !r.parSlot) return '';
+  const catalogue = catalogueParId();
   const points = D.ordreSlots.map((slot) => {
-    const g = r.parSlot.get(slot) || 0;
+    const info = r.parSlot.get(slot);
     const nom = D.nomsSlots[slot] || slot;
-    if (!g) return `<span class="mbDoll vide" title="${echapper(nom)}"></span>`;
-    return `<span class="mbDoll" style="--c:${D.couleurs[String(g)] || '#5a6570'}"
-      title="${echapper(nom)} — ${echapper(D.raretes[String(g)] || '')}"></span>`;
+    if (!info) return `<span class="mbDoll vide" title="${echapper(nom)}"></span>`;
+    const objet = catalogue.get(info.cfg);
+    const couleur = D.couleurs[String(info.g)] || '#5a6570';
+    const titre = `${nom} — ${objet ? objet.n + ', ' : ''}${D.raretes[String(info.g)] || ''}`;
+    const icone = objet && objet.ic
+      ? `<img src="icones/${echapper(objet.ic)}" alt="" loading="lazy">` : '';
+    return `<span class="mbDoll" style="--c:${couleur}" title="${echapper(titre)}">${icone}</span>`;
   }).join('');
   return `<div class="mbPaperdoll">${points}</div>`;
 }
