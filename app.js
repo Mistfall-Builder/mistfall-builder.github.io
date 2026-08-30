@@ -3722,6 +3722,10 @@ function restituer(b) {
    que chercher coûte moins cher que parcourir. */
 const SEUIL_FILTRES = 6;
 const bEtat = { recherche: '', classe: '', rarete: '', tri: 'nom' };
+// La classe dont l'onglet est ouvert dans "Mes builds". Null tant qu'aucun
+// build n'a encore été dessiné une fois -- dessinerBuilds() la pose sur la
+// première classe disponible dès son premier appel.
+let _ongletBuildsActif = null;
 
 /* La rareté d'un build enregistré n'est pas celle de son réglage : « Auto »
    ne dit rien, et le panaché non plus. On la relit donc dans le STUFF, en
@@ -3829,7 +3833,7 @@ function carteBuild(b, i) {
       <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
               title="${t('cmp.mettre')}">⇄</button>
       <button class="suppr" title="${t('builds.supprimer')}">×</button>
-      <button class="ouvrir" title="${titre}">${t('builds.charger')}</button>
+      <button class="ouvrir" title="${titre}">${t('builds.chargerBtn')}</button>
     </div>`;
   const brancher = (sel, cle, cleOui, cleNon) => {
     const c = carte.querySelector(sel);
@@ -3917,14 +3921,10 @@ function dessinerBuilds() {
     $('compteBuildsFiltre').textContent = liste.length === toute.length
       ? '' : t('mesb.compte', { n: liste.length, total: toute.length });
   }
-  boite.innerHTML = '';
-  if (!liste.length) {
-    boite.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
-    return;
-  }
-  // GROUPÉ PAR CLASSE, DANS L'ORDRE DU JEU : seul l'ordre des GROUPES suit
-  // celui des classes ; le tri choisi (nom / classe / affixes) reste actif
-  // À L'INTÉRIEUR de chaque groupe.
+  // UN ONGLET PAR CLASSE, DANS L'ORDRE DU JEU : le tri choisi (nom / classe /
+  // affixes) reste actif À L'INTÉRIEUR de l'onglet ouvert. Les onglets
+  // eux-mêmes suivent le filtre en cours — chercher "Stardust" ne laisse
+  // que les classes qui ont une correspondance.
   const parClasse = new Map();
   for (const b of liste) {
     const c = b.etat.c;
@@ -3933,24 +3933,40 @@ function dessinerBuilds() {
   }
   const ordre = Object.keys(D.classes).map(Number).filter((c) => parClasse.has(c));
   for (const c of parClasse.keys()) if (!ordre.includes(c)) ordre.push(c);
-  for (const c of ordre) {
-    const groupe = parClasse.get(c);
-    const section = document.createElement('div');
-    section.className = 'mbGroupe';
-    const img = CLASSE_IMAGE[c];
-    section.innerHTML = `<div class="mbGroupeTete">
-        ${img ? `<img src="icones_classes/${img}.webp" alt="" loading="lazy" decoding="async">` : ''}
-        <h3>${echapper(D.classes[String(c)] || '?')}</h3>
-        <span class="mbGroupeCompte">${groupe.length}</span>
-      </div>
-      <div class="mbGrille"></div>`;
-    const grille = section.querySelector('.mbGrille');
-    for (const b of groupe) {
-      const i = toute.findIndex((x) => x.nom === b.nom);
-      grille.appendChild(carteBuild(b, i));
-    }
-    boite.appendChild(section);
+
+  const ongletsBoite = $('ongletsBuilds');
+  if (!liste.length) {
+    if (ongletsBoite) ongletsBoite.innerHTML = '';
+    boite.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
+    return;
   }
+  // L'onglet ouvert survit à un redessin (recherche, ami/pub, suppression) ;
+  // il ne retombe sur le premier que s'il a disparu — classe supprimée,
+  // filtrée, ou tout premier affichage.
+  if (!ordre.includes(_ongletBuildsActif)) [_ongletBuildsActif] = ordre;
+  if (ongletsBoite) {
+    ongletsBoite.innerHTML = ordre.map((c) => {
+      const img = CLASSE_IMAGE[c];
+      return `<button type="button" class="${c === _ongletBuildsActif ? 'actif' : ''}" data-c="${c}">
+        ${img ? `<img src="icones_classes/${img}.webp" alt="" loading="lazy" decoding="async">` : ''}
+        ${echapper(D.classes[String(c)] || '?')}
+        <span class="n">${parClasse.get(c).length}</span>
+      </button>`;
+    }).join('');
+    for (const b of ongletsBoite.querySelectorAll('button')) {
+      b.onclick = () => { _ongletBuildsActif = Number(b.dataset.c); dessinerBuilds(); };
+    }
+  }
+
+  boite.innerHTML = '';
+  const groupe = parClasse.get(_ongletBuildsActif) || [];
+  const grille = document.createElement('div');
+  grille.className = 'mbGrille';
+  for (const b of groupe) {
+    const i = toute.findIndex((x) => x.nom === b.nom);
+    grille.appendChild(carteBuild(b, i));
+  }
+  boite.appendChild(grille);
 }
 
 /* LA FENÊTRE "MES BUILDS". Même squelette que la grille d'affixes

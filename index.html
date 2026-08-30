@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=156">
+<link rel="stylesheet" href="icones_affixes.css?v=158">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -807,23 +807,22 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .voirMesBuildsBtn .compte:empty{display:none}
 
 /* Le bouton flottant : accroché au bord droit de l'écran, suit le défilement.
-   Vertical pour rester discret sans empiéter sur le contenu ; horizontal et
-   plein au survol pour rester facile à viser. */
+   Texte à l'endroit (pas de texte vertical, illisible) -- il déborde un peu
+   du bord plutôt que de se réduire à une bande. Bleu (--def), pour ne pas
+   se confondre avec l'orange du bouton Calculer et des autres accents. */
 .boutonFlottantBuilds{position:fixed;right:0;top:60%;transform:translateY(-50%);
-  z-index:45;background:var(--accent);color:#160c05;border:none;
-  border-radius:6px 0 0 6px;padding:14px 7px;font:800 12px/1.2 var(--condense);
-  letter-spacing:1.4px;text-transform:uppercase;cursor:pointer;
-  box-shadow:-4px 0 16px -4px rgba(0,0,0,.55);display:flex;flex-direction:column;
-  align-items:center;gap:7px;writing-mode:vertical-rl;transition:.14s}
-.boutonFlottantBuilds:hover{background:var(--accent-clair);padding-right:11px}
-.boutonFlottantBuilds .compte{writing-mode:horizontal-tb;background:#160c05;
-  color:var(--accent-clair);border-radius:10px;padding:1px 7px;font-size:10.5px;
-  min-width:16px;text-align:center;font-variant-numeric:tabular-nums}
+  z-index:45;background:var(--def);color:#0b141d;border:none;
+  border-radius:20px 0 0 20px;padding:12px 16px 12px 14px;
+  font:800 13px/1 var(--condense);letter-spacing:.8px;text-transform:uppercase;
+  cursor:pointer;box-shadow:-4px 0 16px -4px rgba(0,0,0,.55);
+  display:flex;align-items:center;gap:8px;transition:.14s}
+.boutonFlottantBuilds:hover{background:#6f9fc4}
+.boutonFlottantBuilds .compte{background:#0b141d;color:#bcd7ec;
+  border-radius:10px;padding:1px 7px;font-size:11px;min-width:16px;
+  text-align:center;font-variant-numeric:tabular-nums}
 .boutonFlottantBuilds .compte:empty{display:none}
-@media(max-width:640px){.boutonFlottantBuilds{top:auto;bottom:14px;
-  transform:none;border-radius:20px;flex-direction:row;writing-mode:horizontal-tb;
-  padding:10px 16px}
-  .boutonFlottantBuilds:hover{padding-right:16px}}
+@media(max-width:640px){.boutonFlottantBuilds{top:auto;bottom:14px;right:14px;
+  transform:none;border-radius:20px;padding:10px 16px}}
 
 /* La fenetre elle-même : même squelette que .grilleBoite (voile + tête +
    corps qui défile), la barre de filtres remplace juste la recherche seule
@@ -838,15 +837,25 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .vide-liste,.vide-filtre{color:var(--terne);font-size:12.5px;font-style:italic;
   padding:8px 2px}
 
-.mbGroupe{margin-bottom:22px}
-.mbGroupe:last-child{margin-bottom:0}
-.mbGroupeTete{display:flex;align-items:center;gap:9px;margin-bottom:10px;
-  padding-bottom:6px;border-bottom:1px solid var(--bord)}
-.mbGroupeTete img{width:26px;height:26px;object-fit:contain;border-radius:50%;
-  background:var(--creux)}
-.mbGroupeTete h3{margin:0;font:700 14px/1 var(--condense);letter-spacing:.7px;
-  text-transform:uppercase;color:var(--texte)}
-.mbGroupeCompte{color:var(--terne);font-size:12px}
+/* Un onglet par classe, pas des sections empilées : avec deux ou trois
+   classes jouées, faire défiler pour passer de l'une à l'autre n'apportait
+   rien. Bleu (--def) actif, comme le bouton flottant -- même famille de
+   couleur pour tout ce qui touche à "mes builds". */
+.ongletsBuilds{display:flex;gap:6px;flex-wrap:wrap;padding:11px 15px 0}
+.ongletsBuilds:empty{display:none}
+.ongletsBuilds button{width:auto;display:flex;align-items:center;gap:7px;
+  padding:7px 13px;background:var(--creux);border:1px solid var(--bord);
+  border-radius:20px;font-size:12.5px;color:var(--doux);cursor:pointer;
+  transition:.12s}
+.ongletsBuilds button img{width:18px;height:18px;object-fit:contain;
+  border-radius:50%;background:var(--panneau)}
+.ongletsBuilds button .n{background:var(--panneau2);color:var(--terne);
+  border-radius:10px;padding:0 6px;font-size:11px;font-variant-numeric:tabular-nums}
+.ongletsBuilds button:hover{border-color:var(--bord-fort);color:var(--texte)}
+.ongletsBuilds button.actif{background:var(--def);border-color:var(--def);
+  color:#0b141d}
+.ongletsBuilds button.actif .n{background:#0b141d;color:#bcd7ec}
+
 .mbGrille{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
 
 .mbCarte{--tinte:#5a6570;background:var(--creux);border:1px solid var(--bord);
@@ -874,16 +883,21 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .mbActions .cmpB:hover{color:var(--accent-clair);border-color:var(--accent-sombre)}
 .mbActions .cmpB.actif{color:var(--accent);border-color:var(--accent);
   background:var(--accent-sombre)}
-.mbActions .ami,.mbActions .pub{flex:0 0 auto;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:2px;width:30px;
+/* La case native reste dans le DOM (clic clavier, lecteur d'écran) mais
+   ne s'affiche plus : sur fond sombre elle sortait en carré blanc plein,
+   hors de la charte du reste du site. L'état se lit sur la pilule entière
+   via :has(), comme un vrai bouton à bascule. */
+.mbActions .ami,.mbActions .pub{flex:0 0 auto;display:flex;
+  align-items:center;justify-content:center;width:30px;height:28px;
   background:var(--panneau);border:1px solid var(--bord);border-radius:3px;
   cursor:pointer}
 .mbActions .ami span,.mbActions .pub span{font:700 8px/1 var(--condense);
   letter-spacing:.7px;text-transform:uppercase;color:var(--terne)}
-.mbActions .ami input,.mbActions .pub input{accent-color:var(--accent);
-  cursor:pointer;margin:0}
+.mbActions .ami input,.mbActions .pub input{position:absolute;width:1px;height:1px;
+  padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;
+  border:0}
 .mbActions .ami:has(input:checked),.mbActions .pub:has(input:checked){
-  border-color:var(--accent-sombre)}
+  background:var(--accent-sombre);border-color:var(--accent)}
 .mbActions .ami:has(input:checked) span,.mbActions .pub:has(input:checked) span{
   color:var(--accent-clair)}
 .mbActions .ami:has(input:disabled),.mbActions .pub:has(input:disabled){
@@ -1574,7 +1588,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=156"></script>
+<script src="config.js?v=158"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2454,6 +2468,10 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
       </div>
       <button id="mbFermer" data-i18n="grille.fermer">Terminé</button>
     </div>
+    <!-- Un onglet par classe qui a au moins un build, avec son compte --
+         dessinerBuilds() les régénère à chaque fois, seule mbOngletActif
+         (app.js) décide lequel est ouvert. -->
+    <div id="ongletsBuilds" class="ongletsBuilds"></div>
     <div id="compteBuildsFiltre" class="pas mbCompteFiltre"></div>
     <div id="listeBuilds" class="mbCorps"></div>
   </div>
@@ -2477,21 +2495,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=156"></script>
+<script src="i18n.js?v=158"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=156"></script>
-<script src="comptes.js?v=156"></script>
-<script src="donnees.js?v=156"></script>
-<script src="skills.js?v=156"></script>
-<script src="loot.js?v=156"></script>
-<script src="maps.js?v=156"></script>
-<script src="monstres_icones.js?v=156"></script>
-<script src="craft.js?v=156"></script>
-<script src="talents.js?v=156"></script>
-<script src="builds_reference.js?v=156"></script>
-<script src="guides_classes.js?v=156"></script>
-<script src="fiche.js?v=156"></script>
-<script src="app.js?v=156"></script>
+<script src="verrou.js?v=158"></script>
+<script src="comptes.js?v=158"></script>
+<script src="donnees.js?v=158"></script>
+<script src="skills.js?v=158"></script>
+<script src="loot.js?v=158"></script>
+<script src="maps.js?v=158"></script>
+<script src="monstres_icones.js?v=158"></script>
+<script src="craft.js?v=158"></script>
+<script src="talents.js?v=158"></script>
+<script src="builds_reference.js?v=158"></script>
+<script src="guides_classes.js?v=158"></script>
+<script src="fiche.js?v=158"></script>
+<script src="app.js?v=158"></script>
 </body>
 </html>
