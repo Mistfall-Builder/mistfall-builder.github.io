@@ -3955,6 +3955,11 @@ function carteBuild(b, i) {
     }
   };
   carte.querySelector('.suppr').onclick = () => {
+    // Un clic de trop sur une icône serrée entre d'autres boutons ne doit
+    // pas suffire à perdre un build : on demande confirmation avant toute
+    // suppression, contrairement à Écraser (qui vise un build déjà chargé
+    // et donc voulu).
+    if (!confirm(t('builds.confirmerSuppr', { nom: b.nom }))) return;
     const l = biblio();
     const [parti] = l.splice(i, 1);
     if (!ecrireBiblio(l)) return;
