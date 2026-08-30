@@ -3902,6 +3902,7 @@ function carteBuild(b, i) {
                ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastillePub')}</span></label>
       <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
               title="${t('cmp.mettre')}">⇄</button>
+      <button class="renom" title="${t('builds.renommer')}">✏️</button>
       <button class="suppr" title="${t('builds.supprimer')}">🗑</button>
       <button class="ouvrir" title="${titre}">${t('builds.chargerBtn')}</button>
     </div>`;
@@ -3953,6 +3954,11 @@ function carteBuild(b, i) {
     if (carteCmp && !carteCmp.hidden) {
       carteCmp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+  };
+  carte.querySelector('.renom').onclick = () => {
+    const propose = (prompt(t('builds.renommerInvite', { nom: b.nom }), b.nom) || '').trim();
+    if (!propose || propose === b.nom) return;
+    renommerBuild(b.nom, propose);
   };
   carte.querySelector('.suppr').onclick = () => {
     // Un clic de trop sur une icône serrée entre d'autres boutons ne doit
@@ -4158,6 +4164,50 @@ function enregistrerBuild() {
 function ecraserBuild() {
   if (!_buildCharge) return;
   sauvegarderBuildSous(_buildCharge);
+}
+
+// CHANGE LE NOM D'UN BUILD SANS TOUCHER À SON CONTENU. `nom` sert de clé
+// partout ailleurs (biblio, comparaison, Écraser, Récents, la ligne côté
+// serveur) : renommer doit donc mettre à jour CHAQUE endroit qui le garde
+// en mémoire, sinon l'un d'eux continuerait de viser un nom qui n'existe
+// plus.
+function renommerBuild(ancienNom, nouveauNom) {
+  const liste = biblio();
+  const idx = liste.findIndex((x) => x.nom === ancienNom);
+  if (idx < 0) return;
+  if (liste.some((x) => x.nom === nouveauNom)) {
+    $('noteBuilds').innerHTML =
+      `<span class="ko">${t('builds.nomPris', { nom: nouveauNom })}</span>`;
+    return;
+  }
+  const avant = liste[idx];
+  liste[idx] = { ...avant, nom: nouveauNom };
+  if (!ecrireBiblio(liste)) return;
+
+  if (_cmpA === ancienNom) _cmpA = nouveauNom;
+  if (_cmpB === ancienNom) _cmpB = nouveauNom;
+  if (_buildCharge === ancienNom) { _buildCharge = nouveauNom; majBoutonEcraser(); }
+  try {
+    const r = recentsNoms().map((n) => (n === ancienNom ? nouveauNom : n));
+    localStorage.setItem(CLE_RECENTS, JSON.stringify(r));
+  } catch (e) { /* pas grave : juste le confort du raccourci qui manque */ }
+
+  dessinerBuilds();
+  dessinerComparaison();
+  $('noteBuilds').innerHTML =
+    `<span class="pas">${t('builds.renomme', { avant: ancienNom, apres: nouveauNom })}</span>`;
+
+  // Le nom est la clé côté serveur (user_id, nom) : un simple ré-envoi sous
+  // le nouveau nom laisserait l'ancienne ligne orpheline pour toujours,
+  // d'où le retrait explicite avant l'envoi.
+  if (comptesDispo() && window.Comptes.connecte()) {
+    window.Comptes.supprimerBuild(ancienNom)
+      .then(() => window.Comptes.envoyerBuilds([liste[idx]]))
+      .catch((e) => {
+        $('noteBuilds').innerHTML =
+          `<span class="ko">${tH('sync.partiel', { message: e.message })}</span>`;
+      });
+  }
 }
 
 /* Le lien partageable. Tout l'état tient dans l'adresse : rien à héberger,
