@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=154">
+<link rel="stylesheet" href="icones_affixes.css?v=155">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -850,15 +850,10 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .puceP{color:var(--ko);border-color:#4a2c2c;background:#160d0d}
 .sugg .appl{flex:0 0 auto}
 
-/* Même langage visuel que .puceG.palier ci-dessus, pour le tableau des
-   affixes obtenus : creux tant que le palier n'est pas franchi, plein une
-   fois atteint -- la même transition qu'ailleurs sur le site. */
-.badgePalier{display:inline-flex;align-items:center;font-size:9.5px;
-  font-weight:700;letter-spacing:.3px;text-transform:uppercase;
-  padding:1px 6px;border-radius:20px;border:1px solid var(--accent-sombre);
-  color:var(--accent-clair);white-space:nowrap}
-.badgePalier.atteint{background:var(--accent);border-color:var(--accent);
-  color:#141a22}
+/* La colonne Palier du tableau des affixes obtenus : juste un chiffre,
+   plus ce losange qui ne s'allume que si le build ACTUEL franchit ce
+   niveau -- pas une simple redite du plafond de l'affixe. */
+.losange{color:var(--accent);font-size:10px}
 
 /* ------------------------------------------------- pièces interchangeables */
 .altSlot{margin-bottom:10px}
@@ -1519,7 +1514,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=154"></script>
+<script src="config.js?v=155"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2391,21 +2386,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=154"></script>
+<script src="i18n.js?v=155"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=154"></script>
-<script src="comptes.js?v=154"></script>
-<script src="donnees.js?v=154"></script>
-<script src="skills.js?v=154"></script>
-<script src="loot.js?v=154"></script>
-<script src="maps.js?v=154"></script>
-<script src="monstres_icones.js?v=154"></script>
-<script src="craft.js?v=154"></script>
-<script src="talents.js?v=154"></script>
-<script src="builds_reference.js?v=154"></script>
-<script src="guides_classes.js?v=154"></script>
-<script src="fiche.js?v=154"></script>
-<script src="app.js?v=154"></script>
+<script src="verrou.js?v=155"></script>
+<script src="comptes.js?v=155"></script>
+<script src="donnees.js?v=155"></script>
+<script src="skills.js?v=155"></script>
+<script src="loot.js?v=155"></script>
+<script src="maps.js?v=155"></script>
+<script src="monstres_icones.js?v=155"></script>
+<script src="craft.js?v=155"></script>
+<script src="talents.js?v=155"></script>
+<script src="builds_reference.js?v=155"></script>
+<script src="guides_classes.js?v=155"></script>
+<script src="fiche.js?v=155"></script>
+<script src="app.js?v=155"></script>
 </body>
 </html>

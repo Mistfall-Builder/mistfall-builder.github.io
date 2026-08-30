@@ -2464,15 +2464,16 @@ function afficher(res, classe) {
     // Le ✓ / ✗ se lit avant le nombre : on sait si ça passe sans comparer
     // deux chiffres de colonnes différentes.
     const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
-    // LE PALIER, VISIBLE SANS SURVOLER RIEN. Il vivait déjà en infobulle
-    // dans la Marge de manœuvre, mais fallait l'avoir ouverte pour le voir
-    // — ici, dans le tableau qu'on regarde à chaque calcul, c'est le
-    // premier endroit où la question se pose vraiment.
+    // LE PALIER, EN COLONNE : le chiffre est toujours là (à quel niveau
+    // il se trouve), le losange ne s'allume que si LE BUILD ACTUEL
+    // l'atteint vraiment (stuff + vin). Un tiret pour les affixes qui
+    // n'en ont pas — Elusive, Curse — plutôt qu'un vide qui laisse croire
+    // à un oubli.
     const p = palier(nom);
-    const badgePalier = p
-      ? `<span class="badgePalier${total >= p ? ' atteint' : ''}"
-           title="${echapper(t('palier.quoi', { n: p }))}">${t('sugg.palier')} ${p}</span>`
-      : '';
+    const colonnePalier = p
+      ? `${p}${total >= p ? ` <span class="losange" title="${
+            echapper(t('palier.quoi', { n: p }))}">◆</span>` : ''}`
+      : '—';
     // LE VIN PEUT DÉPASSER LA CIBLE SANS LE DIRE. Warblood verse jusqu'à son
     // plafond par affixe même au-delà de ce qui était demandé — la cible
     // reste écrite « 3 » pendant que le total vaut déjà 4. Rien ne signalait
@@ -2488,8 +2489,9 @@ function afficher(res, classe) {
       : String(total);
     return `<tr data-a="${echapper(nom)}"${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
-              ${pastille(nom)}${libelleAffixe(nom)}${badgePalier}</span></td>
+              ${pastille(nom)}${libelleAffixe(nom)}</span></td>
             <td class="n appoint">${vise == null ? '—' : vise}</td>
+            <td class="n appoint palierCol">${colonnePalier}</td>
             <td class="n appoint">${eq}</td>
             <td class="n vinCase">${selectVin(nom)}</td>
             <td class="n total ${cls}">${totalAffiche}<span class="marque">${marque}</span></td>
@@ -2502,6 +2504,7 @@ function afficher(res, classe) {
     .map(([n, v]) => `${n} ${v}`).join(' · ');
   $('tableauAffixes').innerHTML = lignes
     ? `<table><tr><th>${t('table.affixe')}</th><th>${t('table.vise')}</th>`
+      + `<th title="${echapper(t('table.palierQuoi'))}">${t('table.palier')}</th>`
       + `<th>${t('table.equip')}</th><th>${t('table.vin')}</th>`
       + `<th>${t('table.total')}</th>`
       + ($('mixte').checked
