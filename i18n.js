@@ -104,6 +104,8 @@
       'etat.suggAppNote': '— {avant} remplacé par {apres}. « Calculer » repart des affixes visés.',
 
       'builds.titre': 'Mes builds',
+      'mesb.ouvrir': 'Parcourir mes builds',
+      'mesb.flottant': 'Mes builds',
       'mesb.chercher': 'nom du build…',
       'mesb.toutesClasses': 'Toutes les classes',
       'mesb.toutesRaretes': 'Toutes les raretés',
@@ -679,6 +681,8 @@
       'etat.suggAppNote': '— {avant} replaced with {apres}. "Build it" starts over from the target affixes.',
 
       'builds.titre': 'My builds',
+      'mesb.ouvrir': 'Browse my builds',
+      'mesb.flottant': 'My builds',
       'mesb.chercher': 'build name…',
       'mesb.toutesClasses': 'All classes',
       'mesb.toutesRaretes': 'All rarities',
@@ -1254,6 +1258,8 @@
       'etat.suggAppNote': '— {avant} заменён на {apres}. «Собрать» начнёт заново от нужных аффиксов.',
 
       'builds.titre': 'Мои сборки',
+      'mesb.ouvrir': 'Просмотреть мои сборки',
+      'mesb.flottant': 'Мои сборки',
       'mesb.chercher': 'название сборки…',
       'mesb.toutesClasses': 'Все классы',
       'mesb.toutesRaretes': 'Все редкости',

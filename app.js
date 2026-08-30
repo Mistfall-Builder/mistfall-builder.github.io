@@ -3787,19 +3787,134 @@ function filtrerBuilds(liste) {
   return vus;
 }
 
+/* UNE CARTE PAR BUILD, GROUPÉES PAR CLASSE.
+ *
+ * Même logique qu'avant (chargement, ami/pub, comparaison, suppression),
+ * seule la présentation change : la liste vivait sur 210 px de haut dans
+ * une colonne de 360 px, les affixes n'étaient qu'un compte ("4 affixes").
+ * Ici chaque carte montre les affixes eux-mêmes (icône + niveau), et la
+ * rareté réellement portée teinte son bord gauche.
+ */
+function carteBuild(b, i) {
+  const r = raretesDuBuild(b);
+  const couleur = r
+    ? (r.panache ? 'var(--accent)' : (D.couleurs[String(r.grades[0])] || '#5a6570'))
+    : '#5a6570';
+  const avecCompte = comptesDispo() && window.Comptes.connecte();
+  const fige = !!(b.code || (b.etat && b.etat.k));
+  const titre = fige ? t('builds.charger') : t('builds.chargerVieux');
+  const chips = (b.etat.t || []).map(([n, l]) =>
+    `<span class="mbChip">${pastille(n)}${echapper(libelleAffixe(n))} <b>${l}</b></span>`
+  ).join('');
+  const carte = document.createElement('div');
+  carte.className = 'mbCarte';
+  carte.style.setProperty('--tinte', couleur);
+  // Un nom de build n'est pas forcément le tien : « Copier » depuis la galerie
+  // conserve le nom choisi par l'auteur, et l'import de fichier avale du JSON
+  // arbitraire. La bibliothèque locale échappe donc comme la galerie.
+  carte.innerHTML = `
+    <div class="mbCarteTete">
+      <b title="${echapper(b.nom)}">${echapper(b.nom)}${fige ? '' : ' <i>⚠</i>'}</b>
+      <span class="mbRarete" style="color:${couleur}">${echapper(etiquetteRarete(b))}</span>
+    </div>
+    <div class="mbCarteMeta">${echapper(b.etat.a || '—')} · ${t('builds.affixes', { n: (b.etat.t || []).length })}</div>
+    <div class="mbChips">${chips || `<span class="pas" style="font-size:11px">${t('mesb.rien')}</span>`}</div>
+    <div class="mbActions">
+      <label class="ami" title="${avecCompte ? t('ami.marque') : t('ami.marqueNon')}">
+        <input type="checkbox" ${b.ami ? 'checked' : ''}
+               ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastilleAmi')}</span></label>
+      <label class="pub" title="${avecCompte ? t('builds.public') : t('builds.publicNon')}">
+        <input type="checkbox" ${b.pub ? 'checked' : ''}
+               ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastillePub')}</span></label>
+      <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
+              title="${t('cmp.mettre')}">⇄</button>
+      <button class="suppr" title="${t('builds.supprimer')}">×</button>
+      <button class="ouvrir" title="${titre}">${t('builds.charger')}</button>
+    </div>`;
+  const brancher = (sel, cle, cleOui, cleNon) => {
+    const c = carte.querySelector(sel);
+    if (!c) return;
+    c.onchange = () => {
+      const l = biblio();
+      l[i] = { ...l[i], [cle]: c.checked };
+      if (!ecrireBiblio(l)) { c.checked = !c.checked; return; }
+      window.Comptes.envoyerBuilds([l[i]]).then(() => {
+        $('noteBuilds').innerHTML = `<span class="pas">`
+          + t(c.checked ? cleOui : cleNon, { nom: b.nom }) + '</span>';
+      }).catch((e) => {
+        $('noteBuilds').innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
+      });
+    };
+  };
+  // Deux visibilités distinctes, indépendantes : « ami » se donne avec un
+  // code, « pub » entre dans la galerie. Un build peut être l'un, l'autre,
+  // les deux, ou rien — c'est le défaut.
+  brancher('.pub input', 'pub', 'builds.estPublic', 'builds.plusPublic');
+  brancher('.ami input', 'ami', 'ami.marque', 'ami.marque');
+  carte.querySelector('.ouvrir').onclick = () => {
+    appliquerEtat(b.etat);
+    $('noteBuilds').innerHTML = `<span class="pas">${tH('builds.chargeOk', { nom: b.nom })}</span>`;
+    restituer(b);
+    // Choisir un build referme la fenêtre : le charger EST la conclusion de
+    // la visite, il n'y a rien d'autre à y faire ensuite.
+    fermerModalBuilds();
+  };
+  // Un clic met ce build en A, un clic sur un SECOND le met en B : c'est
+  // la manœuvre « lequel des deux je garde ? », faite sans passer par le
+  // build courant. Recliquer sur un build déjà posé le retire.
+  carte.querySelector('.cmpB').onclick = () => {
+    if (_cmpA === b.nom) _cmpA = '';
+    else if (_cmpB === b.nom) _cmpB = '';
+    else if (!_cmpA) _cmpA = b.nom;
+    else _cmpB = b.nom;
+    dessinerBuilds();
+    dessinerComparaison();
+    const carteCmp = $('carteComparer');
+    if (carteCmp && !carteCmp.hidden) {
+      carteCmp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+  carte.querySelector('.suppr').onclick = () => {
+    const l = biblio();
+    const [parti] = l.splice(i, 1);
+    if (!ecrireBiblio(l)) return;
+    // Un build supprimé ne peut plus être un côté de la comparaison :
+    // sans ça la carte resterait sur un build qui n'existe plus.
+    if (_cmpA === b.nom) _cmpA = '';
+    if (_cmpB === b.nom) _cmpB = '';
+    dessinerBuilds();
+    dessinerComparaison();
+    if (comptesDispo() && window.Comptes.connecte() && parti) {
+      // Sinon la prochaine synchro le ferait réapparaître.
+      window.Comptes.supprimerBuild(parti.nom).catch(() => {});
+    }
+  };
+  return carte;
+}
+
 function dessinerBuilds() {
   const toute = biblio();
   const boite = $('listeBuilds');
   const filtres = $('filtresBuilds');
   if (filtres) filtres.hidden = toute.length < SEUIL_FILTRES;
+  // Le résumé de la colonne et le bouton flottant : un simple compte total,
+  // toujours visible même quand aucune fenêtre n'est ouverte pour le lire
+  // en détail.
+  if ($('compteBuilds')) $('compteBuilds').textContent = toute.length || '';
+  const boutonFlottant = $('boutonFlottantBuilds');
+  if (boutonFlottant) {
+    boutonFlottant.hidden = !toute.length;
+    const badge = $('compteFlottantBuilds');
+    if (badge) badge.textContent = toute.length || '';
+  }
   if (!toute.length) {
     boite.innerHTML = `<div class="vide-liste">${t('builds.vide')}</div>`;
-    if ($('compteBuilds')) $('compteBuilds').textContent = '';
+    if ($('compteBuildsFiltre')) $('compteBuildsFiltre').textContent = '';
     return;
   }
   const liste = toute.length < SEUIL_FILTRES ? toute : filtrerBuilds(toute);
-  if ($('compteBuilds')) {
-    $('compteBuilds').textContent = liste.length === toute.length
+  if ($('compteBuildsFiltre')) {
+    $('compteBuildsFiltre').textContent = liste.length === toute.length
       ? '' : t('mesb.compte', { n: liste.length, total: toute.length });
   }
   boite.innerHTML = '';
@@ -3807,100 +3922,56 @@ function dessinerBuilds() {
     boite.innerHTML = `<div class="vide-filtre">${t('mesb.rien')}</div>`;
     return;
   }
-  liste.forEach((b) => {
-    // L'index doit désigner la ligne dans la bibliothèque ENTIÈRE : après
-    // filtrage, l'index de la vue supprimerait le mauvais build.
-    const i = toute.findIndex((x) => x.nom === b.nom);
-    const ligne = document.createElement('div');
-    ligne.className = 'buildLigne';
-    const cl = (D.classes[String(b.etat.c)] || '?');
-    // La rareté RÉELLEMENT portée, pas le réglage : « Auto » ne dit rien à
-    // qui relit sa liste trois semaines plus tard.
-    const ra = etiquetteRarete(b);
-    // La case « public » n'a de sens qu'avec un compte : sans lui, il n'y a
-    // nulle part où publier. On la montre grisée plutôt que de la cacher,
-    // pour que la possibilité soit visible.
-    const avecCompte = comptesDispo() && window.Comptes.connecte();
-    const fige = !!(b.code || (b.etat && b.etat.k));
-    const titre = fige
-      ? t('builds.charger')
-      : t('builds.chargerVieux');
-    // Un nom de build n'est pas forcément le tien : « Copier » depuis la galerie
-    // conserve le nom choisi par l'auteur, et l'import de fichier avale du JSON
-    // arbitraire. La bibliothèque locale échappe donc comme la galerie.
-    ligne.innerHTML = `<button class="ouvrir" title="${titre}">
-        <b>${echapper(b.nom)}${fige ? '' : ' <i>⚠</i>'}</b>
-        <small>${cl} · ${ra} · ${t('builds.affixes', { n: (b.etat.t || []).length })}</small>
-      </button>
-      <label class="ami" title="${avecCompte
-        ? t('ami.marque') : t('ami.marqueNon')}">
-        <input type="checkbox" ${b.ami ? 'checked' : ''}
-               ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastilleAmi')}</span></label>
-      <label class="pub" title="${avecCompte
-        ? t('builds.public')
-        : t('builds.publicNon')}">
-        <input type="checkbox" ${b.pub ? 'checked' : ''}
-               ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastillePub')}</span></label>
-      <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
-              title="${t('cmp.mettre')}">⇄</button>
-      <button class="suppr" title="${t('builds.supprimer')}">×</button>`;
-    const brancher = (sel, cle, cleOui, cleNon) => {
-      const c = ligne.querySelector(sel);
-      if (!c) return;
-      c.onchange = () => {
-        const l = biblio();
-        l[i] = { ...l[i], [cle]: c.checked };
-        if (!ecrireBiblio(l)) { c.checked = !c.checked; return; }
-        window.Comptes.envoyerBuilds([l[i]]).then(() => {
-          $('noteBuilds').innerHTML = `<span class="pas">`
-            + t(c.checked ? cleOui : cleNon, { nom: b.nom }) + '</span>';
-        }).catch((e) => {
-          $('noteBuilds').innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
-        });
-      };
-    };
-    // Deux visibilités distinctes, indépendantes : « ami » se donne avec un
-    // code, « pub » entre dans la galerie. Un build peut être l'un, l'autre,
-    // les deux, ou rien — c'est le défaut.
-    brancher('.pub input', 'pub', 'builds.estPublic', 'builds.plusPublic');
-    brancher('.ami input', 'ami', 'ami.marque', 'ami.marque');
-    ligne.querySelector('.ouvrir').onclick = () => {
-      appliquerEtat(b.etat);
-      $('noteBuilds').innerHTML = `<span class="pas">${tH('builds.chargeOk', { nom: b.nom })}</span>`;
-      restituer(b);
-    };
-    // Un clic met ce build en A, un clic sur un SECOND le met en B : c'est
-    // la manœuvre « lequel des deux je garde ? », faite sans passer par le
-    // build courant. Recliquer sur un build déjà posé le retire.
-    ligne.querySelector('.cmpB').onclick = () => {
-      if (_cmpA === b.nom) _cmpA = '';
-      else if (_cmpB === b.nom) _cmpB = '';
-      else if (!_cmpA) _cmpA = b.nom;
-      else _cmpB = b.nom;
-      dessinerBuilds();
-      dessinerComparaison();
-      const carte = $('carteComparer');
-      if (carte && !carte.hidden) {
-        carte.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    };
-    ligne.querySelector('.suppr').onclick = () => {
-      const l = biblio();
-      const [parti] = l.splice(i, 1);
-      if (!ecrireBiblio(l)) return;
-      // Un build supprimé ne peut plus être un côté de la comparaison :
-      // sans ça la carte resterait sur un build qui n'existe plus.
-      if (_cmpA === b.nom) _cmpA = '';
-      if (_cmpB === b.nom) _cmpB = '';
-      dessinerBuilds();
-      dessinerComparaison();
-      if (comptesDispo() && window.Comptes.connecte() && parti) {
-        // Sinon la prochaine synchro le ferait réapparaître.
-        window.Comptes.supprimerBuild(parti.nom).catch(() => {});
-      }
-    };
-    boite.appendChild(ligne);
-  });
+  // GROUPÉ PAR CLASSE, DANS L'ORDRE DU JEU : seul l'ordre des GROUPES suit
+  // celui des classes ; le tri choisi (nom / classe / affixes) reste actif
+  // À L'INTÉRIEUR de chaque groupe.
+  const parClasse = new Map();
+  for (const b of liste) {
+    const c = b.etat.c;
+    if (!parClasse.has(c)) parClasse.set(c, []);
+    parClasse.get(c).push(b);
+  }
+  const ordre = Object.keys(D.classes).map(Number).filter((c) => parClasse.has(c));
+  for (const c of parClasse.keys()) if (!ordre.includes(c)) ordre.push(c);
+  for (const c of ordre) {
+    const groupe = parClasse.get(c);
+    const section = document.createElement('div');
+    section.className = 'mbGroupe';
+    const img = CLASSE_IMAGE[c];
+    section.innerHTML = `<div class="mbGroupeTete">
+        ${img ? `<img src="icones_classes/${img}.webp" alt="" loading="lazy" decoding="async">` : ''}
+        <h3>${echapper(D.classes[String(c)] || '?')}</h3>
+        <span class="mbGroupeCompte">${groupe.length}</span>
+      </div>
+      <div class="mbGrille"></div>`;
+    const grille = section.querySelector('.mbGrille');
+    for (const b of groupe) {
+      const i = toute.findIndex((x) => x.nom === b.nom);
+      grille.appendChild(carteBuild(b, i));
+    }
+    boite.appendChild(section);
+  }
+}
+
+/* LA FENÊTRE "MES BUILDS". Même squelette que la grille d'affixes
+   (ouvrirGrille/fermerGrille) : cacher/montrer, bloquer le défilement de la
+   page derrière, rien à valider en fermant puisque chaque action (charger,
+   supprimer, marquer ami/pub) s'applique déjà en direct. */
+function ouvrirModalBuilds() {
+  const v = $('modalMesBuilds');
+  if (!v) return;
+  dessinerBuilds();
+  v.hidden = false;
+  document.body.style.overflow = 'hidden';
+  const ch = $('bChercher');
+  if (ch) ch.focus();
+}
+
+function fermerModalBuilds() {
+  const v = $('modalMesBuilds');
+  if (!v || v.hidden) return;
+  v.hidden = true;
+  document.body.style.overflow = '';
 }
 
 function enregistrerBuild() {
@@ -7255,6 +7326,20 @@ function demarrer(donnees) {
     };
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') fermerGrille();
+    });
+  }
+
+  // La fenêtre "Mes builds" : même mécanique que la grille d'affixes
+  // ci-dessus (voile cliquable, Échap, un seul écouteur clavier de plus).
+  if ($('modalMesBuilds')) {
+    if ($('voirMesBuilds')) $('voirMesBuilds').onclick = ouvrirModalBuilds;
+    if ($('boutonFlottantBuilds')) $('boutonFlottantBuilds').onclick = ouvrirModalBuilds;
+    $('mbFermer').onclick = fermerModalBuilds;
+    $('modalMesBuilds').onclick = (e) => {
+      if (e.target === $('modalMesBuilds')) fermerModalBuilds();
+    };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') fermerModalBuilds();
     });
   }
   // Les sous-onglets de la page Communauté, et le bouton de comparaison.

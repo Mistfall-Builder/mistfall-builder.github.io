@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=155">
+<link rel="stylesheet" href="icones_affixes.css?v=156">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -796,39 +796,99 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 .donRappel button:hover{color:var(--texte);border-color:var(--bord-fort)}
 
 /* ----------------------------------------------------------- mes builds -- */
-#listeBuilds{margin-top:9px;max-height:210px;overflow-y:auto}
+/* Le bouton compact dans la colonne : juste un resume, la vraie liste vit
+   dans #modalMesBuilds (voir plus bas). */
+.voirMesBuildsBtn{display:flex;align-items:center;justify-content:space-between;
+  gap:8px;margin-top:8px;background:var(--creux);border-color:var(--bord);
+  text-align:left}
+.voirMesBuildsBtn:hover{border-color:var(--accent-sombre)}
+.voirMesBuildsBtn .compte{background:var(--panneau2);color:var(--accent-clair);
+  border-radius:10px;padding:1px 8px;font-size:11.5px;font-variant-numeric:tabular-nums}
+.voirMesBuildsBtn .compte:empty{display:none}
+
+/* Le bouton flottant : accroché au bord droit de l'écran, suit le défilement.
+   Vertical pour rester discret sans empiéter sur le contenu ; horizontal et
+   plein au survol pour rester facile à viser. */
+.boutonFlottantBuilds{position:fixed;right:0;top:60%;transform:translateY(-50%);
+  z-index:45;background:var(--accent);color:#160c05;border:none;
+  border-radius:6px 0 0 6px;padding:14px 7px;font:800 12px/1.2 var(--condense);
+  letter-spacing:1.4px;text-transform:uppercase;cursor:pointer;
+  box-shadow:-4px 0 16px -4px rgba(0,0,0,.55);display:flex;flex-direction:column;
+  align-items:center;gap:7px;writing-mode:vertical-rl;transition:.14s}
+.boutonFlottantBuilds:hover{background:var(--accent-clair);padding-right:11px}
+.boutonFlottantBuilds .compte{writing-mode:horizontal-tb;background:#160c05;
+  color:var(--accent-clair);border-radius:10px;padding:1px 7px;font-size:10.5px;
+  min-width:16px;text-align:center;font-variant-numeric:tabular-nums}
+.boutonFlottantBuilds .compte:empty{display:none}
+@media(max-width:640px){.boutonFlottantBuilds{top:auto;bottom:14px;
+  transform:none;border-radius:20px;flex-direction:row;writing-mode:horizontal-tb;
+  padding:10px 16px}
+  .boutonFlottantBuilds:hover{padding-right:16px}}
+
+/* La fenetre elle-même : même squelette que .grilleBoite (voile + tête +
+   corps qui défile), la barre de filtres remplace juste la recherche seule
+   dans la tête. */
+.mbBoite{width:min(1400px,100%)}
+.grilleTete .filtresBuilds{display:flex;flex:1 1 auto;flex-wrap:wrap;gap:6px;margin:0}
+.grilleTete .filtresBuilds input{grid-column:unset;flex:1 1 170px;min-width:150px}
+.grilleTete .filtresBuilds select{flex:1 1 130px;width:auto}
+.mbCompteFiltre:not(:empty){padding:7px 15px 0;font-size:11.5px}
+#listeBuilds.mbCorps{flex:1;overflow-y:auto;padding:11px 15px 15px}
 #listeBuilds:empty{display:none}
-.vide-liste{color:var(--terne);font-size:12px;font-style:italic;padding:4px 2px}
-.buildLigne{display:flex;gap:6px;align-items:stretch;margin-bottom:5px}
-.buildLigne .ouvrir{flex:1;text-align:left;padding:6px 9px;background:var(--creux);
-  border-color:var(--bord);line-height:1.3}
-.buildLigne .ouvrir b{display:block;font-size:12.5px;color:var(--texte);
-  font-weight:600}
-.buildLigne .ouvrir b i{color:var(--avert);font-style:normal}
-.buildLigne .ouvrir small{display:block;font-size:10.5px;color:var(--terne);
-  margin-top:1px}
-.buildLigne .ouvrir:hover{border-color:var(--accent-sombre)}
-.buildLigne .suppr{flex:0 0 auto;width:30px;padding:0;font-size:16px;
-  color:var(--terne);background:var(--creux);border-color:var(--bord)}
-.buildLigne .suppr:hover{color:var(--ko);border-color:var(--ko)}
-.buildLigne .cmpB{flex:0 0 auto;width:30px;padding:0;font-size:14px;
-  color:var(--terne);background:var(--creux);border-color:var(--bord)}
-.buildLigne .cmpB:hover{color:var(--accent-clair);border-color:var(--accent-sombre)}
-/* Un build pose dans la comparaison se voit dans la liste : sans ce
-   repere, on ne sait plus lequel des deux on vient de choisir. */
-.buildLigne .cmpB.actif{color:var(--accent);border-color:var(--accent);
+.vide-liste,.vide-filtre{color:var(--terne);font-size:12.5px;font-style:italic;
+  padding:8px 2px}
+
+.mbGroupe{margin-bottom:22px}
+.mbGroupe:last-child{margin-bottom:0}
+.mbGroupeTete{display:flex;align-items:center;gap:9px;margin-bottom:10px;
+  padding-bottom:6px;border-bottom:1px solid var(--bord)}
+.mbGroupeTete img{width:26px;height:26px;object-fit:contain;border-radius:50%;
+  background:var(--creux)}
+.mbGroupeTete h3{margin:0;font:700 14px/1 var(--condense);letter-spacing:.7px;
+  text-transform:uppercase;color:var(--texte)}
+.mbGroupeCompte{color:var(--terne);font-size:12px}
+.mbGrille{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+
+.mbCarte{--tinte:#5a6570;background:var(--creux);border:1px solid var(--bord);
+  border-left:3px solid var(--tinte);border-radius:4px;padding:10px 12px;
+  display:flex;flex-direction:column;gap:7px}
+.mbCarteTete{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.mbCarteTete b{font-size:13.5px;color:var(--texte);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.mbCarteTete b i{color:var(--avert);font-style:normal}
+.mbRarete{font-size:10.5px;font-weight:700;white-space:nowrap;flex:0 0 auto}
+.mbCarteMeta{font-size:11px;color:var(--terne);margin-top:-4px}
+.mbChips{display:flex;flex-wrap:wrap;gap:4px}
+.mbChip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;
+  padding:2px 7px 2px 4px;border-radius:20px;border:1px solid var(--bord-fort);
+  background:var(--panneau);color:var(--doux);white-space:nowrap}
+.mbChip .pastille{width:15px;height:15px}
+.mbChip b{color:var(--accent-clair);font-weight:700}
+.mbActions{display:flex;align-items:center;gap:5px;margin-top:2px}
+.mbActions .ouvrir{flex:1;background:var(--accent-sombre);color:var(--texte);
+  border:1px solid var(--accent-sombre);font-size:12px;padding:6px 9px}
+.mbActions .ouvrir:hover{background:var(--accent);color:#160c05;border-color:var(--accent)}
+.mbActions .suppr,.mbActions .cmpB{flex:0 0 auto;width:28px;padding:0;
+  font-size:14px;color:var(--terne);background:var(--panneau);border:1px solid var(--bord)}
+.mbActions .suppr:hover{color:var(--ko);border-color:var(--ko)}
+.mbActions .cmpB:hover{color:var(--accent-clair);border-color:var(--accent-sombre)}
+.mbActions .cmpB.actif{color:var(--accent);border-color:var(--accent);
   background:var(--accent-sombre)}
-#noteBuilds:not(:empty){margin-top:8px;font-size:12px}
-.buildLigne .pub{flex:0 0 auto;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:2px;width:34px;
-  background:var(--creux);border:1px solid var(--bord);border-radius:3px;
+.mbActions .ami,.mbActions .pub{flex:0 0 auto;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;width:30px;
+  background:var(--panneau);border:1px solid var(--bord);border-radius:3px;
   cursor:pointer}
-.buildLigne .pub span{font:700 8.5px/1 var(--condense);letter-spacing:.9px;
-  text-transform:uppercase;color:var(--terne)}
-.buildLigne .pub input{accent-color:var(--accent);cursor:pointer;margin:0}
-.buildLigne .pub:has(input:checked){border-color:var(--accent-sombre)}
-.buildLigne .pub:has(input:checked) span{color:var(--accent-clair)}
-.buildLigne .pub:has(input:disabled){opacity:.4;cursor:default}
+.mbActions .ami span,.mbActions .pub span{font:700 8px/1 var(--condense);
+  letter-spacing:.7px;text-transform:uppercase;color:var(--terne)}
+.mbActions .ami input,.mbActions .pub input{accent-color:var(--accent);
+  cursor:pointer;margin:0}
+.mbActions .ami:has(input:checked),.mbActions .pub:has(input:checked){
+  border-color:var(--accent-sombre)}
+.mbActions .ami:has(input:checked) span,.mbActions .pub:has(input:checked) span{
+  color:var(--accent-clair)}
+.mbActions .ami:has(input:disabled),.mbActions .pub:has(input:disabled){
+  opacity:.4;cursor:default}
+#noteBuilds:not(:empty){margin-top:8px;font-size:12px}
 #notePartage:not(:empty),#notePseudo:not(:empty){margin-top:8px;font-size:12px}
 
 /* ---------------------------------------------------------- suggestions -- */
@@ -1514,7 +1574,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=155"></script>
+<script src="config.js?v=156"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -1704,17 +1764,15 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
           <input type="text" id="nomBuild" name="nom-du-build" autocomplete="off" data-form-type="other" data-i18n-ph="builds.nom" placeholder="nom du build…">
           <button id="enregistrerBuild" style="flex:0 0 auto" data-i18n="builds.enregistrer">Enregistrer</button>
         </div>
-        <!-- Les filtres n'apparaissent qu'a partir de quelques builds :
-             au-dessous, ils prennent plus de place qu'ils n'en font gagner. -->
-        <div class="filtresBuilds" id="filtresBuilds" hidden>
-          <input type="search" id="bChercher" name="filtre-mes-builds" autocomplete="off" data-form-type="other" data-i18n-ph="mesb.chercher"
-                 placeholder="nom du build…">
-          <select id="bClasse"></select>
-          <select id="bRarete"></select>
-          <select id="bTri"></select>
-        </div>
-        <div id="listeBuilds"></div>
-        <div id="compteBuilds" class="pas" style="font-size:11px"></div>
+        <!-- La liste detaillee vit desormais dans sa propre fenetre (voir
+             #modalMesBuilds, ouverte par le bouton flottant) : elle avait
+             besoin de bien plus de place que 360 px pour montrer les
+             affixes de chaque build sans les entasser. Ici il ne reste
+             qu'un resume et la porte d'entree vers cette fenetre. -->
+        <button type="button" id="voirMesBuilds" class="voirMesBuildsBtn">
+          <span data-i18n="mesb.ouvrir">Parcourir mes builds</span>
+          <span class="compte" id="compteBuilds"></span>
+        </button>
         <div class="rangee rangeeBoutons" style="margin-top:9px">
           <button id="comparer" data-i18n="cmp.bouton">Comparer</button>
           <button id="lienBuild" data-i18n="builds.lien">Lien de partage</button>
@@ -2368,6 +2426,39 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
   </div>
 </div>
 
+<!-- Le bouton flottant : une porte d'entree vers ses builds depuis
+     n'importe quel endroit de la page, sans avoir a remonter jusqu'a la
+     colonne de gauche ni a deplier la carte. Cache tant qu'il n'y a rien
+     a montrer -- inutile de suivre un bouton vide partout. -->
+<button type="button" id="boutonFlottantBuilds" class="boutonFlottantBuilds" hidden>
+  <span data-i18n="mesb.flottant">Mes builds</span>
+  <span class="compte" id="compteFlottantBuilds"></span>
+</button>
+
+<!-- La fenetre "Mes builds" : meme squelette que la grille d'affixes
+     ci-dessus (voile + boite + tete/corps), pour rester dans le meme
+     langage visuel plutot que d'inventer un deuxieme genre de fenetre.
+     #filtresBuilds et #listeBuilds sont les MEMES elements qui vivaient
+     avant dans la colonne de gauche, deplaces ici -- dessinerBuilds() les
+     cible par leur id, inchange. -->
+<div id="modalMesBuilds" class="voile" hidden>
+  <div class="grilleBoite mbBoite" role="dialog" aria-modal="true" aria-labelledby="mbTitre">
+    <div class="grilleTete">
+      <h2 id="mbTitre" data-i18n="builds.titre">Mes builds</h2>
+      <div class="filtresBuilds mbFiltres" id="filtresBuilds">
+        <input type="search" id="bChercher" name="filtre-mes-builds" autocomplete="off" data-form-type="other" data-i18n-ph="mesb.chercher"
+               placeholder="nom du build…">
+        <select id="bClasse"></select>
+        <select id="bRarete"></select>
+        <select id="bTri"></select>
+      </div>
+      <button id="mbFermer" data-i18n="grille.fermer">Terminé</button>
+    </div>
+    <div id="compteBuildsFiltre" class="pas mbCompteFiltre"></div>
+    <div id="listeBuilds" class="mbCorps"></div>
+  </div>
+</div>
+
 <footer>
   <span data-i18n="pied.texte">Le code produit ici se colle dans</span> <em>Prepare → Manage/Import</em>. <span data-i18n="pied.texte2">Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.</span>
   <span class="don">
@@ -2386,21 +2477,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=155"></script>
+<script src="i18n.js?v=156"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=155"></script>
-<script src="comptes.js?v=155"></script>
-<script src="donnees.js?v=155"></script>
-<script src="skills.js?v=155"></script>
-<script src="loot.js?v=155"></script>
-<script src="maps.js?v=155"></script>
-<script src="monstres_icones.js?v=155"></script>
-<script src="craft.js?v=155"></script>
-<script src="talents.js?v=155"></script>
-<script src="builds_reference.js?v=155"></script>
-<script src="guides_classes.js?v=155"></script>
-<script src="fiche.js?v=155"></script>
-<script src="app.js?v=155"></script>
+<script src="verrou.js?v=156"></script>
+<script src="comptes.js?v=156"></script>
+<script src="donnees.js?v=156"></script>
+<script src="skills.js?v=156"></script>
+<script src="loot.js?v=156"></script>
+<script src="maps.js?v=156"></script>
+<script src="monstres_icones.js?v=156"></script>
+<script src="craft.js?v=156"></script>
+<script src="talents.js?v=156"></script>
+<script src="builds_reference.js?v=156"></script>
+<script src="guides_classes.js?v=156"></script>
+<script src="fiche.js?v=156"></script>
+<script src="app.js?v=156"></script>
 </body>
 </html>
