@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=170">
+<link rel="stylesheet" href="icones_affixes.css?v=171">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -905,16 +905,18 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 /* Poussée en bas de carte plutôt que collée aux chips : la grille
    (.mbGrille) étire déjà les cartes d'une même ligne à la même hauteur,
    donc "Load" tombe au même niveau partout, qu'il y ait 2 affixes ou 8. */
-.mbActions{display:flex;align-items:center;gap:5px;margin-top:auto;padding-top:2px}
+.mbActions{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:auto;padding-top:2px}
 .mbActions .ouvrir{flex:1;background:var(--accent-sombre);color:var(--texte);
   border:1px solid var(--accent-sombre);font-size:12px;padding:6px 9px}
 .mbActions .ouvrir:hover{background:var(--accent);color:#160c05;border-color:var(--accent)}
-.mbActions .suppr,.mbActions .cmpB,.mbActions .renom{flex:0 0 auto;width:28px;height:28px;padding:0;
+.mbActions .suppr,.mbActions .cmpB,.mbActions .renom,.mbActions .dupli,.mbActions .img{
+  flex:0 0 auto;width:28px;height:28px;padding:0;
   display:inline-flex;align-items:center;justify-content:center;
   font-size:14px;color:var(--terne);background:var(--panneau);border:1px solid var(--bord)}
 .mbActions .suppr:hover{color:var(--ko);border-color:var(--ko)}
-.mbActions .renom:hover{color:var(--accent-clair);border-color:var(--accent-sombre)}
-.mbActions .renom svg{width:14px;height:14px}
+.mbActions .renom:hover,.mbActions .dupli:hover,.mbActions .img:hover{
+  color:var(--accent-clair);border-color:var(--accent-sombre)}
+.mbActions .renom svg,.mbActions .dupli svg,.mbActions .img svg{width:14px;height:14px}
 .mbActions .cmpB:hover{color:var(--accent-clair);border-color:var(--accent-sombre)}
 .mbActions .cmpB.actif{color:var(--accent);border-color:var(--accent);
   background:var(--accent-sombre)}
@@ -1623,7 +1625,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=170"></script>
+<script src="config.js?v=171"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -1828,6 +1830,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
           <button id="lienBuild" data-i18n="builds.lien">Lien de partage</button>
           <button id="exporterBuilds" data-i18n="builds.exporter">Exporter</button>
           <button id="importerBuilds" data-i18n="builds.importer">Importer</button>
+          <button type="button" id="exporterImage" data-i18n="builds.exporterImage">Image</button>
         </div>
         <input type="file" id="fichierBuilds" accept="application/json" hidden>
         <div id="noteBuilds"></div>
@@ -2531,21 +2534,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=170"></script>
+<script src="i18n.js?v=171"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=170"></script>
-<script src="comptes.js?v=170"></script>
-<script src="donnees.js?v=170"></script>
-<script src="skills.js?v=170"></script>
-<script src="loot.js?v=170"></script>
-<script src="maps.js?v=170"></script>
-<script src="monstres_icones.js?v=170"></script>
-<script src="craft.js?v=170"></script>
-<script src="talents.js?v=170"></script>
-<script src="builds_reference.js?v=170"></script>
-<script src="guides_classes.js?v=170"></script>
-<script src="fiche.js?v=170"></script>
-<script src="app.js?v=170"></script>
+<script src="verrou.js?v=171"></script>
+<script src="comptes.js?v=171"></script>
+<script src="donnees.js?v=171"></script>
+<script src="skills.js?v=171"></script>
+<script src="loot.js?v=171"></script>
+<script src="maps.js?v=171"></script>
+<script src="monstres_icones.js?v=171"></script>
+<script src="craft.js?v=171"></script>
+<script src="talents.js?v=171"></script>
+<script src="builds_reference.js?v=171"></script>
+<script src="guides_classes.js?v=171"></script>
+<script src="fiche.js?v=171"></script>
+<script src="app.js?v=171"></script>
 </body>
 </html>

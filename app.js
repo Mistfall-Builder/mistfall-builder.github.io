@@ -3834,6 +3834,144 @@ function etiquetteRarete(b) {
   return `${t('perso.mixte')} ${r.grades.map((g) => D.raretes[String(g)]).join(' + ')}`;
 }
 
+function rectArrondi(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+const COULEUR_CAT_IMG = { offense: '#c9603f', defense: '#5a86ad', mobility: '#4c9e88', support: '#c9a253' };
+
+/* LA CARTE PNG DU BUILD -- résumé partageable (paperdoll + affixes visés),
+   entièrement dessiné en <canvas> côté client : mêmes données que l'UI
+   (raretesDuBuild, catalogueParId), pas de service tiers ni de
+   bibliothèque externe pour "photographier" le DOM. Prend l'état d'un
+   build (`etat`, pas forcément enregistré -- peut être celui en cours de
+   calcul) et le nom à afficher séparément, puisqu'un build pas encore
+   sauvegardé n'en a pas dans `etat`. */
+function genererImageBuild(etat, nomAffiche) {
+  const b = { etat, code: etat.k || '' };
+  const r = raretesDuBuild(b);
+  const catalogue = catalogueParId();
+  const cibles = etat.t || [];
+
+  const ECH = 2; // @2x pour rester net sur un écran retina
+  const LARGEUR = 840;
+  const PAD = 32;
+  const TAILLE_DOLL = 56;
+  const GAP_DOLL = 10;
+  const COL_AFFIXE = (LARGEUR - PAD * 2 - 20) / 2;
+  const LIGNES_AFFIXES = Math.max(1, Math.ceil(cibles.length / 2));
+  const H_AFFIXES = LIGNES_AFFIXES * 34;
+  const HAUTEUR = PAD + 74 + 16 + TAILLE_DOLL + 24 + H_AFFIXES + 24 + 26 + PAD;
+
+  const slotsOccupes = (r && r.parSlot ? D.ordreSlots : []).map((slot) => {
+    if (!r || !r.parSlot) return null;
+    const info = r.parSlot.get(slot);
+    if (!info) return null;
+    return { g: info.g, objet: catalogue.get(info.cfg) };
+  });
+  const slots = r && r.parSlot ? slotsOccupes : D.ordreSlots.map(() => null);
+
+  const charger = (src) => new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+  const imgClasse = CLASSE_IMAGE[etat.c]
+    ? charger(`icones_classes/${CLASSE_IMAGE[etat.c]}.webp`) : Promise.resolve(null);
+  const imgsDoll = Promise.all(slots.map((s) =>
+    s && s.objet && s.objet.ic ? charger(`icones/${s.objet.ic}`) : Promise.resolve(null)));
+
+  return Promise.all([imgClasse, imgsDoll]).then(([iconClasse, iconsDoll]) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = LARGEUR * ECH;
+    canvas.height = HAUTEUR * ECH;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(ECH, ECH);
+
+    ctx.fillStyle = '#0b0f11';
+    ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    ctx.strokeStyle = '#202528';
+    ctx.strokeRect(0.5, 0.5, LARGEUR - 1, HAUTEUR - 1);
+
+    let y = PAD;
+    const xTexte = PAD + (iconClasse ? 50 : 0);
+    if (iconClasse) ctx.drawImage(iconClasse, PAD, y, 40, 40);
+    ctx.fillStyle = '#ece7dd';
+    ctx.font = '700 24px system-ui, -apple-system, sans-serif';
+    ctx.fillText(nomAffiche, xTexte, y + 28);
+    const classe = D.classes[String(etat.c)] || '';
+    ctx.fillStyle = '#8a877f';
+    ctx.font = '400 14px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${classe} · ${etat.a || ''} · ${etiquetteRarete(b)}`, xTexte, y + 48);
+    y += 74;
+
+    slots.forEach((s, i) => {
+      const x = PAD + i * (TAILLE_DOLL + GAP_DOLL);
+      const couleur = s ? (D.couleurs[String(s.g)] || '#5a6570') : '#202528';
+      ctx.fillStyle = `${couleur}33`;
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = 1.5;
+      rectArrondi(ctx, x, y, TAILLE_DOLL, TAILLE_DOLL, 8);
+      ctx.fill();
+      ctx.stroke();
+      const icone = iconsDoll[i];
+      if (icone) {
+        const m = 8;
+        ctx.drawImage(icone, x + m, y + m, TAILLE_DOLL - m * 2, TAILLE_DOLL - m * 2);
+      }
+    });
+    y += TAILLE_DOLL + 24;
+
+    cibles.forEach(([nom, niveau], i) => {
+      const col = i % 2;
+      const ligne = Math.floor(i / 2);
+      const x = PAD + col * (COL_AFFIXE + 20);
+      const cy = y + ligne * 34 + 12;
+      const cat = (D.affixes[nom] || {}).cat || 'support';
+      ctx.fillStyle = COULEUR_CAT_IMG[cat] || '#8a877f';
+      ctx.beginPath();
+      ctx.arc(x + 5, cy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#cfcbc3';
+      ctx.font = '400 15px system-ui, -apple-system, sans-serif';
+      ctx.fillText(libelleAffixe(nom), x + 18, cy + 5);
+      ctx.fillStyle = '#f19a61';
+      ctx.font = '700 15px system-ui, -apple-system, sans-serif';
+      const txtNiv = `+${niveau}`;
+      ctx.fillText(txtNiv, x + COL_AFFIXE - ctx.measureText(txtNiv).width, cy + 5);
+    });
+    y += H_AFFIXES + 24;
+
+    ctx.fillStyle = '#8a877f';
+    ctx.font = '400 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText('mistfall-builder.github.io', PAD, y + 12);
+
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  });
+}
+
+function telechargerImageBuild(etat, nomAffiche) {
+  genererImageBuild(etat, nomAffiche).then((blob) => {
+    if (!blob) {
+      $('noteBuilds').innerHTML = `<span class="ko">${t('builds.imageKo')}</span>`;
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `mistfall-${nomAffiche.replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 60)}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $('noteBuilds').innerHTML = `<span class="pas">${t('builds.imageOk')}</span>`;
+  });
+}
+
 function filtrerBuilds(liste) {
   const q = bEtat.recherche.toLowerCase();
   let vus = liste.filter((b) => {
@@ -3908,6 +4046,21 @@ function carteBuild(b, i) {
           <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
         </svg>
       </button>
+      <button class="dupli" title="${t('builds.dupliquer')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+      <button class="img" title="${t('builds.imageCarte')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
       <button class="suppr" title="${t('builds.supprimer')}">🗑</button>
       <button class="ouvrir" title="${titre}">${t('builds.chargerBtn')}</button>
     </div>`;
@@ -3965,6 +4118,8 @@ function carteBuild(b, i) {
     if (!propose || propose === b.nom) return;
     renommerBuild(b.nom, propose);
   };
+  carte.querySelector('.dupli').onclick = () => dupliquerBuild(b.nom);
+  carte.querySelector('.img').onclick = () => telechargerImageBuild(b.etat, b.nom);
   carte.querySelector('.suppr').onclick = () => {
     // Un clic de trop sur une icône serrée entre d'autres boutons ne doit
     // pas suffire à perdre un build : on demande confirmation avant toute
@@ -4212,6 +4367,49 @@ function renommerBuild(ancienNom, nouveauNom) {
         $('noteBuilds').innerHTML =
           `<span class="ko">${tH('sync.partiel', { message: e.message })}</span>`;
       });
+  }
+}
+
+// UN NOM DE COPIE LIBRE, PROPOSÉ D'OFFICE dans le prompt : « Nom (copie) »,
+// et si ça existe déjà « Nom (copie) 2 », 3, etc. -- l'utilisateur peut
+// toujours le remplacer avant de valider.
+function nomCopieDisponible(nom, liste) {
+  const pris = new Set(liste.map((x) => x.nom));
+  const base = t('builds.suffixeCopie', { nom });
+  if (!pris.has(base)) return base;
+  let n = 2;
+  while (pris.has(`${base} ${n}`)) n += 1;
+  return `${base} ${n}`;
+}
+
+// CRÉE UNE COPIE INDÉPENDANTE d'un build existant, sous un nouveau nom --
+// pour essayer une variante sans toucher à l'original ni retaper tout le
+// stuff/les cibles à la main. La copie part toujours privée (pub/ami à
+// zéro) : publier était une décision prise pour l'original, pas pour un
+// brouillon de test.
+function dupliquerBuild(nom) {
+  const liste = biblio();
+  const original = liste.find((x) => x.nom === nom);
+  if (!original) return;
+  const suggestion = nomCopieDisponible(nom, liste);
+  const propose = (prompt(t('builds.dupliquerInvite', { nom }), suggestion) || '').trim();
+  if (!propose) return;
+  if (liste.some((x) => x.nom === propose)) {
+    $('noteBuilds').innerHTML =
+      `<span class="ko">${t('builds.nomPris', { nom: propose })}</span>`;
+    return;
+  }
+  const copie = { ...original, nom: propose, pub: false, ami: false };
+  liste.push(copie);
+  if (!ecrireBiblio(liste)) return;
+  dessinerBuilds();
+  $('noteBuilds').innerHTML =
+    `<span class="pas">${t('builds.enregistre', { nom: propose })}</span>`;
+  if (comptesDispo() && window.Comptes.connecte()) {
+    window.Comptes.envoyerBuilds([copie]).catch((e) => {
+      $('noteBuilds').innerHTML =
+        `<span class="ko">${tH('sync.partiel', { message: e.message })}</span>`;
+    });
   }
 }
 
@@ -7798,6 +7996,14 @@ function demarrer(donnees) {
       `<span class="pas">${t('builds.exporte', { n: liste.length })}</span>`;
   };
   $('importerBuilds').onclick = () => $('fichierBuilds').click();
+  $('exporterImage').onclick = () => {
+    if (!cibles.size) {
+      $('noteBuilds').innerHTML = `<span class="ko">${t('builds.affixeRequis')}</span>`;
+      return;
+    }
+    const nom = _buildCharge || ($('nomBuild').value || '').trim() || t('builds.imageSansNom');
+    telechargerImageBuild(etatActuel(), nom);
+  };
   $('fichierBuilds').onchange = (ev) => {
     const f = ev.target.files && ev.target.files[0];
     if (!f) return;
