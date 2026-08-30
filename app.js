@@ -2361,7 +2361,16 @@ function afficher(res, classe) {
       <div class="inne${it.i ? '' : ' sans'}">${it.i ? t('equip.inne') + ' ' + it.i : t('equip.aucunInne')}</div>
       ${zoneAlt}
       ${gems}
-      <button class="cadenas" type="button"></button>`;
+      <button class="cadenas" type="button"></button>
+      <button class="retirer" type="button" title="${echapper(t('equip.retirer'))}">✕</button>`;
+    // LA CROIX. Vide CE slot et relance le solveur dessus, en figeant
+    // temporairement les sept autres pièces (leurs cadenas réels restent
+    // intacts, on n'écrit jamais dans `verrouilles` pour elles) : le reste
+    // du build ne bouge pas, seul cet emplacement change.
+    carte.querySelector('.retirer').onclick = (ev) => {
+      ev.stopPropagation();
+      supprimerPiece(slot);
+    };
     // LE CADENAS. Il fige CETTE pièce avec les gemmes qu'elle porte à cet
     // instant : c'est la photo du moment, pas une consigne abstraite.
     const cad = carte.querySelector('.cadenas');
@@ -2455,6 +2464,15 @@ function afficher(res, classe) {
     // Le ✓ / ✗ se lit avant le nombre : on sait si ça passe sans comparer
     // deux chiffres de colonnes différentes.
     const marque = vise == null ? '' : (total >= vise ? '✓' : '✗');
+    // LE PALIER, VISIBLE SANS SURVOLER RIEN. Il vivait déjà en infobulle
+    // dans la Marge de manœuvre, mais fallait l'avoir ouverte pour le voir
+    // — ici, dans le tableau qu'on regarde à chaque calcul, c'est le
+    // premier endroit où la question se pose vraiment.
+    const p = palier(nom);
+    const badgePalier = p
+      ? `<span class="badgePalier${total >= p ? ' atteint' : ''}"
+           title="${echapper(t('palier.quoi', { n: p }))}">${t('sugg.palier')} ${p}</span>`
+      : '';
     // LE VIN PEUT DÉPASSER LA CIBLE SANS LE DIRE. Warblood verse jusqu'à son
     // plafond par affixe même au-delà de ce qui était demandé — la cible
     // reste écrite « 3 » pendant que le total vaut déjà 4. Rien ne signalait
@@ -2470,7 +2488,7 @@ function afficher(res, classe) {
       : String(total);
     return `<tr data-a="${echapper(nom)}"${cls === 'ko' ? ' class="ligneKo"' : ''}>
             <td><span style="display:flex;align-items:center;gap:8px">
-              ${pastille(nom)}${libelleAffixe(nom)}</span></td>
+              ${pastille(nom)}${libelleAffixe(nom)}${badgePalier}</span></td>
             <td class="n appoint">${vise == null ? '—' : vise}</td>
             <td class="n appoint">${eq}</td>
             <td class="n vinCase">${selectVin(nom)}</td>
@@ -4144,6 +4162,51 @@ function dessinerAlternatives(res, classe) {
     bloc.appendChild(rangee);
     boite.appendChild(bloc);
   }
+}
+
+/* VIDER UN SLOT ET NE RECALCULER QUE LUI.
+ *
+ * Pas un simple retrait à l'affichage : ça laisserait le tableau des
+ * affixes mentir sur ce que le stuff couvre vraiment. On fige donc
+ * TEMPORAIREMENT les sept autres pièces à ce qu'elles sont déjà — jamais
+ * dans `verrouilles` lui-même, sinon les cadenas réels du joueur se
+ * retrouveraient fermés partout sans qu'il l'ait demandé — et on relance
+ * construire() dessus. Un vrai cadenas posé sur une autre pièce garde la
+ * priorité sur ce qu'on vient de lire dans le dernier résultat.
+ */
+function supprimerPiece(slot) {
+  if (!dernier) return;
+  const classe = Number($('classe').value);
+  const arme = $('arme').value || null;
+  const grade = $('rarete').value ? Number($('rarete').value) : null;
+  const mixte = $('mixte').checked;
+  const planchers = planchersActuels();
+  const saveurs = saveursActuelles();
+
+  const verrousTemp = {};
+  for (const [s, it] of Object.entries(dernier.slotItems)) {
+    if (s === slot || !it) continue;
+    const gemmes = dernier.sockets.filter((g) => g.slot === s)
+      .sort((a, b) => a.index - b.index).map((g) => g.gem || null);
+    verrousTemp[s] = { item: it, gemmes };
+  }
+  for (const [s, v] of verrouilles) if (s !== slot) verrousTemp[s] = v;
+  // La croix passe outre un cadenas éventuel sur CE slot précis : demander
+  // de retirer une pièce puis la revoir revenir sans bouger n'aurait aucun
+  // sens.
+  if (verrouilles.has(slot)) verrouilles.delete(slot);
+  majNoteVerrous();
+
+  $('etat').textContent = t('etat.calcul');
+  const res = construire(classe, arme, [...cibles.entries()], grade,
+                         $('vin').checked, mixte, planchers, vinManuel,
+                         verrousTemp, saveurs);
+  res.secondeArme = secondeArmeActuelle(classe, res);
+  dernier = res;
+  afficher(res, classe);
+  $('etat').innerHTML = res.suffisant
+    ? `<span class="ok">${t('etat.ok')}</span>`
+    : `<span class="ko">${t('etat.ko')}</span>`;
 }
 
 function calculer() {
