@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=165">
+<link rel="stylesheet" href="icones_affixes.css?v=166">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -704,6 +704,9 @@ select:disabled{opacity:.4}
 /* Les rangees de boutons d'action gardent une largeur lisible : sous
    ~120 px un libelle se coupe en deux lignes, autant passer a la ligne. */
 .rangeeBoutons>*{flex:1 1 120px}
+/* Le nom du build visé rend ce bouton-ci de longueur imprévisible --
+   les autres de la rangée ont un libellé fixe. */
+#ecraserBuild{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .coche{display:flex;align-items:center;gap:9px;color:var(--texte2);
   font:400 13.5px/1.35 var(--corps);margin:11px 0 0;cursor:pointer;
@@ -1617,7 +1620,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=165"></script>
+<script src="config.js?v=166"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -1817,6 +1820,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
           <span class="compte" id="compteBuilds"></span>
         </button>
         <div class="rangee rangeeBoutons" style="margin-top:9px">
+          <button type="button" id="ecraserBuild" hidden></button>
           <button id="comparer" data-i18n="cmp.bouton">Comparer</button>
           <button id="lienBuild" data-i18n="builds.lien">Lien de partage</button>
           <button id="exporterBuilds" data-i18n="builds.exporter">Exporter</button>
@@ -2524,21 +2528,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=165"></script>
+<script src="i18n.js?v=166"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=165"></script>
-<script src="comptes.js?v=165"></script>
-<script src="donnees.js?v=165"></script>
-<script src="skills.js?v=165"></script>
-<script src="loot.js?v=165"></script>
-<script src="maps.js?v=165"></script>
-<script src="monstres_icones.js?v=165"></script>
-<script src="craft.js?v=165"></script>
-<script src="talents.js?v=165"></script>
-<script src="builds_reference.js?v=165"></script>
-<script src="guides_classes.js?v=165"></script>
-<script src="fiche.js?v=165"></script>
-<script src="app.js?v=165"></script>
+<script src="verrou.js?v=166"></script>
+<script src="comptes.js?v=166"></script>
+<script src="donnees.js?v=166"></script>
+<script src="skills.js?v=166"></script>
+<script src="loot.js?v=166"></script>
+<script src="maps.js?v=166"></script>
+<script src="monstres_icones.js?v=166"></script>
+<script src="craft.js?v=166"></script>
+<script src="talents.js?v=166"></script>
+<script src="builds_reference.js?v=166"></script>
+<script src="guides_classes.js?v=166"></script>
+<script src="fiche.js?v=166"></script>
+<script src="app.js?v=166"></script>
 </body>
 </html>

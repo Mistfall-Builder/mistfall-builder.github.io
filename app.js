@@ -3902,7 +3902,7 @@ function carteBuild(b, i) {
                ${avecCompte ? '' : 'disabled'}><span>${t('builds.pastillePub')}</span></label>
       <button class="cmpB${_cmpA === b.nom || _cmpB === b.nom ? ' actif' : ''}"
               title="${t('cmp.mettre')}">⇄</button>
-      <button class="suppr" title="${t('builds.supprimer')}">×</button>
+      <button class="suppr" title="${t('builds.supprimer')}">🗑</button>
       <button class="ouvrir" title="${titre}">${t('builds.chargerBtn')}</button>
     </div>`;
   const brancher = (sel, cle, cleOui, cleNon) => {
@@ -4097,14 +4097,12 @@ function fermerModalBuilds() {
   document.body.style.overflow = '';
 }
 
-function enregistrerBuild() {
-  const champ = $('nomBuild');
-  const nom = (champ.value || '').trim();
-  if (!nom) {
-    $('noteBuilds').innerHTML = `<span class="ko">${t('builds.nomRequis')}</span>`;
-    champ.focus();
-    return;
-  }
+// LE SEUL CHEMIN QUI ÉCRIT UN BUILD DANS LA BIBLIOTHÈQUE. « Enregistrer »
+// (nom tapé dans le champ) et « Écraser » (nom du build déjà chargé) n'en
+// sont que deux façons de fournir ce nom -- partagé pour que les deux
+// gestes gardent la même règle de fusion (pub/ami préservés, etc.) sans
+// jamais diverger.
+function sauvegarderBuildSous(nom) {
   if (!cibles.size) {
     $('noteBuilds').innerHTML = `<span class="ko">${t('builds.affixeRequis')}</span>`;
     return;
@@ -4120,7 +4118,6 @@ function enregistrerBuild() {
                    ami: deja >= 0 ? !!liste[deja].ami : false };
   if (deja >= 0) liste[deja] = entree; else liste.push(entree);
   if (!ecrireBiblio(liste)) return;
-  champ.value = '';
   // Ce qu'on vient d'enregistrer devient « le build chargé » : le bouton
   // Écraser, s'il réapparaît après une modification de plus, visera celui-ci.
   _buildCharge = nom;
@@ -4134,6 +4131,28 @@ function enregistrerBuild() {
         `<span class="ko">${tH('sync.partiel', { message: e.message })}</span>`;
     });
   }
+}
+
+function enregistrerBuild() {
+  const champ = $('nomBuild');
+  const nom = (champ.value || '').trim();
+  if (!nom) {
+    $('noteBuilds').innerHTML = `<span class="ko">${t('builds.nomRequis')}</span>`;
+    champ.focus();
+    return;
+  }
+  sauvegarderBuildSous(nom);
+  champ.value = '';
+}
+
+// RÉENREGISTRE SOUS SON PROPRE NOM le build actuellement chargé (celui posé
+// par carteBuild() à l'ouverture, ou par un enregistrement précédent) --
+// sans repasser par le champ « nom du build ». Le bouton qui l'appelle est
+// caché tant que _buildCharge est vide (voir majBoutonEcraser), donc ce
+// garde ne devrait normalement jamais se déclencher.
+function ecraserBuild() {
+  if (!_buildCharge) return;
+  sauvegarderBuildSous(_buildCharge);
 }
 
 /* Le lien partageable. Tout l'état tient dans l'adresse : rien à héberger,
@@ -5159,6 +5178,7 @@ function majBoutonEcraser() {
   bouton.hidden = !_buildCharge;
   if (_buildCharge) {
     bouton.textContent = t('builds.ecraser', { nom: _buildCharge });
+    bouton.title = bouton.textContent;
   }
 }
 
@@ -7684,6 +7704,7 @@ function demarrer(donnees) {
 
   $('enregistrerBuild').onclick = enregistrerBuild;
   $('nomBuild').onkeydown = (ev) => { if (ev.key === 'Enter') enregistrerBuild(); };
+  $('ecraserBuild').onclick = ecraserBuild;
   $('lienBuild').onclick = () => {
     if (!cibles.size) {
       $('noteBuilds').innerHTML = `<span class="ko">${t('etat.choisir')}</span>`;
