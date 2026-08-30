@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=171">
+<link rel="stylesheet" href="icones_affixes.css?v=172">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -153,7 +153,12 @@ main[hidden],.page[hidden]{display:none}
 main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
      display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;
      align-items:start}
-@media(max-width:1040px){main{grid-template-columns:1fr}}
+/* minmax(0,1fr) et pas juste 1fr : une piste `1fr` toute seule refuse de
+   rétrécir sous le min-content de ce qu'elle contient (un tableau large,
+   par ex.) -- elle poussait toute la page plus large que l'écran plutôt
+   que de laisser CE contenu déborder localement (lui sait le faire, voir
+   #code plus bas). Le 0 dans minmax() est ce qui autorise à rétrécir. */
+@media(max-width:1040px){main{grid-template-columns:minmax(0,1fr)}}
 .colonne{position:sticky;top:84px}
 @media(max-width:1040px){.colonne{position:static}}
 /* ESSAI RATE, CONFIRME PAR CAPTURE : position:sticky simple sur la carte
@@ -1439,7 +1444,12 @@ td.cout{width:64px}
   header{height:auto}
   .barre{flex-wrap:wrap;height:auto;padding:8px 12px;gap:8px 10px}
   .logo .sous{display:none}
-  .nav{margin-left:0}
+  /* Les 6 onglets ne rentrent pas sur 375px : plutôt que de les casser sur
+     plusieurs lignes (illisible, la barre "Mécaniques" cassée en deux),
+     ils défilent horizontalement -- comme #code un peu plus bas pour la
+     même raison. Sans ce overflow-x, c'est TOUTE la page qui héritait du
+     débordement de cette seule rangée. */
+  .nav{margin-left:0;overflow-x:auto;flex-wrap:nowrap;max-width:100%}
   .droite{margin-left:auto}
 
   /* la modale des affixes : son en-tete enveloppe, son bouton doit rester pris */
@@ -1625,7 +1635,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=171"></script>
+<script src="config.js?v=172"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2534,21 +2544,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=171"></script>
+<script src="i18n.js?v=172"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=171"></script>
-<script src="comptes.js?v=171"></script>
-<script src="donnees.js?v=171"></script>
-<script src="skills.js?v=171"></script>
-<script src="loot.js?v=171"></script>
-<script src="maps.js?v=171"></script>
-<script src="monstres_icones.js?v=171"></script>
-<script src="craft.js?v=171"></script>
-<script src="talents.js?v=171"></script>
-<script src="builds_reference.js?v=171"></script>
-<script src="guides_classes.js?v=171"></script>
-<script src="fiche.js?v=171"></script>
-<script src="app.js?v=171"></script>
+<script src="verrou.js?v=172"></script>
+<script src="comptes.js?v=172"></script>
+<script src="donnees.js?v=172"></script>
+<script src="skills.js?v=172"></script>
+<script src="loot.js?v=172"></script>
+<script src="maps.js?v=172"></script>
+<script src="monstres_icones.js?v=172"></script>
+<script src="craft.js?v=172"></script>
+<script src="talents.js?v=172"></script>
+<script src="builds_reference.js?v=172"></script>
+<script src="guides_classes.js?v=172"></script>
+<script src="fiche.js?v=172"></script>
+<script src="app.js?v=172"></script>
 </body>
 </html>
