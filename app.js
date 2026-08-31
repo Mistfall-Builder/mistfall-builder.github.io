@@ -431,7 +431,7 @@ function poserGemmesExact(sockets, want, couvert) {
     if (finale[idx] === INF) continue;
     const c = {};
     noms.forEach((n, i) => { c[n] = Math.floor(idx / strides[i]) % (caps[i] + 1); });
-    const note = couvertureEffective(c, want, noms);
+    const note = couvertureEffective(c, want, null);
     let secours = 0;
     for (const [n, lvl] of Object.entries(want)) {
       secours -= Math.max(0, (lvl - (c[n] || 0)) - 2);
@@ -691,7 +691,7 @@ function poolDe(classe, slot, arme, grade, mixte) {
 const RELANCES_RARETE_UNIQUE = 20;
 
 function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, affinite,
-                           depart, verrous, saveurs) {
+                           depart, verrous, saveurs, priorite) {
   const want = Object.fromEntries(cibleListe);
   // Les pièces verrouillees : leur objet est impose, leurs gemmes figees,
   // et la recherche n'a plus le droit d'y toucher.
@@ -720,7 +720,6 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     slotItemsDepart[slot] = best || null;
   }
 
-  const priorite = Object.keys(want);
   const note = (items, e) => {
     const base = couvertureEffective(e.couvert, want, priorite);
     const sur = surplus(e.couvert, want);
@@ -930,7 +929,7 @@ function sommeRaretes(slotItems) {
 }
 
 function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinChoisi,
-                    verrous, saveurs) {
+                    verrous, saveurs, priorite) {
   const affinite = D.affinites[String(classe)] || null;
 
   /* LE VIN SE RETIRE DES CIBLES AVANT DE CHERCHER, PAS APRÈS.
@@ -953,11 +952,10 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
       .map(([n, l]) => [n, l - (vinPoints.get(n) || 0)])
       .filter(([, l]) => l > 0);
     const want = Object.fromEntries(cibleGear);
-    const priorite = Object.keys(want);
-    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep, verrous, saveurs);
+    const a = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, null, dep, verrous, saveurs, priorite);
     let r = a;
     if (affinite) {
-      const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous, saveurs);
+      const b = construireAuGrade(classe, arme, cibleGear, g, mx, planchers, affinite, dep, verrous, saveurs, priorite);
       const na = [couvertureEffective(a.couvert, want, priorite), surplus(a.couvert, want)];
       const nb = [couvertureEffective(b.couvert, want, priorite), surplus(b.couvert, want)];
       r = (nb[0] > na[0] || (nb[0] === na[0] && nb[1] >= na[1])) ? b : a;
@@ -1037,8 +1035,8 @@ function construire(classe, arme, cibleListe, grade, vin, mixte, planchers, vinC
     if (justeEnDessous) departs.push({ ...justeEnDessous.slotItems });
     for (const dep of departs) {
       const pan = essai(grade || 1, true, dep);
-      const np = [couvertureEffective(pan.couvert, want, Object.keys(want)), -raretes(pan)];
-      const nr = [couvertureEffective(res.couvert, want, Object.keys(want)), -raretes(res)];
+      const np = [couvertureEffective(pan.couvert, want, priorite), -raretes(pan)];
+      const nr = [couvertureEffective(res.couvert, want, priorite), -raretes(res)];
       if (np[0] > nr[0] || (np[0] === nr[0] && np[1] > nr[1])) res = pan;
     }
   }
@@ -2079,106 +2077,6 @@ function dessinerAffixes() {
   }
   const c = $('compteCibles');
   if (c) c.textContent = cibles.size ? t('grille.compte', { n: cibles.size }) : '';
-  dessinerPriorite();
-}
-
-/* ================================================================
-   LE RECAP DE PRIORITE
-
-   La grille ci-dessus dit QUELS affixes et à quel niveau ; elle ne dit
-   jamais dans quel ORDRE les servir si le stuff ne peut pas tout tenir.
-   `cibles` est une Map, donc déjà ordonnée par construction (dernier
-   niveau posé = dernière position) -- ce recap la rend VISIBLE et
-   réordonnable, et son ordre est ce que `construire()` lit comme
-   priorité (voir couvertureEffective). Rien ne change tant qu'on n'y
-   touche pas : l'ordre de clic reste la priorité par défaut. */
-let _prioriteTraine = null;
-
-function reordonnerCibles(depuis, versNom, avant) {
-  const entrees = [...cibles.entries()];
-  const iDepuis = entrees.findIndex(([n]) => n === depuis);
-  if (iDepuis < 0) return;
-  const [entree] = entrees.splice(iDepuis, 1);
-  let iVers = entrees.findIndex(([n]) => n === versNom);
-  if (iVers < 0) iVers = entrees.length;
-  else if (!avant) iVers += 1;
-  entrees.splice(iVers, 0, entree);
-  cibles.clear();
-  for (const [n, v] of entrees) cibles.set(n, v);
-}
-
-function lignePriorite(nom, rang) {
-  const el = document.createElement('div');
-  el.className = 'prioriteLigne';
-  el.draggable = true;
-  el.dataset.affixe = nom;
-  const vise = cibles.get(nom);
-  const p = palier(nom);
-  const max = plafond(nom);
-  el.innerHTML = `<span class="poignee" aria-hidden="true">⠿</span>
-    <span class="rang">${rang + 1}</span>
-    ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
-    <span class="niv">${vise}/${max}</span>
-    <span class="rapide">
-      <button type="button" class="palier"${p ? '' : ' disabled'}
-        title="${p ? echapper(t('priorite.viserPalier', { n: p })) : echapper(t('priorite.sansPalier'))}"
-        >${t('priorite.palier')}</button>
-      <button type="button" class="max" title="${echapper(t('priorite.viserMax', { n: max }))}"
-        >${t('priorite.max')}</button>
-    </span>
-    <button type="button" class="retirer" title="${echapper(t('affixes.retirer'))}">✕</button>`;
-
-  const btnPalier = el.querySelector('.palier');
-  const btnMax = el.querySelector('.max');
-  btnPalier.classList.toggle('actif', !!p && vise === p);
-  btnMax.classList.toggle('actif', vise === max);
-  if (p) btnPalier.onclick = () => { cibles.set(nom, p); dessinerAffixes(); majBudgetVin(); };
-  btnMax.onclick = () => { cibles.set(nom, max); dessinerAffixes(); majBudgetVin(); };
-  el.querySelector('.retirer').onclick = () => { cibles.delete(nom); dessinerAffixes(); majBudgetVin(); };
-
-  el.ondragstart = (ev) => {
-    _prioriteTraine = nom;
-    el.classList.add('traine');
-    ev.dataTransfer.effectAllowed = 'move';
-    // Firefox exige des donnees pour autoriser le glisser -- inutilisees
-    // ici, la reorganisation se fait via _prioriteTraine.
-    ev.dataTransfer.setData('text/plain', nom);
-  };
-  el.ondragend = () => {
-    _prioriteTraine = null;
-    el.classList.remove('traine');
-    el.parentElement?.querySelectorAll('.prioriteLigne.survole')
-      .forEach((n) => n.classList.remove('survole'));
-  };
-  el.ondragover = (ev) => {
-    if (!_prioriteTraine || _prioriteTraine === nom) return;
-    ev.preventDefault();
-    el.classList.add('survole');
-  };
-  el.ondragleave = () => el.classList.remove('survole');
-  el.ondrop = (ev) => {
-    ev.preventDefault();
-    el.classList.remove('survole');
-    if (!_prioriteTraine || _prioriteTraine === nom) return;
-    const rect = el.getBoundingClientRect();
-    const avant = ev.clientY < rect.top + rect.height / 2;
-    reordonnerCibles(_prioriteTraine, nom, avant);
-    dessinerPriorite();
-  };
-  return el;
-}
-
-function dessinerPriorite() {
-  const conteneur = $('listePriorite');
-  if (!conteneur) return;
-  const noms = [...cibles.keys()];
-  conteneur.hidden = !noms.length;
-  if (!noms.length) { conteneur.innerHTML = ''; return; }
-  conteneur.innerHTML = `<div class="prioriteTete">${t('priorite.titre')}${
-    noms.length > 1 ? ' — ' + t('priorite.aide') : ''}</div>
-    <div class="prioriteListe"></div>`;
-  const boite = conteneur.querySelector('.prioriteListe');
-  noms.forEach((nom, i) => boite.appendChild(lignePriorite(nom, i)));
 }
 
 /* ======================================================================

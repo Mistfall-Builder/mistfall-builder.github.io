@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=173">
+<link rel="stylesheet" href="icones_affixes.css?v=174">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -532,36 +532,6 @@ table.cmp .ec.nul{color:var(--terne)}
 .gNiv button.palier::after{content:'';display:block;width:3px;height:3px;
   border-radius:50%;background:var(--accent);margin:2px auto 0}
 .gNiv button.choisi.palier::after{background:var(--texte)}
-
-/* Le recap des cibles deja posees : QUAND remplir chaque affixe compte
-   plus que LEQUEL, glisser reordonne au lieu de retaper des cibles. */
-#listePriorite{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
-.prioriteTete{font-size:11px;color:var(--terne);line-height:1.4}
-.prioriteListe{display:flex;flex-direction:column;gap:5px}
-.prioriteLigne{display:flex;align-items:center;gap:7px;
-  border:1px solid var(--bord);border-radius:3px;padding:6px 8px;
-  background:var(--creux);transition:opacity .12s,border-color .12s}
-.prioriteLigne.traine{opacity:.4}
-.prioriteLigne.survole{border-color:var(--accent)}
-.prioriteLigne .poignee{cursor:grab;color:var(--terne);flex:0 0 auto;
-  font-size:13px;letter-spacing:-1px;touch-action:none}
-.prioriteLigne .rang{flex:0 0 auto;width:17px;height:17px;border-radius:50%;
-  background:var(--panneau2);color:var(--doux);font:700 10px/17px var(--condense);
-  text-align:center}
-.prioriteLigne .pastille{flex:0 0 auto}
-.prioriteLigne .txt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap;font-size:12.5px}
-.prioriteLigne .niv{flex:0 0 auto;color:var(--terne);font-size:11px;
-  font-variant-numeric:tabular-nums}
-.prioriteLigne .rapide{flex:0 0 auto;display:flex;gap:4px}
-.prioriteLigne .rapide button{padding:4px 8px;font-size:10.5px;
-  background:var(--panneau);border-color:var(--bord)}
-.prioriteLigne .rapide button.actif{background:var(--accent-sombre);
-  border-color:var(--accent);color:var(--texte)}
-.prioriteLigne .rapide button:disabled{opacity:.3;cursor:default}
-.prioriteLigne .retirer{flex:0 0 auto;width:22px;padding:2px 0;font-size:13px;
-  background:none;border:none;color:var(--terne)}
-.prioriteLigne .retirer:hover{color:var(--ko)}
 
 /* Marge de manoeuvre : la carte parle dans les deux sens. Une proposition
    de BAISSE se distingue d'une proposition de hausse -- ce n'est pas le
@@ -1665,7 +1635,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=173"></script>
+<script src="config.js?v=174"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -1807,12 +1777,6 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
                   data-i18n-title="grille.ouvrir"
                   title="Tout voir d'un coup">⛶</button>
         </div>
-        <!-- Le recap des cibles deja posees, dans l'ordre ou elles comptent
-             si le stuff ne peut pas TOUT satisfaire -- glisser reordonne,
-             les deux boutons sautent direct au palier ou au max sans
-             chercher le bon chiffre dans la grille ci-dessous. Caché tant
-             qu'aucune cible n'est posée. -->
-        <div id="listePriorite" hidden></div>
         <!-- Plus d'en-tetes de colonnes : les tuiles ne sont plus un tableau,
              chaque reglage porte son sens sur place. -->
         <div id="listeAffixes"></div>
@@ -2580,21 +2544,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=173"></script>
+<script src="i18n.js?v=174"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=173"></script>
-<script src="comptes.js?v=173"></script>
-<script src="donnees.js?v=173"></script>
-<script src="skills.js?v=173"></script>
-<script src="loot.js?v=173"></script>
-<script src="maps.js?v=173"></script>
-<script src="monstres_icones.js?v=173"></script>
-<script src="craft.js?v=173"></script>
-<script src="talents.js?v=173"></script>
-<script src="builds_reference.js?v=173"></script>
-<script src="guides_classes.js?v=173"></script>
-<script src="fiche.js?v=173"></script>
-<script src="app.js?v=173"></script>
+<script src="verrou.js?v=174"></script>
+<script src="comptes.js?v=174"></script>
+<script src="donnees.js?v=174"></script>
+<script src="skills.js?v=174"></script>
+<script src="loot.js?v=174"></script>
+<script src="maps.js?v=174"></script>
+<script src="monstres_icones.js?v=174"></script>
+<script src="craft.js?v=174"></script>
+<script src="talents.js?v=174"></script>
+<script src="builds_reference.js?v=174"></script>
+<script src="guides_classes.js?v=174"></script>
+<script src="fiche.js?v=174"></script>
+<script src="app.js?v=174"></script>
 </body>
 </html>
