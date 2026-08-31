@@ -2720,12 +2720,21 @@ let _analyse = null;
 
 function arreterAnalyse() {
   if (_analyse) { _analyse.stop = true; _analyse = null; }
+  // Remet la liste et la barre dans leur état "rien en cours", que le
+  // balayage ait fini normalement ou qu'on l'interrompe (carte refermée,
+  // nouveau calcul) en plein milieu.
+  const boite = $('listeMarge');
+  const barre = $('margeProgress');
+  if (boite) boite.hidden = false;
+  if (barre) barre.hidden = true;
 }
 
 function lancerAnalyseComplete(res) {
   arreterAnalyse();
   const boite = $('listeMarge');
   const note = $('margeMot');
+  const barre = $('margeProgress');
+  const remplissage = barre ? barre.querySelector('i') : null;
   if (!boite || !res || !res.slotItems) return;
   const jeton = { stop: false };
   _analyse = jeton;
@@ -2749,13 +2758,20 @@ function lancerAnalyseComplete(res) {
     .filter((n) => affixeReel(n) && actuelDe(n) < plafond(n))
     .sort((a, b) => (cibles.has(b) ? 1 : 0) - (cibles.has(a) ? 1 : 0)
                  || a.localeCompare(b));
-  // Les lignes deja posees par les deux voies rapides sont des ESTIMATIONS :
-  // « il reste un emplacement qui accepte cette gemme ». Elles ne savent pas
-  // que cet emplacement est peut-etre convoite par une autre cible. Le
-  // moteur, lui, tranche. On les fait donc toutes confirmer, et celle qu'il
-  // dement disparait au lieu de rester la a mentir.
-  const dejaLa = new Map([...boite.querySelectorAll('.lm')]
-    .map((e) => [e.dataset.affixe, e]));
+
+  /* RIEN NE S'AFFICHE PENDANT LE BALAYAGE.
+   *
+   * Avant, les estimations rapides (dessinerMarge) restaient à l'écran ET
+   * cliquables pendant que le balayage lent les remplaçait une à une par
+   * en dessous -- une ligne pouvait sauter en bas de liste PILE au moment
+   * du clic. La liste se cache maintenant derrière une barre de
+   * progression le temps du balayage, et le résultat complet, trié, ne
+   * remplace tout d'un coup qu'une fois fini : plus rien ne bouge sous la
+   * souris pendant qu'on regarde. */
+  boite.hidden = true;
+  boite.innerHTML = '';
+  if (barre) { barre.hidden = false; if (remplissage) remplissage.style.width = '0%'; }
+  const resultats = new Map();
   let i = 0;
 
   /* LA DICHOTOMIE D'UN AFFIXE SURVIT D'UNE TRANCHE A L'AUTRE.
@@ -2793,23 +2809,41 @@ function lancerAnalyseComplete(res) {
   const poser = (e) => {
     let vise = e.vise;
     if (!vise && e.bas > e.a) vise = e.bas;
-    const existante = dejaLa.get(e.nom);
-    if (!vise) {
-      // Le moteur dement l'estimation : la ligne s'en va.
-      if (existante) { existante.remove(); dejaLa.delete(e.nom); }
+    if (!vise) return;
+    resultats.set(e.nom, { nom: e.nom, actuel: e.a, atteignable: vise,
+                           gain: vise - e.a, palier: e.p, via: 'moteur' });
+  };
+
+  // LA SEULE FONCTION QUI TOUCHE À L'ÉCRAN, une fois tout le balayage
+  // terminé -- un seul remplacement, pas une trentaine.
+  const finir = () => {
+    boite.innerHTML = '';
+    // Même tri que dessinerMarge() : le plus gros gain en tête.
+    const liste = [...resultats.values()].sort((x, y) => (y.gain - x.gain)
+      || ((y.palier && y.atteignable >= y.palier ? 1 : 0)
+          - (x.palier && x.atteignable >= x.palier ? 1 : 0))
+      || x.nom.localeCompare(y.nom));
+    for (const m of liste) boite.appendChild(ligneMarge(m));
+    boite.hidden = false;
+    if (barre) barre.hidden = true;
+    _nbMarge = liste.length;
+    majCompteMarge();
+    if (!note) return;
+    note.className = 'pas';
+    if (liste.length) {
+      note.textContent = t('marge.aideCourt2');
       return;
     }
-    if (existante) {
-      // La ligne rapide existe deja ; on ne la remplace que si le moteur va
-      // PLUS HAUT qu'elle ne l'annoncait.
-      const dit = Number(existante.dataset.niveau || 0);
-      if (dit >= vise) return;
-      existante.remove(); dejaLa.delete(e.nom);
-    }
-    const ligne = ligneMarge({ nom: e.nom, actuel: e.a, atteignable: vise,
-                               gain: vise - e.a, palier: e.p, via: 'moteur' });
-    boite.appendChild(ligne);
-    dejaLa.set(e.nom, ligne);
+    /* LE BALAYAGE PEUT TOUT REFUTER : la carte doit dire ce qu'elle a
+       trouve -- rien -- et pourquoi, plutot que de rester sur le texte
+       d'introduction au-dessus d'une liste vide. */
+    let raisons = [];
+    try { raisons = pourquoiRien(res, classe, arme); } catch (e) { raisons = []; }
+    note.innerHTML = `${echapper(t('marge.rien'))}`
+      + (raisons.length
+        ? '<ul style="margin:7px 0 0;padding-left:18px;line-height:1.6">'
+          + raisons.map((r) => `<li>${echapper(r)}</li>`).join('') + '</ul>'
+        : '');
   };
 
   const tranche = () => {
@@ -2843,36 +2877,16 @@ function lancerAnalyseComplete(res) {
         etat = null;
       }
     }
+    if (remplissage) {
+      remplissage.style.width = `${Math.round((i / aTester.length) * 100)}%`;
+    }
     if (note) {
       note.className = 'pas';
-      if (i < aTester.length || etat) {
-        note.textContent = t('marge.recherche', { fait: i, total: aTester.length });
-      } else if (boite.querySelector('.lm')) {
-        note.textContent = t('marge.aideCourt2');
-      } else {
-        /* LE BALAYAGE PEUT TOUT REFUTER.
-         *
-         * Les deux voies rapides posent des lignes, le moteur les dement une
-         * a une, et la liste finit vide — mais le texte d'introduction, lui,
-         * restait celui qui annonce « voici ce que tu peux prendre ». On
-         * lisait donc une promesse au-dessus d'un vide, sur un build ou
-         * quatre pieces sans inne sautaient aux yeux. La carte doit dire ce
-         * qu'elle a trouve : rien, et pourquoi. */
-        let raisons = [];
-        try {
-          raisons = pourquoiRien(res, Number($('classe').value), $('arme').value || null);
-        } catch (e) { raisons = []; }
-        note.innerHTML = `${echapper(t('marge.rien'))}`
-          + (raisons.length
-            ? '<ul style="margin:7px 0 0;padding-left:18px;line-height:1.6">'
-              + raisons.map((r) => `<li>${echapper(r)}</li>`).join('') + '</ul>'
-            : '');
-      }
+      note.textContent = t('marge.recherche', { fait: i, total: aTester.length });
     }
-    _nbMarge = boite.querySelectorAll('.lm').length;
-    majCompteMarge();
-    if (i < aTester.length || etat) setTimeout(tranche, 0);
-    else if (_analyse === jeton) _analyse = null;
+    if (i < aTester.length || etat) { setTimeout(tranche, 0); return; }
+    finir();
+    if (_analyse === jeton) _analyse = null;
   };
   if (note) { note.className = 'pas';
               note.textContent = t('marge.recherche', { fait: 0, total: aTester.length }); }
@@ -4314,8 +4328,12 @@ function majAjoutRapide() {
   if (!sel) return;
   const ordre = Object.keys(D.affixes).sort((a, b) => a.localeCompare(b));
   const dispo = ordre.filter((n) => affixeReel(n) && !_rapideCibles.has(n));
-  remplirSelect(sel, dispo.map((n) => [n, libelleAffixe(n)]));
-  $('rAjouter').disabled = !dispo.length;
+  // Une option vide en tête, sélectionnée par défaut : choisir DANS la
+  // liste ajoute directement (voir le onchange plus bas), donc chaque
+  // vraie option doit rester un choix qu'on n'a pas encore fait.
+  remplirSelect(sel, [['', t('rapide.choisirAffixe')]]
+    .concat(dispo.map((n) => [n, libelleAffixe(n)])), '');
+  sel.disabled = !dispo.length;
 }
 
 function reordonnerCiblesRapide(depuis, versNom, avant) {
@@ -8077,7 +8095,7 @@ function demarrer(donnees) {
     });
     $('rClasse').onchange = () => { majArmesRapide(); };
     $('rRarete').onchange = () => { majArmeSupDispo(); };
-    $('rAjouter').onclick = () => {
+    $('rAjoutAffixe').onchange = () => {
       const nom = $('rAjoutAffixe').value;
       if (!nom) return;
       const p = palier(nom);
