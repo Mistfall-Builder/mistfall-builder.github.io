@@ -4339,6 +4339,7 @@ function ligneRapide(nom, rang) {
   const p = palier(nom);
   const max = plafond(nom);
   el.innerHTML = `<span class="poignee" aria-hidden="true">⠿</span>
+    <button type="button" class="retirerAffixe" title="${echapper(t('affixes.retirer'))}">✕</button>
     <span class="rang">${rang + 1}</span>
     ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
     <span class="niv">${vise}/${max}</span>
@@ -4348,8 +4349,7 @@ function ligneRapide(nom, rang) {
         >${t('priorite.palier')}</button>
       <button type="button" class="max" title="${echapper(t('priorite.viserMax', { n: max }))}"
         >${t('priorite.max')}</button>
-    </span>
-    <button type="button" class="retirer" title="${echapper(t('affixes.retirer'))}">✕</button>`;
+    </span>`;
 
   const btnPalier = el.querySelector('.palier');
   const btnMax = el.querySelector('.max');
@@ -4357,7 +4357,7 @@ function ligneRapide(nom, rang) {
   btnMax.classList.toggle('actif', vise === max);
   if (p) btnPalier.onclick = () => { _rapideCibles.set(nom, p); dessinerListeRapide(); };
   btnMax.onclick = () => { _rapideCibles.set(nom, max); dessinerListeRapide(); };
-  el.querySelector('.retirer').onclick = () => {
+  el.querySelector('.retirerAffixe').onclick = () => {
     _rapideCibles.delete(nom); dessinerListeRapide(); majAjoutRapide();
   };
 

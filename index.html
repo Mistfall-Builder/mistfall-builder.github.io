@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=179">
+<link rel="stylesheet" href="icones_affixes.css?v=180">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -557,9 +557,9 @@ table.cmp .ec.nul{color:var(--terne)}
 .prioriteLigne .rapide button.actif{background:var(--accent-sombre);
   border-color:var(--accent);color:var(--texte)}
 .prioriteLigne .rapide button:disabled{opacity:.3;cursor:default}
-.prioriteLigne .retirer{flex:0 0 auto;width:22px;padding:2px 0;font-size:13px;
+.prioriteLigne .retirerAffixe{flex:0 0 auto;width:22px;padding:2px 0;font-size:13px;
   background:none;border:none;color:var(--terne)}
-.prioriteLigne .retirer:hover{color:var(--ko)}
+.prioriteLigne .retirerAffixe:hover{color:var(--ko)}
 
 /* Marge de manoeuvre : la carte parle dans les deux sens. Une proposition
    de BAISSE se distingue d'une proposition de hausse -- ce n'est pas le
@@ -1694,7 +1694,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=179"></script>
+<script src="config.js?v=180"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2667,21 +2667,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=179"></script>
+<script src="i18n.js?v=180"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=179"></script>
-<script src="comptes.js?v=179"></script>
-<script src="donnees.js?v=179"></script>
-<script src="skills.js?v=179"></script>
-<script src="loot.js?v=179"></script>
-<script src="maps.js?v=179"></script>
-<script src="monstres_icones.js?v=179"></script>
-<script src="craft.js?v=179"></script>
-<script src="talents.js?v=179"></script>
-<script src="builds_reference.js?v=179"></script>
-<script src="guides_classes.js?v=179"></script>
-<script src="fiche.js?v=179"></script>
-<script src="app.js?v=179"></script>
+<script src="verrou.js?v=180"></script>
+<script src="comptes.js?v=180"></script>
+<script src="donnees.js?v=180"></script>
+<script src="skills.js?v=180"></script>
+<script src="loot.js?v=180"></script>
+<script src="maps.js?v=180"></script>
+<script src="monstres_icones.js?v=180"></script>
+<script src="craft.js?v=180"></script>
+<script src="talents.js?v=180"></script>
+<script src="builds_reference.js?v=180"></script>
+<script src="guides_classes.js?v=180"></script>
+<script src="fiche.js?v=180"></script>
+<script src="app.js?v=180"></script>
 </body>
 </html>
