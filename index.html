@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=177">
+<link rel="stylesheet" href="icones_affixes.css?v=178">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -1693,7 +1693,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=177"></script>
+<script src="config.js?v=178"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2612,6 +2612,9 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
         <select id="rArme"></select>
         <select id="rRarete"></select>
       </div>
+      <label class="coche"><input type="checkbox" id="rVin" checked>
+        <span data-i18n="perso.vin">Compter le Victory Wine</span></label>
+      <select id="rBrew" class="brew"></select>
       <label class="coche" id="rLabelArmeSup">
         <input type="checkbox" id="rArmeSup">
         <span data-i18n="rapide.armeSup">Arme dans une rareté au-dessus du
@@ -2662,21 +2665,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=177"></script>
+<script src="i18n.js?v=178"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=177"></script>
-<script src="comptes.js?v=177"></script>
-<script src="donnees.js?v=177"></script>
-<script src="skills.js?v=177"></script>
-<script src="loot.js?v=177"></script>
-<script src="maps.js?v=177"></script>
-<script src="monstres_icones.js?v=177"></script>
-<script src="craft.js?v=177"></script>
-<script src="talents.js?v=177"></script>
-<script src="builds_reference.js?v=177"></script>
-<script src="guides_classes.js?v=177"></script>
-<script src="fiche.js?v=177"></script>
-<script src="app.js?v=177"></script>
+<script src="verrou.js?v=178"></script>
+<script src="comptes.js?v=178"></script>
+<script src="donnees.js?v=178"></script>
+<script src="skills.js?v=178"></script>
+<script src="loot.js?v=178"></script>
+<script src="maps.js?v=178"></script>
+<script src="monstres_icones.js?v=178"></script>
+<script src="craft.js?v=178"></script>
+<script src="talents.js?v=178"></script>
+<script src="builds_reference.js?v=178"></script>
+<script src="guides_classes.js?v=178"></script>
+<script src="fiche.js?v=178"></script>
+<script src="app.js?v=178"></script>
 </body>
 </html>

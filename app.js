@@ -4409,6 +4409,8 @@ function ouvrirBuildRapide() {
     majArmesRapide();
     remplirSelect($('rRarete'),
       [['', t('perso.auto')]].concat([1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
+    remplirSelect($('rBrew'),
+      BREWS.map((b) => [b.id, `${b.nom} — ${t('vin.regle', { n: b.total, p: b.parAffixe })}`]), _brew);
   }
   majArmeSupDispo();
   majAjoutRapide();
@@ -4447,14 +4449,24 @@ function genererBuildRapide() {
   }
   const cibleListe = [..._rapideCibles.entries()];
   const priorite = [..._rapideCibles.keys()];
+  const vinOn = $('rVin').checked;
+  const brewChoisi = $('rBrew').value || _brew;
 
+  // reglesVin() (donc tout le vin du moteur) lit la boisson dans _brew, un
+  // global partagé avec le Builder principal -- on la bascule le temps de
+  // CET appel puis on la restaure aussitôt, pour que le choix fait ici ne
+  // change jamais silencieusement ce que le Builder affichait.
   let res;
+  const brewAvant = _brew;
   try {
+    if (vinOn) _brew = brewChoisi;
     res = construire(classeId, arme, cibleListe, grade,
-      true, mixte, planchers, null, {}, {}, priorite);
+      vinOn, mixte, planchers, null, {}, {}, priorite);
   } catch (e) {
     note.innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
     return;
+  } finally {
+    _brew = brewAvant;
   }
 
   // ------------------------------------------------------------- items
@@ -4469,15 +4481,21 @@ function genererBuildRapide() {
   }).join('');
 
   // --------------------------------------------------------- couverture
+  // Le total, pas juste l'équipement : `res.suffisant` (la note globale
+  // au-dessus) compte déjà le vin, cette ligne par affixe doit dire la
+  // même chose ou un ✗ ici contredirait un "atteint" là-haut.
   const couv = $('rapideCouverture');
   couv.innerHTML = cibleListe.map(([nom, niveau]) => {
-    const eu = res.couvert[nom] || 0;
-    const ok = eu >= niveau;
+    const gear = res.couvert[nom] || 0;
+    const vin = (res.vinPoints && res.vinPoints.get(nom)) || 0;
+    const total = gear + vin;
+    const ok = total >= niveau;
     const p = palier(nom);
-    const losange = p && eu >= p ? ' ◆' : '';
+    const losange = p && total >= p ? ' ◆' : '';
+    const vinTxt = vin ? ` <span class="pas">(+${vin} ${t('rapide.vin')})</span>` : '';
     return `<div class="rapideCouv ${ok ? 'ok' : 'ko'}">
       ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
-      <span class="n">${eu}/${niveau}${losange} ${ok ? '✓' : '✗'}</span>
+      <span class="n">${total}/${niveau}${losange} ${ok ? '✓' : '✗'}</span>${vinTxt}
     </div>`;
   }).join('');
 
@@ -4504,7 +4522,7 @@ function genererBuildRapide() {
     ? `<span class="pas ok">${t('etat.ok')}</span>`
     : `<span class="ko">${t('rapide.partiel')}</span>`;
 
-  _rapideDernier = { classeId, arme, grade, mixte, planchers, cibleListe, code };
+  _rapideDernier = { classeId, arme, grade, mixte, planchers, cibleListe, code, vinOn, brewChoisi };
 }
 
 // BASCULE LE DERNIER RÉSULTAT DANS LE BUILDER PRINCIPAL. `appliquerEtat`
@@ -4517,8 +4535,8 @@ function chargerDansBuilder() {
   const d = _rapideDernier;
   if (!d || !d.code) return;
   const etat = {
-    k: d.code, c: d.classeId, a: d.arme, g: d.grade, v: true, m: d.mixte,
-    pr: d.planchers, sv: {}, t: d.cibleListe, w: [], b: 'gods',
+    k: d.code, c: d.classeId, a: d.arme, g: d.grade, v: d.vinOn, m: d.mixte,
+    pr: d.planchers, sv: {}, t: d.cibleListe, w: [], b: d.brewChoisi,
     sa: false, st: null, sg: null,
   };
   appliquerEtat(etat);
