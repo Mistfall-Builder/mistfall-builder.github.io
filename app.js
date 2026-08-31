@@ -4280,6 +4280,9 @@ function fermerModalBuilds() {
    Builder ni dans la bibliothèque de builds. */
 let _rapideCibles = new Map();
 let _rapideTraine = null;
+// Le dernier résultat généré, pour le bouton "Charger dans le Builder" --
+// posé nul tant qu'aucune génération n'a réussi (voir genererBuildRapide).
+let _rapideDernier = null;
 
 function armesRapide(classeId) {
   return D.armes[String(classeId)] || [];
@@ -4500,6 +4503,27 @@ function genererBuildRapide() {
   note.innerHTML = res.suffisant
     ? `<span class="pas ok">${t('etat.ok')}</span>`
     : `<span class="ko">${t('rapide.partiel')}</span>`;
+
+  _rapideDernier = { classeId, arme, grade, mixte, planchers, cibleListe, code };
+}
+
+// BASCULE LE DERNIER RÉSULTAT DANS LE BUILDER PRINCIPAL. `appliquerEtat`
+// pose classe/arme/rareté/cibles -- exactement ce que fait déjà "Charger"
+// sur une carte de Mes builds. Le stuff, lui, vient du CODE (comme
+// restituer()) et non d'un recalcul : le Builder ne sait pas tenir compte
+// de la priorité (voir couvertureEffective), un recalcul ici pourrait
+// donc sortir un stuff différent de celui qu'on vient de voir.
+function chargerDansBuilder() {
+  const d = _rapideDernier;
+  if (!d || !d.code) return;
+  const etat = {
+    k: d.code, c: d.classeId, a: d.arme, g: d.grade, v: true, m: d.mixte,
+    pr: d.planchers, sv: {}, t: d.cibleListe, w: [], b: 'gods',
+    sa: false, st: null, sg: null,
+  };
+  appliquerEtat(etat);
+  restituer({ code: d.code });
+  fermerBuildRapide();
 }
 
 // LE SEUL CHEMIN QUI ÉCRIT UN BUILD DANS LA BIBLIOTHÈQUE. « Enregistrer »
@@ -8035,6 +8059,7 @@ function demarrer(donnees) {
       try { dire(document.execCommand('copy')); } catch (e) { dire(false); }
       champ.setAttribute('readonly', '');
     };
+    $('rapideCharger').onclick = chargerDansBuilder;
   }
   // Les sous-onglets de la page Communauté, et le bouton de comparaison.
   for (const b of document.querySelectorAll('#sousOnglets button')) {
