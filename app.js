@@ -4268,6 +4268,240 @@ function fermerModalBuilds() {
   document.body.style.overflow = '';
 }
 
+/* ========================================================================
+   BUILD RAPIDE -- OUTIL À PART
+
+   Sa propre classe/arme/rareté/liste d'affixes, entièrement séparées de
+   celles du Builder principal (`cibles`, `$('classe')`, etc.) : ouvrir,
+   utiliser puis fermer cette fenêtre ne change rien à ce que le Builder
+   affichait avant. Il rappelle directement construire() -- le même moteur,
+   avec la priorité explicitement fournie cette fois (voir couvertureEffective) --
+   et affiche son propre résultat, sans jamais écrire dans l'état du
+   Builder ni dans la bibliothèque de builds. */
+let _rapideCibles = new Map();
+let _rapideTraine = null;
+
+function armesRapide(classeId) {
+  return D.armes[String(classeId)] || [];
+}
+
+function majArmesRapide() {
+  const sel = $('rArme');
+  if (!sel) return;
+  remplirSelect(sel, armesRapide($('rClasse').value).map((a) => [a, a]));
+}
+
+function majArmeSupDispo() {
+  const chk = $('rArmeSup');
+  const rarete = $('rRarete').value;
+  // « Une rareté au-dessus » n'a de sens que si on sait DE QUELLE rareté
+  // partir : en Auto, le moteur choisit lui-même son palier, il n'y a rien
+  // à dépasser d'un cran avant de le connaître.
+  const dispo = rarete !== '' && Number(rarete) < 6;
+  chk.disabled = !dispo;
+  if (!dispo) chk.checked = false;
+  $('rLabelArmeSup').title = dispo ? '' : t('rapide.armeSupAuto');
+}
+
+// LES AFFIXES QU'ON PEUT ENCORE AJOUTER : ceux qui existent vraiment en
+// jeu (affixeReel -- sinon le stuff ne pourrait jamais les fournir) et pas
+// déjà dans la liste.
+function majAjoutRapide() {
+  const sel = $('rAjoutAffixe');
+  if (!sel) return;
+  const ordre = Object.keys(D.affixes).sort((a, b) => a.localeCompare(b));
+  const dispo = ordre.filter((n) => affixeReel(n) && !_rapideCibles.has(n));
+  remplirSelect(sel, dispo.map((n) => [n, libelleAffixe(n)]));
+  $('rAjouter').disabled = !dispo.length;
+}
+
+function reordonnerCiblesRapide(depuis, versNom, avant) {
+  const entrees = [..._rapideCibles.entries()];
+  const iDepuis = entrees.findIndex(([n]) => n === depuis);
+  if (iDepuis < 0) return;
+  const [entree] = entrees.splice(iDepuis, 1);
+  let iVers = entrees.findIndex(([n]) => n === versNom);
+  if (iVers < 0) iVers = entrees.length;
+  else if (!avant) iVers += 1;
+  entrees.splice(iVers, 0, entree);
+  _rapideCibles = new Map(entrees);
+}
+
+function ligneRapide(nom, rang) {
+  const el = document.createElement('div');
+  el.className = 'prioriteLigne';
+  el.draggable = true;
+  el.dataset.affixe = nom;
+  const vise = _rapideCibles.get(nom);
+  const p = palier(nom);
+  const max = plafond(nom);
+  el.innerHTML = `<span class="poignee" aria-hidden="true">⠿</span>
+    <span class="rang">${rang + 1}</span>
+    ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
+    <span class="niv">${vise}/${max}</span>
+    <span class="rapide">
+      <button type="button" class="palier"${p ? '' : ' disabled'}
+        title="${p ? echapper(t('priorite.viserPalier', { n: p })) : echapper(t('priorite.sansPalier'))}"
+        >${t('priorite.palier')}</button>
+      <button type="button" class="max" title="${echapper(t('priorite.viserMax', { n: max }))}"
+        >${t('priorite.max')}</button>
+    </span>
+    <button type="button" class="retirer" title="${echapper(t('affixes.retirer'))}">✕</button>`;
+
+  const btnPalier = el.querySelector('.palier');
+  const btnMax = el.querySelector('.max');
+  btnPalier.classList.toggle('actif', !!p && vise === p);
+  btnMax.classList.toggle('actif', vise === max);
+  if (p) btnPalier.onclick = () => { _rapideCibles.set(nom, p); dessinerListeRapide(); };
+  btnMax.onclick = () => { _rapideCibles.set(nom, max); dessinerListeRapide(); };
+  el.querySelector('.retirer').onclick = () => {
+    _rapideCibles.delete(nom); dessinerListeRapide(); majAjoutRapide();
+  };
+
+  el.ondragstart = (ev) => {
+    _rapideTraine = nom;
+    el.classList.add('traine');
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', nom);
+  };
+  el.ondragend = () => {
+    _rapideTraine = null;
+    el.classList.remove('traine');
+    el.parentElement?.querySelectorAll('.prioriteLigne.survole')
+      .forEach((n) => n.classList.remove('survole'));
+  };
+  el.ondragover = (ev) => {
+    if (!_rapideTraine || _rapideTraine === nom) return;
+    ev.preventDefault();
+    el.classList.add('survole');
+  };
+  el.ondragleave = () => el.classList.remove('survole');
+  el.ondrop = (ev) => {
+    ev.preventDefault();
+    el.classList.remove('survole');
+    if (!_rapideTraine || _rapideTraine === nom) return;
+    const rect = el.getBoundingClientRect();
+    const avant = ev.clientY < rect.top + rect.height / 2;
+    reordonnerCiblesRapide(_rapideTraine, nom, avant);
+    dessinerListeRapide();
+  };
+  return el;
+}
+
+function dessinerListeRapide() {
+  const boite = $('rapideListe');
+  const vide = $('rapideVide');
+  if (!boite) return;
+  boite.innerHTML = '';
+  const noms = [..._rapideCibles.keys()];
+  if (vide) vide.hidden = !!noms.length;
+  noms.forEach((nom, i) => boite.appendChild(ligneRapide(nom, i)));
+}
+
+function ouvrirBuildRapide() {
+  const v = $('modalBuildRapide');
+  if (!v) return;
+  if (!$('rClasse').children.length) {
+    remplirSelect($('rClasse'), Object.entries(D.classes).map(([id, n]) => [id, n]), '11');
+    majArmesRapide();
+    remplirSelect($('rRarete'),
+      [['', t('perso.auto')]].concat([1, 2, 3, 4, 5, 6].map((g) => [g, D.raretes[String(g)]])), '');
+  }
+  majArmeSupDispo();
+  majAjoutRapide();
+  dessinerListeRapide();
+  $('rapideResultat').hidden = true;
+  $('rapideNote').innerHTML = '';
+  v.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function fermerBuildRapide() {
+  const v = $('modalBuildRapide');
+  if (!v || v.hidden) return;
+  v.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function genererBuildRapide() {
+  const note = $('rapideNote');
+  if (!_rapideCibles.size) {
+    note.innerHTML = `<span class="ko">${t('builds.affixeRequis')}</span>`;
+    return;
+  }
+  note.innerHTML = `<span class="pas">…</span>`;
+  $('rapideResultat').hidden = true;
+
+  const classeId = Number($('rClasse').value);
+  const arme = $('rArme').value || null;
+  const raretteVal = $('rRarete').value;
+  const grade = raretteVal === '' ? null : Number(raretteVal);
+  const armeSup = $('rArmeSup').checked && !$('rArmeSup').disabled;
+  const mixte = armeSup;
+  const planchers = {};
+  if (armeSup) {
+    for (const slot of D.ordreSlots) planchers[slot] = slot === 'weapon' ? grade + 1 : grade;
+  }
+  const cibleListe = [..._rapideCibles.entries()];
+  const priorite = [..._rapideCibles.keys()];
+
+  let res;
+  try {
+    res = construire(classeId, arme, cibleListe, grade,
+      true, mixte, planchers, null, {}, {}, priorite);
+  } catch (e) {
+    note.innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
+    return;
+  }
+
+  // ------------------------------------------------------------- items
+  const pieces = $('rapidePieces');
+  pieces.innerHTML = D.ordreSlots.map((slot) => {
+    const it = res.slotItems[slot];
+    const couleur = it ? (D.couleurs[String(it.g)] || '#5a6570') : '#5a6570';
+    return `<div class="rapidePiece" style="--tinte:${couleur}">
+      <div class="slot">${echapper(D.nomsSlots[slot] || slot)}</div>
+      <div>${it ? echapper(it.n) : '—'}</div>
+    </div>`;
+  }).join('');
+
+  // --------------------------------------------------------- couverture
+  const couv = $('rapideCouverture');
+  couv.innerHTML = cibleListe.map(([nom, niveau]) => {
+    const eu = res.couvert[nom] || 0;
+    const ok = eu >= niveau;
+    const p = palier(nom);
+    const losange = p && eu >= p ? ' ◆' : '';
+    return `<div class="rapideCouv ${ok ? 'ok' : 'ko'}">
+      ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
+      <span class="n">${eu}/${niveau}${losange} ${ok ? '✓' : '✗'}</span>
+    </div>`;
+  }).join('');
+
+  // --------------------------------------------------------------- code
+  let code = '';
+  try {
+    const objets = {};
+    for (const [codeSlot, slotOutil] of Object.entries(D.codec.versGameData)) {
+      const it = res.slotItems[slotOutil];
+      if (!it) continue;
+      const trous = D.codec.trous[String(it.id)] || 0;
+      const gemmes = new Array(trous).fill(0);
+      for (const s of res.sockets) {
+        if (s.slot === slotOutil && s.gem && s.index < trous) gemmes[s.index] = Number(s.gem.id);
+      }
+      objets[Number(codeSlot)] = { cfg: Number(it.id), gemmes };
+    }
+    code = encoderCode(classeId, objets);
+  } catch (e) { /* le code reste vide, le reste du resultat s'affiche quand meme */ }
+  $('rapideCode').value = code;
+
+  $('rapideResultat').hidden = false;
+  note.innerHTML = res.suffisant
+    ? `<span class="pas ok">${t('etat.ok')}</span>`
+    : `<span class="ko">${t('rapide.partiel')}</span>`;
+}
+
 // LE SEUL CHEMIN QUI ÉCRIT UN BUILD DANS LA BIBLIOTHÈQUE. « Enregistrer »
 // (nom tapé dans le champ) et « Écraser » (nom du build déjà chargé) n'en
 // sont que deux façons de fournir ce nom -- partagé pour que les deux
@@ -7767,6 +8001,40 @@ function demarrer(donnees) {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') fermerModalBuilds();
     });
+  }
+  // Build rapide : même mécanique de fenêtre, entièrement indépendante.
+  if ($('modalBuildRapide')) {
+    $('boutonBuildRapide').onclick = ouvrirBuildRapide;
+    $('rapideFermer').onclick = fermerBuildRapide;
+    $('modalBuildRapide').onclick = (e) => {
+      if (e.target === $('modalBuildRapide')) fermerBuildRapide();
+    };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') fermerBuildRapide();
+    });
+    $('rClasse').onchange = () => { majArmesRapide(); };
+    $('rRarete').onchange = () => { majArmeSupDispo(); };
+    $('rAjouter').onclick = () => {
+      const nom = $('rAjoutAffixe').value;
+      if (!nom) return;
+      const p = palier(nom);
+      _rapideCibles.set(nom, p || plafond(nom));
+      dessinerListeRapide();
+      majAjoutRapide();
+    };
+    $('rGenerer').onclick = genererBuildRapide;
+    $('rapideCopier').onclick = () => {
+      const champ = $('rapideCode');
+      const dire = (ok) => { $('rapideNote').textContent = t(ok ? 'code.copie' : 'code.copieKo'); };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(champ.value).then(() => dire(true), () => dire(false));
+        return;
+      }
+      champ.removeAttribute('readonly');
+      champ.select();
+      try { dire(document.execCommand('copy')); } catch (e) { dire(false); }
+      champ.setAttribute('readonly', '');
+    };
   }
   // Les sous-onglets de la page Communauté, et le bouton de comparaison.
   for (const b of document.querySelectorAll('#sousOnglets button')) {

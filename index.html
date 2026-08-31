@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=174">
+<link rel="stylesheet" href="icones_affixes.css?v=175">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -533,6 +533,34 @@ table.cmp .ec.nul{color:var(--terne)}
   border-radius:50%;background:var(--accent);margin:2px auto 0}
 .gNiv button.choisi.palier::after{background:var(--texte)}
 
+/* La liste priorité de Build rapide : une ligne par affixe ajouté,
+   réordonnable au glisser-déposer. */
+.prioriteListe{display:flex;flex-direction:column;gap:5px}
+.prioriteLigne{display:flex;align-items:center;gap:7px;
+  border:1px solid var(--bord);border-radius:3px;padding:6px 8px;
+  background:var(--creux);transition:opacity .12s,border-color .12s}
+.prioriteLigne.traine{opacity:.4}
+.prioriteLigne.survole{border-color:var(--accent)}
+.prioriteLigne .poignee{cursor:grab;color:var(--terne);flex:0 0 auto;
+  font-size:13px;letter-spacing:-1px;touch-action:none}
+.prioriteLigne .rang{flex:0 0 auto;width:17px;height:17px;border-radius:50%;
+  background:var(--panneau2);color:var(--doux);font:700 10px/17px var(--condense);
+  text-align:center}
+.prioriteLigne .pastille{flex:0 0 auto}
+.prioriteLigne .txt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:12.5px}
+.prioriteLigne .niv{flex:0 0 auto;color:var(--terne);font-size:11px;
+  font-variant-numeric:tabular-nums}
+.prioriteLigne .rapide{flex:0 0 auto;display:flex;gap:4px}
+.prioriteLigne .rapide button{padding:4px 8px;font-size:10.5px;
+  background:var(--panneau);border-color:var(--bord)}
+.prioriteLigne .rapide button.actif{background:var(--accent-sombre);
+  border-color:var(--accent);color:var(--texte)}
+.prioriteLigne .rapide button:disabled{opacity:.3;cursor:default}
+.prioriteLigne .retirer{flex:0 0 auto;width:22px;padding:2px 0;font-size:13px;
+  background:none;border:none;color:var(--terne)}
+.prioriteLigne .retirer:hover{color:var(--ko)}
+
 /* Marge de manoeuvre : la carte parle dans les deux sens. Une proposition
    de BAISSE se distingue d'une proposition de hausse -- ce n'est pas le
    meme geste, et confondre les deux ferait cliquer a l'envers. */
@@ -832,6 +860,12 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 @media(max-width:640px){.boutonFlottantBuilds{top:auto;bottom:14px;right:14px;
   transform:none;border-radius:20px;padding:10px 16px}}
 
+/* Le bouton Build rapide, empilé au-dessus de Mes builds -- même mécanique,
+   couleur accent pour ne pas les confondre au premier coup d'œil. */
+.boutonRapide{top:calc(60% - 46px);background:var(--accent);color:#160c05}
+.boutonRapide:hover{background:var(--accent-clair)}
+@media(max-width:640px){.boutonRapide{bottom:60px;right:14px}}
+
 /* La fenetre elle-même : même squelette que .grilleBoite (voile + tête +
    corps qui défile), la barre de filtres remplace juste la recherche seule
    dans la tête. */
@@ -851,6 +885,30 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 @media(min-width:641px){
   .mbBoite{width:min(1000px,calc(100% / 1.4));zoom:1.4}
 }
+/* BUILD RAPIDE : boîte plus étroite que Mes builds (formulaire + une
+   poignée de lignes, pas une grille de cartes), hauteur qui suit son
+   contenu au lieu de toujours occuper 92vh. */
+.rapideBoite{width:min(640px,100%);height:auto;max-height:min(90vh,100%)}
+.rapideCorps{overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px}
+.rapideAide{margin:0;font-size:12px;color:var(--terne);line-height:1.5}
+#rLabelArmeSup:has(input:disabled){opacity:.45}
+.rapideAjout select{flex:1}
+.rapideAjout button{flex:0 0 auto}
+#rapideVide:empty,#rapideVide[hidden]{display:none}
+#rapideResultat{border-top:1px solid var(--bord);padding-top:12px;margin-top:2px;
+  display:flex;flex-direction:column;gap:10px}
+.rapidePieces{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.rapidePiece{border:1px solid var(--bord);border-radius:3px;padding:6px 8px;
+  background:var(--creux);border-left:3px solid var(--tinte,var(--bord));font-size:12px}
+.rapidePiece .slot{color:var(--terne);font-size:10px;text-transform:uppercase;
+  letter-spacing:.5px}
+.rapideCouverture{display:flex;flex-direction:column;gap:3px}
+.rapideCouv{display:flex;align-items:center;gap:6px;font-size:12.5px}
+.rapideCouv .txt{flex:1 1 auto}
+.rapideCouv .n{font-variant-numeric:tabular-nums;color:var(--terne)}
+.rapideCouv.ok .n{color:var(--ok)}
+.rapideCouv.ko .n{color:var(--ko)}
+
 .grilleTete .filtresBuilds{display:flex;flex:1 1 auto;flex-wrap:wrap;gap:6px;margin:0}
 .grilleTete .filtresBuilds input{grid-column:unset;flex:1 1 170px;min-width:150px}
 .grilleTete .filtresBuilds select{flex:1 1 130px;width:auto}
@@ -1635,7 +1693,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=174"></script>
+<script src="config.js?v=175"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2498,6 +2556,15 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
   <span class="compte" id="compteFlottantBuilds"></span>
 </button>
 
+<!-- OUTIL À PART : mêmes fonctions moteur que le Builder (construire(),
+     encoderCode()...), sa propre classe/arme/rareté/liste d'affixes, son
+     propre résultat. N'importe rien du Builder principal (cibles, champs
+     de la colonne de gauche) et n'est jamais lu par lui -- fermer cette
+     fenêtre laisse le Builder exactement comme on l'a laissé. -->
+<button type="button" id="boutonBuildRapide" class="boutonFlottantBuilds boutonRapide">
+  <span data-i18n="rapide.flottant">Build rapide</span>
+</button>
+
 <!-- La fenetre "Mes builds" : meme squelette que la grille d'affixes
      ci-dessus (voile + boite + tete/corps), pour rester dans le meme
      langage visuel plutot que d'inventer un deuxieme genre de fenetre.
@@ -2526,6 +2593,52 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
   </div>
 </div>
 
+<!-- BUILD RAPIDE : classe + rareté + arme (éventuellement supérieure) +
+     une poignée d'affixes par ordre de priorité, un bouton, un stuff. Pour
+     poser vite un import correct sans passer par le Builder détaillé. -->
+<div id="modalBuildRapide" class="voile" hidden>
+  <div class="grilleBoite rapideBoite" role="dialog" aria-modal="true" aria-labelledby="rapideTitre">
+    <div class="grilleTete">
+      <h2 id="rapideTitre" data-i18n="rapide.titre">Build rapide</h2>
+      <button id="rapideFermer" data-i18n="grille.fermer">Terminé</button>
+    </div>
+    <div class="rapideCorps">
+      <p class="rapideAide" data-i18n="rapide.aide">Choisis classe, arme et
+        rareté, ajoute les affixes qui t'intéressent par ordre de priorité
+        (glisse pour réordonner), puis génère. Ce panneau ne touche à rien
+        de ce que tu as déjà dans le Builder.</p>
+      <div class="rangee">
+        <select id="rClasse"></select>
+        <select id="rArme"></select>
+        <select id="rRarete"></select>
+      </div>
+      <label class="coche" id="rLabelArmeSup">
+        <input type="checkbox" id="rArmeSup">
+        <span data-i18n="rapide.armeSup">Arme dans une rareté au-dessus du
+          reste</span>
+      </label>
+      <div class="rangee rapideAjout">
+        <select id="rAjoutAffixe"></select>
+        <button type="button" id="rAjouter" data-i18n="rapide.ajouter">Ajouter</button>
+      </div>
+      <div id="rapideVide" class="pas" data-i18n="rapide.rien">Aucun affixe
+        ajouté pour l'instant.</div>
+      <div id="rapideListe" class="prioriteListe"></div>
+      <button type="button" id="rGenerer" class="primaire" data-i18n="rapide.generer">Générer le stuff</button>
+      <div id="rapideNote"></div>
+      <div id="rapideResultat" hidden>
+        <div id="rapidePieces" class="rapidePieces"></div>
+        <div id="rapideCouverture" class="rapideCouverture"></div>
+        <div class="rangee">
+          <input type="text" id="rapideCode" readonly data-i18n-ph="code.place"
+                 placeholder="Calcule un build pour obtenir son code.">
+          <button type="button" id="rapideCopier" data-i18n="code.copier">Export build code</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer>
   <span data-i18n="pied.texte">Le code produit ici se colle dans</span> <em>Prepare → Manage/Import</em>. <span data-i18n="pied.texte2">Format vérifié en jeu dans les deux sens. Aucun prix, aucun marché.</span>
   <span class="don">
@@ -2544,21 +2657,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=174"></script>
+<script src="i18n.js?v=175"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=174"></script>
-<script src="comptes.js?v=174"></script>
-<script src="donnees.js?v=174"></script>
-<script src="skills.js?v=174"></script>
-<script src="loot.js?v=174"></script>
-<script src="maps.js?v=174"></script>
-<script src="monstres_icones.js?v=174"></script>
-<script src="craft.js?v=174"></script>
-<script src="talents.js?v=174"></script>
-<script src="builds_reference.js?v=174"></script>
-<script src="guides_classes.js?v=174"></script>
-<script src="fiche.js?v=174"></script>
-<script src="app.js?v=174"></script>
+<script src="verrou.js?v=175"></script>
+<script src="comptes.js?v=175"></script>
+<script src="donnees.js?v=175"></script>
+<script src="skills.js?v=175"></script>
+<script src="loot.js?v=175"></script>
+<script src="maps.js?v=175"></script>
+<script src="monstres_icones.js?v=175"></script>
+<script src="craft.js?v=175"></script>
+<script src="talents.js?v=175"></script>
+<script src="builds_reference.js?v=175"></script>
+<script src="guides_classes.js?v=175"></script>
+<script src="fiche.js?v=175"></script>
+<script src="app.js?v=175"></script>
 </body>
 </html>
