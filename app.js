@@ -4428,6 +4428,26 @@ function fermerBuildRapide() {
   document.body.style.overflow = '';
 }
 
+// REMET L'OUTIL À ZÉRO -- classe/arme/rareté/vin/boisson/arme supérieure
+// à leur défaut, la liste d'affixes vidée, le dernier résultat oublié.
+// Recommencer un stuff sans fermer/rouvrir la fenêtre ni retirer les
+// affixes un par un.
+function reinitialiserBuildRapide() {
+  _rapideCibles = new Map();
+  _rapideDernier = null;
+  $('rClasse').value = '11';
+  majArmesRapide();
+  $('rRarete').value = '';
+  $('rArmeSup').checked = false;
+  $('rVin').checked = true;
+  $('rBrew').value = _brew;
+  majArmeSupDispo();
+  majAjoutRapide();
+  dessinerListeRapide();
+  $('rapideResultat').hidden = true;
+  $('rapideNote').innerHTML = '';
+}
+
 function genererBuildRapide() {
   const note = $('rapideNote');
   if (!_rapideCibles.size) {
@@ -8048,6 +8068,7 @@ function demarrer(donnees) {
   if ($('modalBuildRapide')) {
     $('boutonBuildRapide').onclick = ouvrirBuildRapide;
     $('rapideFermer').onclick = fermerBuildRapide;
+    $('rapideReset').onclick = reinitialiserBuildRapide;
     $('modalBuildRapide').onclick = (e) => {
       if (e.target === $('modalBuildRapide')) fermerBuildRapide();
     };
