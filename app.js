@@ -5483,19 +5483,28 @@ function carteStat(lib, val, sous, fort, picto) {
 /* LE TEMPS DE RECHARGE DU MODE CHOISI. Une dizaine de compétences ont un
    cooldown distinct en Trio (« Trio cooldown » sur le wiki, champ cd_trio
    de skills.js) ; les autres gardent le même dans les deux modes. */
-/* « À jour — patch du ... » dans l'en-tête, depuis config.js : que les
-   visiteurs voient que les chiffres suivent le jeu. Date dans la langue
-   affichée ; rien si la config n'en donne pas. */
+/* « À jour · patch du ... » dans l'en-tête : que les visiteurs voient que
+   les chiffres suivent le jeu. Les dates viennent de maj.json, que la veille
+   du lundi (tools/surveiller_patch.py) réécrit et publie seule quand le site
+   colle au wiki. Relu sans cache comme version.txt, et une seule fois : le
+   changement de langue ne fait que redessiner. Rien si le fichier manque. */
+let _maj = null;
 function majBadgePatch() {
   const b = $('badgePatch');
-  const cfg = window.MISTFALL_CONFIG || {};
-  if (!b || !cfg.patchJeu) return;
-  const lang = document.documentElement.lang || 'fr';
-  const date = (iso) => new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
-    .format(new Date(iso + 'T12:00:00'));
-  b.textContent = '✓ ' + t('maj.badge', { date: date(cfg.patchJeu) });
-  b.title = t('maj.aide', { date: date(cfg.patchJeu), verif: date(cfg.verifie || cfg.patchJeu) });
-  b.hidden = false;
+  if (!b) return;
+  if (!_maj) {
+    _maj = fetch('maj.json', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  }
+  _maj.then((m) => {
+    if (!m || !m.patchJeu) return;
+    const lang = document.documentElement.lang || 'fr';
+    const date = (iso) => new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
+      .format(new Date(iso + 'T12:00:00'));
+    b.textContent = '✓ ' + t('maj.badge', { date: date(m.patchJeu) });
+    b.title = t('maj.aide', { date: date(m.patchJeu), verif: date(m.verifie || m.patchJeu) });
+    b.hidden = false;
+  });
 }
 
 function cdDe(s) {
