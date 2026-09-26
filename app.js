@@ -3426,13 +3426,43 @@ function majBandeauCompte() {
   if (email) $('compteEmail').textContent = email;
 }
 
+/* SUPPRIMÉ HORS CONNEXION. Sans compte ouvert, la suppression (ou l'ancien
+   nom d'un build renommé) ne peut pas atteindre le serveur : on la garde
+   ici, et la prochaine synchro la transmet avant de fusionner -- sinon le
+   serveur renvoyait le build à la connexion suivante. */
+const CLE_A_SUPPRIMER = 'mistfall.builds.aSupprimer.v1';
+function aSupprimer() {
+  try { return JSON.parse(localStorage.getItem(CLE_A_SUPPRIMER) || '[]'); } catch (e) { return []; }
+}
+function noterSuppression(nom) {
+  try {
+    const l = aSupprimer().filter((n) => n !== nom);
+    l.push(nom);
+    localStorage.setItem(CLE_A_SUPPRIMER, JSON.stringify(l.slice(-300)));
+  } catch (e) { /* au pire le build reviendra, comme avant */ }
+}
+
 async function synchroniser(silencieux) {
   if (!comptesDispo() || !window.Comptes.connecte()) return;
   const dire = (html) => { if (!silencieux) $('noteBuilds').innerHTML = html; };
   try {
     dire(`<span class="pas">${t('sync.encours')}</span>`);
-    const distants = await window.Comptes.listerBuilds();
-    const locaux = biblio();
+    // 1. Les suppressions faites hors connexion partent d'abord -- sauf un
+    //    nom qui a été réenregistré depuis, lui est vivant.
+    const presents = new Set(biblio().map((b) => b.nom));
+    for (const nom of aSupprimer()) {
+      if (!presents.has(nom)) await window.Comptes.supprimerBuild(nom);
+    }
+    try { localStorage.removeItem(CLE_A_SUPPRIMER); } catch (e) { /* rien */ }
+    // 2. Ce qui a été supprimé ou renommé sur UN AUTRE appareil : écarté ici
+    //    aussi, localement comme côté serveur, au lieu d'être renvoyé.
+    const enterres = new Set(((await window.Comptes.listerSupprimes()) || []).map((x) => x.nom));
+    const tousDistants = (await window.Comptes.listerBuilds()) || [];
+    // Une ligne enterrée encore présente (renvoyée par une ancienne version
+    // du site restée ouverte ailleurs) est effacée pour de bon.
+    for (const d of tousDistants) if (enterres.has(d.nom)) await window.Comptes.supprimerBuild(d.nom);
+    const distants = tousDistants.filter((d) => !enterres.has(d.nom));
+    const locaux = biblio().filter((b) => !enterres.has(b.nom));
     // FUSION, jamais remplacement : on ne perd ni ce qui est sur le serveur
     // ni ce qui vient d'être créé hors ligne.
     const par = new Map(locaux.map((b) => [b.nom, b]));
@@ -3461,7 +3491,7 @@ async function synchroniser(silencieux) {
     const fusion = [...par.values()];
     ecrireBiblio(fusion);
     dessinerBuilds();
-    await window.Comptes.envoyerBuilds(fusion);
+    await window.Comptes.envoyerBuilds(fusion, false);
     dire(`<span class="pas">${tH('sync.ok', { n: fusion.length, r: recus })}</span>`);
   } catch (e) {
     dire(`<span class="ko">${tH('sync.ko', { message: e.message })}</span>`);
@@ -4191,7 +4221,9 @@ function carteBuild(b, i) {
     dessinerComparaison();
     if (comptesDispo() && window.Comptes.connecte() && parti) {
       // Sinon la prochaine synchro le ferait réapparaître.
-      window.Comptes.supprimerBuild(parti.nom).catch(() => {});
+      window.Comptes.supprimerBuild(parti.nom).catch(() => noterSuppression(parti.nom));
+    } else if (parti) {
+      noterSuppression(parti.nom);
     }
   };
   return carte;
@@ -4615,15 +4647,48 @@ function genererBuildRapide() {
 // restituer()) et non d'un recalcul : le Builder ne sait pas tenir compte
 // de la priorité (voir couvertureEffective), un recalcul ici pourrait
 // donc sortir un stuff différent de celui qu'on vient de voir.
-function chargerDansBuilder() {
-  const d = _rapideDernier;
-  if (!d || !d.code) return;
-  const etat = {
+// Le résultat de Build rapide sous la forme d'un build du site (même forme
+// que etatActuel()) : ce qu'il faut pour le charger ou l'enregistrer.
+function etatRapide(d) {
+  return {
     k: d.code, c: d.classeId, a: d.arme, g: d.grade, v: d.vinOn, m: d.mixte,
     pr: d.planchers, sv: {}, t: d.cibleListe, w: [], b: d.brewChoisi,
     sa: false, st: null, sg: null,
   };
-  appliquerEtat(etat);
+}
+
+// ENREGISTRER SANS PASSER PAR LE BUILDER : directement dans Mes builds, sous
+// un nom libre (jamais par-dessus un build existant).
+function enregistrerDepuisRapide() {
+  const d = _rapideDernier;
+  if (!d || !d.code) return;
+  const liste = biblio();
+  const base = [D.classes[String(d.classeId)], d.arme].filter(Boolean).join(' ')
+    || t('builds.imageSansNom');
+  let suggestion = base;
+  for (let n = 2; liste.some((x) => x.nom === suggestion); n += 1) suggestion = `${base} ${n}`;
+  const nom = (prompt(t('rapide.nomInvite'), suggestion) || '').trim();
+  if (!nom) return;
+  if (liste.some((x) => x.nom === nom)) {
+    $('rapideNote').innerHTML = `<span class="ko">${tH('builds.nomPris', { nom })}</span>`;
+    return;
+  }
+  const entree = { nom, etat: etatRapide(d), code: d.code, pub: false, ami: false };
+  liste.push(entree);
+  if (!ecrireBiblio(liste)) return;
+  dessinerBuilds();
+  $('rapideNote').innerHTML = `<span class="pas">${tH('builds.enregistre', { nom })}</span>`;
+  if (comptesDispo() && window.Comptes.connecte()) {
+    window.Comptes.envoyerBuilds([entree]).catch((e) => {
+      $('rapideNote').innerHTML = `<span class="ko">${tH('sync.partiel', { message: e.message })}</span>`;
+    });
+  }
+}
+
+function chargerDansBuilder() {
+  const d = _rapideDernier;
+  if (!d || !d.code) return;
+  appliquerEtat(etatRapide(d));
   // Le vin EXACT que ce résultat a utilisé, et non une répartition refaite :
   // quand la répartition concentrée échouait, le moteur retombait sur la
   // répartition étalée, et restituer() en recalculant une autre aurait
@@ -4729,6 +4794,7 @@ function renommerBuild(ancienNom, nouveauNom) {
   // Le nom est la clé côté serveur (user_id, nom) : un simple ré-envoi sous
   // le nouveau nom laisserait l'ancienne ligne orpheline pour toujours,
   // d'où le retrait explicite avant l'envoi.
+  if (!(comptesDispo() && window.Comptes.connecte())) noterSuppression(ancienNom);
   if (comptesDispo() && window.Comptes.connecte()) {
     window.Comptes.supprimerBuild(ancienNom)
       .then(() => window.Comptes.envoyerBuilds([liste[idx]]))
@@ -8197,6 +8263,7 @@ function demarrer(donnees) {
       champ.setAttribute('readonly', '');
     };
     $('rapideCharger').onclick = chargerDansBuilder;
+    $('rapideEnregistrer').onclick = enregistrerDepuisRapide;
   }
   // Les sous-onglets de la page Communauté, et le bouton de comparaison.
   for (const b of document.querySelectorAll('#sousOnglets button')) {

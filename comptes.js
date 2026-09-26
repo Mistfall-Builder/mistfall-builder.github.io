@@ -351,7 +351,37 @@
     return (r && r[0]) || null;
   }
 
-  async function envoyerBuilds(liste) {
+  // LES PIERRES TOMBALES. Supprimer ou renommer un build effaçait sa ligne,
+  // mais un autre appareil qui l'avait encore la renvoyait à sa prochaine
+  // synchro : le build revenait. Le serveur garde donc le NOM de ce qui a
+  // été supprimé (table builds_supprimes, voir la migration du même nom) et
+  // la synchro l'écarte partout. Tant que la migration n'est pas passée,
+  // tout ceci échoue sans bruit et rien ne change.
+  let _sansTombes = false;
+  const enListe = (noms) => 'in.(' + noms.map((n) => '"' + String(n)
+    .replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').map(encodeURIComponent).join(',') + ')';
+
+  async function listerSupprimes() {
+    if (_sansTombes) return [];
+    try {
+      return (await avecReprise(() => appeler(
+        '/rest/v1/builds_supprimes?select=nom', {}, true))) || [];
+    } catch (e) { _sansTombes = true; return []; }
+  }
+
+  async function leverTombes(noms) {
+    if (_sansTombes || !noms.length) return;
+    try {
+      await avecReprise(() => appeler(
+        `/rest/v1/builds_supprimes?nom=${enListe(noms)}`,
+        { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true));
+    } catch (e) { /* la table n'existe pas encore : rien a lever */ }
+  }
+
+  // `leverLesTombes` : réenregistrer un nom supprimé ailleurs le fait
+  // revivre. La synchro complète passe false -- elle vient justement
+  // d'écarter les noms enterrés, il n'y a rien à lever.
+  async function envoyerBuilds(liste, leverLesTombes = true) {
     if (!liste.length) return [];
     const s = connecte();
     const lignes = liste.map((b) => {
@@ -369,19 +399,31 @@
         body: JSON.stringify(lignes),
       }, true));
     try {
-      return await envoyer();
+      await envoyer();
     } catch (e) {
       if (!/partage|column|42703|does not exist/i.test(e.message)) throw e;
       _sansColonnePartage = true;
       for (const l of lignes) delete l.partage;
-      return envoyer();
+      await envoyer();
+    } finally {
+      if (leverLesTombes) await leverTombes(liste.map((b) => b.nom));
     }
+    return [];
   }
 
   async function supprimerBuild(nom) {
-    return avecReprise(() => appeler(
+    await avecReprise(() => appeler(
       `/rest/v1/builds?nom=eq.${encodeURIComponent(nom)}`,
       { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true));
+    if (_sansTombes) return;
+    try {
+      await avecReprise(() => appeler(
+        '/rest/v1/builds_supprimes?on_conflict=user_id,nom', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([{ user_id: connecte().user.id, nom }]),
+        }, true));
+    } catch (e) { _sansTombes = true; }
   }
 
   /* LE RETOUR DU LIEN DE CONFIRMATION.
@@ -436,7 +478,7 @@
 
   window.Comptes = {
     actif, connecte, courriel, inscrire, connecter, deconnecter,
-    listerBuilds, envoyerBuilds, supprimerBuild, lireFragmentAuth,
+    listerBuilds, envoyerBuilds, supprimerBuild, listerSupprimes, lireFragmentAuth,
     monProfil, monProfilComplet, definirPseudo, parPseudo,
     galerie, combienDeBuildsPublics, basculerVote,
     mesGuides, enregistrerGuide, supprimerGuide, guidesPublics, guideComplet,
