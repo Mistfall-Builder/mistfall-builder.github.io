@@ -14,6 +14,14 @@
  * et tout le monde peut lire ce fichier une fois le site en ligne.
  */
 window.MISTFALL_CONFIG = {
+  /* LE BADGE « À JOUR » DE L'EN-TÊTE. Le jeu ne publie pas de numéro de
+   * version : ses patchs sont nommés par leur date. `patchJeu` = le dernier
+   * patch passé en revue (tous ses chiffres publiés intégrés), `verifie` =
+   * le jour de cette vérification. À changer après chaque mise à jour des
+   * données (la veille du lundi, tools/surveiller_patch.py, prévient). */
+  patchJeu: '2026-09-23',
+  verifie: '2026-09-26',
+
   supabaseUrl: 'https://grnndksniashncksyzvv.supabase.co',
   supabaseAnonKey: 'sb_publishable_o-6QtPqCK624RcH96KsFxA_qHHdbgRx',
 

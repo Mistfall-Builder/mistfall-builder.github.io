@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=183">
+<link rel="stylesheet" href="icones_affixes.css?v=184">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -872,6 +872,10 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
 
 /* Le bouton Build rapide, empilé au-dessus de Mes builds -- même mécanique,
    couleur accent pour ne pas les confondre au premier coup d'œil. */
+.badgePatch{flex:0 0 auto;align-self:center;font-size:11px;font-weight:600;
+  color:var(--ok);border:1px solid rgba(123,191,106,.35);background:rgba(123,191,106,.08);
+  border-radius:20px;padding:3px 9px;white-space:nowrap;cursor:help}
+.badgePatch[hidden]{display:none}
 .boutonRapide{top:calc(60% - 46px);background:#7bbf6a;color:#0b1f0a}
 .boutonRapide:hover{background:#96d185}
 @media(max-width:640px){.boutonRapide{top:auto;bottom:60px;right:14px}}
@@ -1705,7 +1709,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=183"></script>
+<script src="config.js?v=184"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -1740,6 +1744,8 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
       <span class="mot">Mistfall<em>Builder</em>
         <span class="sous" data-i18n="entete.sous">Compose ton stuff, récupère le code d'import</span></span>
     </a>
+    <!-- Rempli par majBadgePatch() (app.js) depuis config.js. -->
+    <span class="badgePatch" id="badgePatch" hidden></span>
     <nav class="nav" id="nav">
       <button data-page="main" class="actif" data-i18n="nav.builder">Builder</button>
       <button data-page="pageCommunaute" data-i18n="nav.communaute">Communauté</button>
@@ -2689,21 +2695,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=183"></script>
+<script src="i18n.js?v=184"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=183"></script>
-<script src="comptes.js?v=183"></script>
-<script src="donnees.js?v=183"></script>
-<script src="skills.js?v=183"></script>
-<script src="loot.js?v=183"></script>
-<script src="maps.js?v=183"></script>
-<script src="monstres_icones.js?v=183"></script>
-<script src="craft.js?v=183"></script>
-<script src="talents.js?v=183"></script>
-<script src="builds_reference.js?v=183"></script>
-<script src="guides_classes.js?v=183"></script>
-<script src="fiche.js?v=183"></script>
-<script src="app.js?v=183"></script>
+<script src="verrou.js?v=184"></script>
+<script src="comptes.js?v=184"></script>
+<script src="donnees.js?v=184"></script>
+<script src="skills.js?v=184"></script>
+<script src="loot.js?v=184"></script>
+<script src="maps.js?v=184"></script>
+<script src="monstres_icones.js?v=184"></script>
+<script src="craft.js?v=184"></script>
+<script src="talents.js?v=184"></script>
+<script src="builds_reference.js?v=184"></script>
+<script src="guides_classes.js?v=184"></script>
+<script src="fiche.js?v=184"></script>
+<script src="app.js?v=184"></script>
 </body>
 </html>

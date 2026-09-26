@@ -5483,6 +5483,21 @@ function carteStat(lib, val, sous, fort, picto) {
 /* LE TEMPS DE RECHARGE DU MODE CHOISI. Une dizaine de compétences ont un
    cooldown distinct en Trio (« Trio cooldown » sur le wiki, champ cd_trio
    de skills.js) ; les autres gardent le même dans les deux modes. */
+/* « À jour — patch du ... » dans l'en-tête, depuis config.js : que les
+   visiteurs voient que les chiffres suivent le jeu. Date dans la langue
+   affichée ; rien si la config n'en donne pas. */
+function majBadgePatch() {
+  const b = $('badgePatch');
+  const cfg = window.MISTFALL_CONFIG || {};
+  if (!b || !cfg.patchJeu) return;
+  const lang = document.documentElement.lang || 'fr';
+  const date = (iso) => new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
+    .format(new Date(iso + 'T12:00:00'));
+  b.textContent = '✓ ' + t('maj.badge', { date: date(cfg.patchJeu) });
+  b.title = t('maj.aide', { date: date(cfg.patchJeu), verif: date(cfg.verifie || cfg.patchJeu) });
+  b.hidden = false;
+}
+
 function cdDe(s) {
   const trio = ($('sortsMode') || {}).value === 'trio';
   return trio && s.cd_trio != null ? s.cd_trio : s.cd;
@@ -8022,6 +8037,7 @@ window.surChangementDeLangue = function () {
   remplirSelect($('sortsMode'), [
     ['solo', t('sorts.mode.solo')],
     ['trio', t('sorts.mode.trio')]], ($('sortsMode') || {}).value || 'solo');
+  majBadgePatch();
   // Les listes distantes aussi : elles contiennent des libellés traduits
   // (« Charger », « Copier chez moi ») que seul un redessin met à jour.
   if (comptesDispo()) {
@@ -8285,6 +8301,7 @@ function demarrer(donnees) {
   remplirSelect($('sortsMode'), [
     ['solo', t('sorts.mode.solo')],
     ['trio', t('sorts.mode.trio')]], ($('sortsMode') || {}).value || 'solo');
+  majBadgePatch();
   const redessinerFiche = () => {
     if (dernier) dessinerFiche(dernier, Number($('classe').value));
   };
