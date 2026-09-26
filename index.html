@@ -31,7 +31,7 @@
 <meta name="twitter:description" content="Pick the affix levels you want, get the minimum gear that reaches them, and the in-game import code.">
 <meta name="twitter:image" content="https://mistfall-builder.github.io/marque/partage.png">
 <!-- Les 43 icônes d'affixe du jeu, inlinées (voir tools/generer_site.py). -->
-<link rel="stylesheet" href="icones_affixes.css?v=181">
+<link rel="stylesheet" href="icones_affixes.css?v=182">
 <style>
 /* ------------------------------------------------------------------ base --
    Charte relevée sur la page de référence : fond quasi noir légèrement
@@ -174,6 +174,9 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
    le HTML. #blocFiche n'a donc plus besoin d'une classe de mise en page
    séparée : c'est une div ordinaire, cachée tant qu'aucun build n'existe. */
 #blocFiche{display:grid;gap:18px}
+/* Les regles d'ID/classe qui posent un display battent le [hidden] du
+   navigateur : sans cette garde, hidden=true ne cachait rien. */
+#blocFiche[hidden]{display:none}
 
 /* Les filtres de la bibliotheque locale : compacts, dans une colonne de
    330 px, donc deux par ligne plutot qu'une file qui deborde. */
@@ -181,7 +184,7 @@ main{max-width:var(--large);margin:0 auto;padding:20px 22px 44px;
   margin:8px 0 9px}
 .filtresBuilds input{grid-column:1/-1}
 .filtresBuilds select{width:100%;min-width:0;font-size:12px;padding:5px 7px}
-.filtresBuilds[hidden]{display:none}
+.filtresBuilds[hidden],#filtresBuilds[hidden]{display:none}
 .vide-filtre{font-size:12px;color:var(--terne);padding:8px 2px}
 
 /* ------------------------------------------------- filtres et pagination -- */
@@ -858,6 +861,7 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
   font:800 13px/1 var(--condense);letter-spacing:.8px;text-transform:uppercase;
   cursor:pointer;box-shadow:-4px 0 16px -4px rgba(0,0,0,.55);
   display:flex;align-items:center;gap:8px;transition:.14s}
+.boutonFlottantBuilds[hidden]{display:none}
 .boutonFlottantBuilds:hover{background:#6f9fc4}
 .boutonFlottantBuilds .compte{background:#0b141d;color:#bcd7ec;
   border-radius:10px;padding:1px 7px;font-size:11px;min-width:16px;
@@ -870,7 +874,7 @@ button.primaire:hover{background:var(--accent-clair);border-color:var(--accent-c
    couleur accent pour ne pas les confondre au premier coup d'œil. */
 .boutonRapide{top:calc(60% - 46px);background:#7bbf6a;color:#0b1f0a}
 .boutonRapide:hover{background:#96d185}
-@media(max-width:640px){.boutonRapide{bottom:60px;right:14px}}
+@media(max-width:640px){.boutonRapide{top:auto;bottom:60px;right:14px}}
 
 /* La fenetre elle-même : même squelette que .grilleBoite (voile + tête +
    corps qui défile), la barre de filtres remplace juste la recherche seule
@@ -912,8 +916,8 @@ select.rapideAjout{width:100%}
 .rapideCouv{display:flex;align-items:center;gap:6px;font-size:12.5px}
 .rapideCouv .txt{flex:1 1 auto}
 .rapideCouv .n{font-variant-numeric:tabular-nums;color:var(--terne)}
-.rapideCouv.ok .n{color:var(--ok)}
-.rapideCouv.ko .n{color:var(--ko)}
+.rapideCouv.couvOk .n{color:var(--ok)}
+.rapideCouv.couvKo .n{color:var(--ko)}
 
 .grilleTete .filtresBuilds{display:flex;flex:1 1 auto;flex-wrap:wrap;gap:6px;margin:0}
 .grilleTete .filtresBuilds input{grid-column:unset;flex:1 1 170px;min-width:150px}
@@ -996,7 +1000,7 @@ select.rapideAjout{width:100%}
 .mbActions .ami,.mbActions .pub{flex:0 0 auto;display:flex;
   align-items:center;justify-content:center;width:30px;height:28px;
   background:var(--panneau);border:1px solid var(--bord);border-radius:3px;
-  cursor:pointer}
+  cursor:pointer;margin:0}
 .mbActions .ami span,.mbActions .pub span{font:700 8px/1 var(--condense);
   letter-spacing:.7px;text-transform:uppercase;color:var(--terne)}
 .mbActions .ami input,.mbActions .pub input{position:absolute;width:1px;height:1px;
@@ -1305,6 +1309,7 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .carteObjetActif{display:flex;flex-wrap:wrap;align-items:center;gap:8px;
   padding:7px 9px;background:var(--panneau2);border:1px solid var(--accent-sombre);
   border-radius:4px;font-size:12px}
+.carteObjetActif[hidden]{display:none}
 .carteObjetActif img{width:26px;height:26px;flex:0 0 auto;object-fit:contain;
   border-radius:3px}
 .carteObjetActif .nom{flex:1;min-width:0;font-weight:600;display:flex;
@@ -1319,7 +1324,8 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
   flex-direction:column;gap:2px;border:1px solid var(--bord);
   border-radius:4px;padding:4px}
 .carteItem{display:flex;align-items:center;gap:7px;padding:5px 7px;
-  border-radius:3px;font-size:12px;cursor:pointer;user-select:none}
+  border-radius:3px;font:400 12px/1.35 var(--corps);cursor:pointer;user-select:none;
+  margin:0;letter-spacing:0;text-transform:none;color:var(--texte2)}
 .carteItem:hover{background:rgba(255,255,255,.03)}
 .carteItem input{margin:0;flex:0 0 auto}
 .carteItem .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
@@ -1699,7 +1705,7 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      juste en dessous a besoin de MISTFALL_CONFIG pour savoir si un verrou
      est actif, et ca doit se decider avant que <header> ne soit peint --
      sinon le site reel flashe une fraction de seconde avant de se cacher. -->
-<script src="config.js?v=181"></script>
+<script src="config.js?v=182"></script>
 <script>
   try {
     if (window.MISTFALL_CONFIG && window.MISTFALL_CONFIG.verrouActif
@@ -2081,6 +2087,10 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
         <div class="corps">
           <div class="filtres">
             <select id="sortsCible"></select>
+            <!-- Solo / Trio : une dizaine de compétences ont un temps de
+                 recharge distinct en groupe (cd_trio dans skills.js). -->
+            <select id="sortsMode" data-i18n-title="sorts.mode.aide"
+                    title="Temps de recharge en Solo ou en Trio" style="flex:0 0 auto;width:auto"></select>
             <label class="coche" style="flex:0 0 auto">
               <input type="checkbox" id="sortsArme" checked>
               <span data-i18n="sorts.filtreArme">Seulement mon arme</span></label>
@@ -2676,21 +2686,21 @@ body.verrouille #verrouSite{display:flex;position:fixed;inset:0;z-index:50;
      une mise en ligne, et on se retrouve avec une page neuve pilotée par
      du vieux code — le pire des deux mondes. À incrémenter à chaque
      modification de ces fichiers. -->
-<script src="i18n.js?v=181"></script>
+<script src="i18n.js?v=182"></script>
 <!-- config.js est deja charge tout en haut de <body>, pour le script
      anti-flash du verrou -- pas la peine de le recharger ici. -->
-<script src="verrou.js?v=181"></script>
-<script src="comptes.js?v=181"></script>
-<script src="donnees.js?v=181"></script>
-<script src="skills.js?v=181"></script>
-<script src="loot.js?v=181"></script>
-<script src="maps.js?v=181"></script>
-<script src="monstres_icones.js?v=181"></script>
-<script src="craft.js?v=181"></script>
-<script src="talents.js?v=181"></script>
-<script src="builds_reference.js?v=181"></script>
-<script src="guides_classes.js?v=181"></script>
-<script src="fiche.js?v=181"></script>
-<script src="app.js?v=181"></script>
+<script src="verrou.js?v=182"></script>
+<script src="comptes.js?v=182"></script>
+<script src="donnees.js?v=182"></script>
+<script src="skills.js?v=182"></script>
+<script src="loot.js?v=182"></script>
+<script src="maps.js?v=182"></script>
+<script src="monstres_icones.js?v=182"></script>
+<script src="craft.js?v=182"></script>
+<script src="talents.js?v=182"></script>
+<script src="builds_reference.js?v=182"></script>
+<script src="guides_classes.js?v=182"></script>
+<script src="fiche.js?v=182"></script>
+<script src="app.js?v=182"></script>
 </body>
 </html>

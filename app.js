@@ -333,7 +333,7 @@ function poserGemmesGlouton(sockets, want, couvert) {
 
 /* Pose EXACTE — programmation dynamique, port de gemmes_exactes. */
 const LIMITE_ETATS = 400000;
-function poserGemmesExact(sockets, want, couvert) {
+function poserGemmesExact(sockets, want, couvert, priorite) {
   const noms = Object.keys(want).filter((n) => want[n] > 0);
   if (!noms.length) return true;
   if (noms.length > 12) return false;
@@ -431,7 +431,7 @@ function poserGemmesExact(sockets, want, couvert) {
     if (finale[idx] === INF) continue;
     const c = {};
     noms.forEach((n, i) => { c[n] = Math.floor(idx / strides[i]) % (caps[i] + 1); });
-    const note = couvertureEffective(c, want, null);
+    const note = couvertureEffective(c, want, priorite);
     let secours = 0;
     for (const [n, lvl] of Object.entries(want)) {
       secours -= Math.max(0, (lvl - (c[n] || 0)) - 2);
@@ -498,7 +498,7 @@ function ciblesPourStuff(cibleMap, vinPoints) {
    qui a deja pose ses gemmes en jeu verrait le site lui en proposer
    d'autres. Les deux poseurs ne remplissent que les emplacements VIDES :
    pre-remplir suffit donc a les mettre hors de portee. */
-function assembler(slotItems, want, exact, figees) {
+function assembler(slotItems, want, exact, figees, priorite) {
   const sockets = [];
   const couvert = {};
   const sources = [];
@@ -513,7 +513,7 @@ function assembler(slotItems, want, exact, figees) {
     if (it.i) { couvert[it.i] = (couvert[it.i] || 0) + 1; sources.push({ slot, affixe: it.i }); }
   }
   let pose = false;
-  if (exact) pose = poserGemmesExact(sockets, want, couvert);
+  if (exact) pose = poserGemmesExact(sockets, want, couvert, priorite);
   if (!pose) poserGemmesGlouton(sockets, want, couvert);
   return { sockets, couvert, sources };
 }
@@ -851,7 +851,10 @@ function construireAuGrade(classe, arme, cibleListe, grade, mixte, planchers, af
     }
   }
 
-  const final = assembler(items, want, true, figees);
+  // La priorite doit aller JUSQU'ICI : la pose exacte redistribue toutes
+  // les gemmes, et sans elle un affixe classe dernier pouvait rafler ce que
+  // la montee avait reserve au premier.
+  const final = assembler(items, want, true, figees, priorite);
   return { slotItems: items, ...final, options };
 }
 
@@ -1445,6 +1448,17 @@ function selectVin(nom, classe = 'vin') {
  * par cible, donc la recalculer serait exactement ce qu'on refuse de faire.
  * Ses cases repassent au marqueur d'attente plutôt que d'afficher un chiffre
  * qui n'est plus vrai. */
+/* La case "Palier" du tableau : le seuil, et un ◆ s'il est atteint. Une
+   seule fonction pour le rendu initial ET le repeint après un réglage de
+   vin -- sinon le ◆ restait affiché après avoir retiré le vin qui y
+   menait. */
+function htmlPalier(nom, total) {
+  const p = palier(nom);
+  if (!p) return '—';
+  return `${p}${total >= p ? ` <span class="losange" title="${
+    echapper(t('palier.quoi', { n: p }))}">◆</span>` : ''}`;
+}
+
 function repeindreLigneVin(res, nom) {
   const table = $('tableauAffixes');
   const tr = table && table.querySelector(`tr[data-a="${CSS.escape(nom)}"]`);
@@ -1458,6 +1472,7 @@ function repeindreLigneVin(res, nom) {
   const tient = vise == null ? null : total >= vise;
 
   tr.classList.toggle('ligneKo', tient === false);
+  cellules[2].innerHTML = htmlPalier(nom, total);
   const cellTotal = cellules[5];
   cellTotal.className = 'n total ' + (tient == null ? '' : (tient ? 'ok' : 'ko'));
   // MÊME DÉPASSEMENT QU'AU RENDU INITIAL — voir le commentaire sur .majCible
@@ -2469,11 +2484,7 @@ function afficher(res, classe) {
     // l'atteint vraiment (stuff + vin). Un tiret pour les affixes qui
     // n'en ont pas — Elusive, Curse — plutôt qu'un vide qui laisse croire
     // à un oubli.
-    const p = palier(nom);
-    const colonnePalier = p
-      ? `${p}${total >= p ? ` <span class="losange" title="${
-            echapper(t('palier.quoi', { n: p }))}">◆</span>` : ''}`
-      : '—';
+    const colonnePalier = htmlPalier(nom, total);
     // LE VIN PEUT DÉPASSER LA CIBLE SANS LE DIRE. Warblood verse jusqu'à son
     // plafond par affixe même au-delà de ce qui était demandé — la cible
     // reste écrite « 3 » pendant que le total vaut déjà 4. Rien ne signalait
@@ -3300,6 +3311,10 @@ function appliquerEtat(e) {
   // Changer de build change tout le stuff : garder un cadenas d'un autre
   // build ferait construire autour d'une piece qui n'est plus la.
   libererVerrous();
+  // Même raison que dans afficherCode : charger un autre build (galerie,
+  // ami, référence, Build rapide...) ne doit pas laisser "Écraser « A »"
+  // pointer sur le précédent -- un clic l'aurait remplacé sans prévenir.
+  _buildCharge = ''; majBoutonEcraser();
   if (!e) return;
   $('classe').value = String(e.c);
   majArmes();
@@ -3570,7 +3585,10 @@ function carteBuildDistant(b, auteur) {
   }
   el.querySelector('.bdCopier').onclick = () => {
     const liste = biblio();
-    const nom = liste.some((x) => x.nom === b.nom) ? `${b.nom} (copie)` : b.nom;
+    // nomCopieDisponible et pas un simple " (copie)" : copier deux builds
+    // du meme nom donnait deux fois "X (copie)", et les cartes de Mes
+    // builds (retrouvees par leur nom) agissaient alors sur la mauvaise.
+    const nom = liste.some((x) => x.nom === b.nom) ? nomCopieDisponible(b.nom, liste) : b.nom;
     liste.push({ nom, etat: b.etat, code: b.code || '', pub: false, ami: false });
     if (!ecrireBiblio(liste)) return;
     dessinerBuilds();
@@ -3632,7 +3650,10 @@ function carteBuildGalerie(b) {
   };
   el.querySelector('.bdCopier').onclick = () => {
     const liste = biblio();
-    const nom = liste.some((x) => x.nom === b.nom) ? `${b.nom} (copie)` : b.nom;
+    // nomCopieDisponible et pas un simple " (copie)" : copier deux builds
+    // du meme nom donnait deux fois "X (copie)", et les cartes de Mes
+    // builds (retrouvees par leur nom) agissaient alors sur la mauvaise.
+    const nom = liste.some((x) => x.nom === b.nom) ? nomCopieDisponible(b.nom, liste) : b.nom;
     liste.push({ nom, etat: b.etat, code: b.code || '', pub: false, ami: false });
     if (!ecrireBiblio(liste)) return;
     dessinerBuilds();
@@ -4078,16 +4099,24 @@ function carteBuild(b, i) {
       <button class="suppr" title="${t('builds.supprimer')}">🗑</button>
       <button class="ouvrir" title="${titre}">${t('builds.chargerBtn')}</button>
     </div>`;
+  // L'index reçu date du DESSIN de la carte : la bibliothèque a pu changer
+  // depuis (autre onglet, synchro). On le revérifie au moment d'agir et on
+  // retombe sur le nom, pour ne jamais modifier ou effacer la mauvaise
+  // entrée.
+  const indexActuel = (l) => ((l[i] && l[i].nom === b.nom)
+    ? i : l.findIndex((x) => x.nom === b.nom));
   const brancher = (sel, cle, cleOui, cleNon) => {
     const c = carte.querySelector(sel);
     if (!c) return;
     c.onchange = () => {
       const l = biblio();
-      l[i] = { ...l[i], [cle]: c.checked };
+      const j = indexActuel(l);
+      if (j < 0) { dessinerBuilds(); return; }
+      l[j] = { ...l[j], [cle]: c.checked };
       if (!ecrireBiblio(l)) { c.checked = !c.checked; return; }
-      window.Comptes.envoyerBuilds([l[i]]).then(() => {
+      window.Comptes.envoyerBuilds([l[j]]).then(() => {
         $('noteBuilds').innerHTML = `<span class="pas">`
-          + t(c.checked ? cleOui : cleNon, { nom: b.nom }) + '</span>';
+          + tH(c.checked ? cleOui : cleNon, { nom: b.nom }) + '</span>';
       }).catch((e) => {
         $('noteBuilds').innerHTML = `<span class="ko">${echapper(e.message)}</span>`;
       });
@@ -4141,8 +4170,17 @@ function carteBuild(b, i) {
     // et donc voulu).
     if (!confirm(t('builds.confirmerSuppr', { nom: b.nom }))) return;
     const l = biblio();
-    const [parti] = l.splice(i, 1);
+    const j = indexActuel(l);
+    if (j < 0) { dessinerBuilds(); return; }
+    const [parti] = l.splice(j, 1);
     if (!ecrireBiblio(l)) return;
+    // Plus rien à retrouver sous ce nom dans « Récents » : il y gardait une
+    // des huit places, et un futur build du même nom y serait apparu sans
+    // avoir jamais été chargé.
+    try {
+      localStorage.setItem(CLE_RECENTS,
+        JSON.stringify(recentsNoms().filter((n) => n !== b.nom)));
+    } catch (e) { /* le raccourci reste juste un peu faux */ }
     // Un build supprimé ne peut plus être un côté de la comparaison :
     // sans ça la carte resterait sur un build qui n'existe plus.
     if (_cmpA === b.nom) _cmpA = '';
@@ -4255,8 +4293,9 @@ function dessinerBuilds() {
   const grille = document.createElement('div');
   grille.className = 'mbGrille';
   for (const b of groupe) {
-    const i = toute.findIndex((x) => x.nom === b.nom);
-    grille.appendChild(carteBuild(b, i));
+    // indexOf, pas findIndex par nom : deux builds homonymes (anciennes
+    // copies) recevaient le meme index et se partageaient les actions.
+    grille.appendChild(carteBuild(b, toute.indexOf(b)));
   }
   boite.appendChild(grille);
 }
@@ -4486,7 +4525,11 @@ function genererBuildRapide() {
     for (const slot of D.ordreSlots) planchers[slot] = slot === 'weapon' ? grade + 1 : grade;
   }
   const cibleListe = [..._rapideCibles.entries()];
-  const priorite = [..._rapideCibles.keys()];
+  // Dix rangs au plus : les poids sont des puissances de 16 additionnées en
+  // flottant, et au-delà les derniers rangs (et le bonus de palier) tombent
+  // sous la précision du total -- le moteur ne les distinguait plus. Les
+  // affixes suivants restent visés, simplement à égalité entre eux.
+  const priorite = [..._rapideCibles.keys()].slice(0, 10);
   const vinOn = $('rVin').checked;
   const brewChoisi = $('rBrew').value || _brew;
 
@@ -4526,12 +4569,14 @@ function genererBuildRapide() {
   couv.innerHTML = cibleListe.map(([nom, niveau]) => {
     const gear = res.couvert[nom] || 0;
     const vin = (res.vinPoints && res.vinPoints.get(nom)) || 0;
-    const total = gear + vin;
+    // Plafonné comme dans le tableau du Builder : sans ça, un inné + des
+    // gemmes doubles + le vin affichaient "9/7", impossible en jeu.
+    const total = Math.min(plafond(nom), gear + vin);
     const ok = total >= niveau;
     const p = palier(nom);
     const losange = p && total >= p ? ' ◆' : '';
     const vinTxt = vin ? ` <span class="pas">(+${vin} ${t('rapide.vin')})</span>` : '';
-    return `<div class="rapideCouv ${ok ? 'ok' : 'ko'}">
+    return `<div class="rapideCouv ${ok ? 'couvOk' : 'couvKo'}">
       ${pastille(nom)}<span class="txt">${echapper(libelleAffixe(nom))}</span>
       <span class="n">${total}/${niveau}${losange} ${ok ? '✓' : '✗'}</span>${vinTxt}
     </div>`;
@@ -4560,7 +4605,8 @@ function genererBuildRapide() {
     ? `<span class="pas ok">${t('etat.ok')}</span>`
     : `<span class="ko">${t('rapide.partiel')}</span>`;
 
-  _rapideDernier = { classeId, arme, grade, mixte, planchers, cibleListe, code, vinOn, brewChoisi };
+  _rapideDernier = { classeId, arme, grade, mixte, planchers, cibleListe, code, vinOn, brewChoisi,
+                     vinPoints: new Map(res.vinPoints || []) };
 }
 
 // BASCULE LE DERNIER RÉSULTAT DANS LE BUILDER PRINCIPAL. `appliquerEtat`
@@ -4578,7 +4624,16 @@ function chargerDansBuilder() {
     sa: false, st: null, sg: null,
   };
   appliquerEtat(etat);
-  restituer({ code: d.code });
+  // Le vin EXACT que ce résultat a utilisé, et non une répartition refaite :
+  // quand la répartition concentrée échouait, le moteur retombait sur la
+  // répartition étalée, et restituer() en recalculant une autre aurait
+  // affiché des totaux (et donc des cibles) différents de ceux qu'on vient
+  // de voir dans Build rapide.
+  try {
+    afficherCode(d.code, d.vinOn ? new Map(d.vinPoints) : new Map());
+  } catch (e) {
+    restituer({ code: d.code });
+  }
   fermerBuildRapide();
 }
 
@@ -4609,7 +4664,7 @@ function sauvegarderBuildSous(nom) {
   majBoutonEcraser();
   dessinerBuilds();
   $('noteBuilds').innerHTML =
-    `<span class="pas">${t(deja >= 0 ? 'builds.remplace' : 'builds.enregistre', { nom })}</span>`;
+    `<span class="pas">${tH(deja >= 0 ? 'builds.remplace' : 'builds.enregistre', { nom })}</span>`;
   if (comptesDispo() && window.Comptes.connecte()) {
     window.Comptes.envoyerBuilds([entree]).catch((e) => {
       $('noteBuilds').innerHTML =
@@ -4651,7 +4706,7 @@ function renommerBuild(ancienNom, nouveauNom) {
   if (idx < 0) return;
   if (liste.some((x) => x.nom === nouveauNom)) {
     $('noteBuilds').innerHTML =
-      `<span class="ko">${t('builds.nomPris', { nom: nouveauNom })}</span>`;
+      `<span class="ko">${tH('builds.nomPris', { nom: nouveauNom })}</span>`;
     return;
   }
   const avant = liste[idx];
@@ -4669,7 +4724,7 @@ function renommerBuild(ancienNom, nouveauNom) {
   dessinerBuilds();
   dessinerComparaison();
   $('noteBuilds').innerHTML =
-    `<span class="pas">${t('builds.renomme', { avant: ancienNom, apres: nouveauNom })}</span>`;
+    `<span class="pas">${tH('builds.renomme', { avant: ancienNom, apres: nouveauNom })}</span>`;
 
   // Le nom est la clé côté serveur (user_id, nom) : un simple ré-envoi sous
   // le nouveau nom laisserait l'ancienne ligne orpheline pour toujours,
@@ -4710,7 +4765,7 @@ function dupliquerBuild(nom) {
   if (!propose) return;
   if (liste.some((x) => x.nom === propose)) {
     $('noteBuilds').innerHTML =
-      `<span class="ko">${t('builds.nomPris', { nom: propose })}</span>`;
+      `<span class="ko">${tH('builds.nomPris', { nom: propose })}</span>`;
     return;
   }
   const copie = { ...original, nom: propose, pub: false, ami: false };
@@ -4718,7 +4773,7 @@ function dupliquerBuild(nom) {
   if (!ecrireBiblio(liste)) return;
   dessinerBuilds();
   $('noteBuilds').innerHTML =
-    `<span class="pas">${t('builds.enregistre', { nom: propose })}</span>`;
+    `<span class="pas">${tH('builds.enregistre', { nom: propose })}</span>`;
   if (comptesDispo() && window.Comptes.connecte()) {
     window.Comptes.envoyerBuilds([copie]).catch((e) => {
       $('noteBuilds').innerHTML =
@@ -5170,6 +5225,9 @@ function importer() {
  * avait été gardée et que l'optimiseur repartait de zéro. */
 function afficherCode(code, vinPoints) {
   libererVerrous();
+  // Un autre stuff arrive : "Écraser" ne vise plus le build d'avant. Le
+  // bouton "Charger" d'une carte de Mes builds le repose juste après.
+  _buildCharge = ''; majBoutonEcraser();
   {
     // Sans second argument on affiche un code nu — celui qu'un inconnu vient
     // de coller. On ne lui prête aucun vin : rien dans le code ne le dit.
@@ -5232,7 +5290,11 @@ function afficherCode(code, vinPoints) {
     }
     dessinerAffixes();
     majBudgetVin();
+    // vinAuto : ce que "auto" doit rétablir sur une ligne du tableau (voir
+    // appliquerVin). Sans lui, repasser une ligne sur "auto" après l'avoir
+    // touchée mettait son vin à 0 sur tout build rouvert depuis son code.
     dernier = { slotItems, sockets, couvert, vin: new Set(vp.keys()), vinPoints: vp,
+                vinAuto: new Map(vp),
                 suffisant: true, sources: [], secondeArme: secondeArmeLue };
     // La case et ses réglages suivent ce que le code portait vraiment,
     // sinon "Deuxième arme" reste décochée alors que le paperdoll en montre
@@ -5350,6 +5412,14 @@ function carteStat(lib, val, sous, fort, picto) {
     <div class="lib">${pictoStat(picto)}<span>${lib}</span></div>
     <div class="val">${val}</div>
     ${sous ? `<div class="sous">${sous}</div>` : ''}</div>`;
+}
+
+/* LE TEMPS DE RECHARGE DU MODE CHOISI. Une dizaine de compétences ont un
+   cooldown distinct en Trio (« Trio cooldown » sur le wiki, champ cd_trio
+   de skills.js) ; les autres gardent le même dans les deux modes. */
+function cdDe(s) {
+  const trio = ($('sortsMode') || {}).value === 'trio';
+  return trio && s.cd_trio != null ? s.cd_trio : s.cd;
 }
 
 function dessinerFiche(res, classeId) {
@@ -5565,7 +5635,7 @@ function remplirGroupe(boite, membres, f, cible, memeArme, res, classeId, second
         <span class="d">${s.coups.length ? nb(tot.degats) : t('sorts.sansDegats')}</span>
         <span class="m">${[
           s.energie != null ? `${nb(s.energie, 1)} ${t('sorts.energie')}` : '',
-          s.cd != null ? `${nb(s.cd, 0)} s` : ''].filter(Boolean).join(' · ')}</span>
+          cdDe(s) != null ? `${nb(cdDe(s), 0)} s` : ''].filter(Boolean).join(' · ')}</span>
       </span>`;
     b.onclick = () => {
       _sortChoisi = (_sortChoisi === s.nom) ? null : s.nom;
@@ -5629,7 +5699,7 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
       <div class="jetons">
         ${s.arme ? `<span class="jeton">${echapper(s.arme)}</span>` : ''}
         ${s.energie != null ? `<span class="jeton">${nb(s.energie, 1)} ${t('sorts.energie')}</span>` : ''}
-        ${s.cd != null ? `<span class="jeton">${nb(s.cd, 0)} s</span>` : ''}
+        ${cdDe(s) != null ? `<span class="jeton">${nb(cdDe(s), 0)} s</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -5639,7 +5709,11 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
   // perdre les quatre autres.
   const tableauEffets = () => {
     const l = [];
-    if (s.cd != null) l.push([t('sorts.cooldown'), `${nb(s.cd, 0)} s`]);
+    if (s.cd != null) {
+      l.push([t('sorts.cooldown'), s.cd_trio != null && s.cd_trio !== s.cd
+        ? t('sorts.cdSoloTrio', { solo: nb(s.cd, 0), trio: nb(s.cd_trio, 0) })
+        : `${nb(s.cd, 0)} s`]);
+    }
     if (s.energie != null) l.push([t('sorts.coutEnergie'), nb(s.energie, 1)]);
     if (s.anim != null) l.push([t('sorts.animation'), `${nb(s.anim, 2)} s`]);
     for (const [k, v] of (s.effets || [])) l.push([echapper(k), echapper(v)]);
@@ -5683,8 +5757,8 @@ function dessinerDetailSort(s, f, cible, res, classeId) {
   }).join('');
 
   const tot = window.Fiche.totalCompetence(s, f, cible, _brancheChoisie);
-  const dps = (s.cd || s.anim)
-    ? tot.degats / Math.max(s.cd || 0, s.anim || 0) : null;
+  const dps = (cdDe(s) || s.anim)
+    ? tot.degats / Math.max(cdDe(s) || 0, s.anim || 0) : null;
 
   boite.innerHTML = entete + `
     ${description}
@@ -6036,7 +6110,7 @@ function dessinerBuildsClasses() {
       };
       carte.querySelector('.refCopier').onclick = () => {
         const l = biblio();
-        const n2 = l.some((x) => x.nom === etiquette) ? `${etiquette} (copie)` : etiquette;
+        const n2 = l.some((x) => x.nom === etiquette) ? nomCopieDisponible(etiquette, l) : etiquette;
         l.push({ nom: n2, etat, code: b.code, pub: false, ami: false });
         if (!ecrireBiblio(l)) return;
         dessinerBuilds();
@@ -7879,6 +7953,9 @@ window.surChangementDeLangue = function () {
     ['brut', t('sorts.cible.brut')],
     ['monstre', t('sorts.cible.monstre')],
     ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'brut');
+  remplirSelect($('sortsMode'), [
+    ['solo', t('sorts.mode.solo')],
+    ['trio', t('sorts.mode.trio')]], ($('sortsMode') || {}).value || 'solo');
   // Les listes distantes aussi : elles contiennent des libellés traduits
   // (« Charger », « Copier chez moi ») que seul un redessin met à jour.
   if (comptesDispo()) {
@@ -7988,7 +8065,10 @@ function demarrer(donnees) {
    * par defaut, on ne les depense que si quelqu'un veut vraiment savoir. */
   if ($('carteMarge')) {
     $('carteMarge').addEventListener('toggle', () => {
-      if ($('carteMarge').open && dernier) lancerAnalyseComplete(dernier);
+      // Sur un build qui ÉCHOUE, la carte montre déjà la seule chose utile
+      // (de combien redescendre) : lancer le balayage l'effaçait pour
+      // chercher des hausses avec des cibles qui ne passent même pas.
+      if ($('carteMarge').open && dernier && !_nbBaisse) lancerAnalyseComplete(dernier);
       else arreterAnalyse();
     });
   }
@@ -8135,11 +8215,15 @@ function demarrer(donnees) {
     ['brut', t('sorts.cible.brut')],
     ['monstre', t('sorts.cible.monstre')],
     ['moi', t('sorts.cible.moi')]], ($('sortsCible') || {}).value || 'brut');
+  remplirSelect($('sortsMode'), [
+    ['solo', t('sorts.mode.solo')],
+    ['trio', t('sorts.mode.trio')]], ($('sortsMode') || {}).value || 'solo');
   const redessinerFiche = () => {
     if (dernier) dessinerFiche(dernier, Number($('classe').value));
   };
   $('sortsCible').onchange = redessinerFiche;
   $('sortsArme').onchange = redessinerFiche;
+  $('sortsMode').onchange = redessinerFiche;
 
   // MES BUILDS : tri et filtres. Ils ne touchent que l'affichage, la
   // bibliotheque reste intacte.
